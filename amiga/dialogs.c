@@ -466,7 +466,7 @@ void dlg_define_name(void)
     if (run_modal(w, ends, NULL) != ID_DLGOK) break;
     latin1_utf8(sget(name), un, sizeof un); latin1_utf8(sget(ref), ur, sizeof ur);
     if (book_define_name(book, un, ur, SHEET_SELF)) break;
-    ask("OK", "%s", "A name starts with a letter and holds letters, digits, _ and . only,\nisn't a cell address, and refers to a cell, a range or a formula.");
+    ask("OK", "%s", tr("A name starts with a letter and holds letters, digits, _ and . only,\nisn't a cell address, and refers to a cell, a range or a formula."));
   }
   MUI_DisposeObject(w);
   refresh_all();
@@ -1216,7 +1216,7 @@ void dlg_series(void)
   Object *w, *dir, *step, *stop;
   Rect a = cur_sel();
   trl(dirs_en, dirs);
-  if (a.r1 == a.r2 && a.c1 == a.c2) { ask("OK", "%s", "Select the cells to fill first: the first one holds the starting number."); return; }
+  if (a.r1 == a.r2 && a.c1 == a.c2) { ask("OK", "%s", tr("Select the cells to fill first: the first one holds the starting number.")); return; }
   w = dialog_window("Series", ColGroup(2),
         Child, Label1(tr("Series in:")), Child, dir = cycle_obj(dirs, a.r1 == a.r2 ? 1 : 0),
         Child, Label1(tr("Step value:")), Child, step = str_obj("1", 20),
@@ -1226,7 +1226,7 @@ void dlg_series(void)
   if (run_modal(w, ends, NULL) == ID_DLGOK) {
     const char *sv = sget(stop);
     if (!book_series(book, cur_index(), a, (int)xget(dir, MUIA_Cycle_Active), atof(sget(step)), sv[0] ? atof(sv) : NAN))
-      ask("OK", "%s", "The first selected cell must hold a number to start the series from.");
+      ask("OK", "%s", tr("The first selected cell must hold a number to start the series from."));
     refresh_all();
   }
   MUI_DisposeObject(w);
@@ -1235,8 +1235,8 @@ void dlg_series(void)
 /* ------------------------------------------------------------------ Insert and Delete Cells */
 void dlg_insert_cells(int del)
 {
-  int r = del ? ask("Shift cells up|Shift cells left|Entire row|Entire column|Cancel", "%s", "Delete the selected cells, and move the others how?")
-              : ask("Shift cells down|Shift cells right|Entire row|Entire column|Cancel", "%s", "Insert cells here, and move the others how?");
+  int r = del ? ask("Shift cells up|Shift cells left|Entire row|Entire column|Cancel", "%s", tr("Delete the selected cells, and move the others how?"))
+              : ask("Shift cells down|Shift cells right|Entire row|Entire column|Cancel", "%s", tr("Insert cells here, and move the others how?"));
   Rect a = cur_sel();
   switch (r) {
   case 1: if (del) book_delete_cells(book, cur_index(), a, 1); else book_insert_cells(book, cur_index(), a, 1); break;
@@ -1257,7 +1257,7 @@ void dlg_unhide_sheet(void)
   int i, n = 0;
   for (i = 0; i < book->nsh && n < 64; i++) if (book->sh[i]->hidden) { utf8_to_latin1(book->sh[i]->name, (u32)strlen(book->sh[i]->name), names[n], sizeof names[n]); ptrs[n] = names[n]; idx[n++] = i; }
   ptrs[n] = NULL;
-  if (!n) { ask("OK", "%s", "No sheets are hidden."); return; }
+  if (!n) { ask("OK", "%s", tr("No sheets are hidden.")); return; }
   w = dialog_window("Unhide", VGroup, Child, TextObject, MUIA_Text_Contents, (ULONG)tr("Unhide sheet:"), End,
         Child, ListviewObject, MUIA_Listview_List, list = ListObject, InputListFrame, MUIA_List_SourceArray, (ULONG)ptrs, MUIA_List_Active, 0, End, MUIA_CycleChain, 1, End,
       End, NULL);

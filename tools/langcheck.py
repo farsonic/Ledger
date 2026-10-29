@@ -32,7 +32,7 @@ QUIET_CALLS = {'printf', 'fprintf', 'sscanf', 'strcmp', 'strncmp', 'strstr', 'st
                'MatchPattern', 'ParsePattern', 'ParsePatternNoCase', 'MatchFirst', 'AddPart', 'strcasecmp', 'strncasecmp',
                'name_is', 'ext_is', 'has_ext', 'eq', 'starts', 'ends_with', 'fputs', 'qlog_line', 'splash_log'}
 # gadget-making calls and tags that show their text as it is: a literal there needs tr()
-SHOWN = re.compile(r'(?:\b(?:Label1|Label2|LLabel1|LLabel2|Label|LLabel|QLabel|QButton|SimpleButton|KeyButton|theme_bubble|CLabel)\s*\(\s*'
+SHOWN = re.compile(r'(?:\bask\("[^"]*", "%s", |\b(?:Label1|Label2|LLabel1|LLabel2|Label|LLabel|QLabel|QButton|SimpleButton|KeyButton|theme_bubble|CLabel)\s*\(\s*'
                    r'|MUIA_(?:ShortHelp|Text_Contents|Window_Title|Frame_Title|FrameTitle)\s*,\s*\(ULONG\)\s*)"([^"]+)"')
 FMT = re.compile(r'%(?:-?[0-9]*(?:\.[0-9]+)?|\.\*|-?\*)(?:hh|h|ll|l)?[diouxXeEfgGcs%]')
 
@@ -90,6 +90,7 @@ def not_words(t):
     """true for text that isn't words for people to read"""
     s = FMT.sub(' ', t)
     if not re.search(r'[A-Za-z\300-\377]{2}', s): return True             # numbers, signs, conversions
+    if re.fullmatch(r'(\$VER: )?Ledger [0-9.]+( \(.*)?', t): return True                # the version
     if ICON.match(t) and re.search(r'\d', t): return True                  # an icon's drawing (theme.c)
     if re.fullmatch(r'[A-Z][A-Z0-9_.]*[A-Z0-9]?(\(\)?)?', t) and len(t) >= 3: return True   # FUNCTION names, IDs
     if ' ' not in t and re.fullmatch(r'[A-Za-z0-9_]+:\S+', t): return True           # PROGDIR:file, FONTS:...

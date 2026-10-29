@@ -1168,13 +1168,13 @@ static void rename_sheet(void)
     char u[96];
     latin1_utf8(t, u, sizeof u);
     if (book_rename_sheet(book, cur_index(), u)) break;
-    ask("OK", "%s", "A sheet's name can't be empty, used by another sheet,\nlonger than 31 characters or hold : \\ / ? * [ ]");
+    ask("OK", "%s", tr("A sheet's name can't be empty, used by another sheet,\nlonger than 31 characters or hold : \\ / ? * [ ]"));
   }
   refresh_all();
 }
 static void delete_sheet(void)
 {
-  if (book->nsh <= 1) { ask("OK", "%s", "A workbook must keep at least one sheet."); return; }
+  if (book->nsh <= 1) { ask("OK", "%s", tr("A workbook must keep at least one sheet.")); return; }
   if (sheet_last_row(cur_sheet()) >= 0 && ask("Delete|Cancel", "Delete the sheet \"%s\" and everything on it?", cur_sheet()->name) != 1) return;
   book_delete_sheet(book, cur_index());
   set(grid, MUIA_Grid_Book, (ULONG)book);
@@ -1192,7 +1192,7 @@ static void hide_sheet(void)
 {
   int i, visible = 0;
   for (i = 0; i < book->nsh; i++) visible += !book->sh[i]->hidden;
-  if (visible <= 1) { ask("OK", "%s", "A workbook must have at least one sheet showing."); return; }
+  if (visible <= 1) { ask("OK", "%s", tr("A workbook must have at least one sheet showing.")); return; }
   cur_sheet()->hidden = 1;
   book->dirty = 1;
   for (i = 0; i < book->nsh; i++) if (!book->sh[(book->active + i) % book->nsh]->hidden) { book->active = (book->active + i) % book->nsh; break; }
@@ -1386,7 +1386,7 @@ static void command(ULONG id)
   case ID_SAVEAS: save_as(0); break;
   case ID_SAVECSV: save_as(1); break;
   case ID_ABOUT:
-    ask("OK", "%s", "Ledger 0.3\nA spreadsheet for the Amiga (68040 or better, MUI)\n\nReads and writes Excel workbooks (.xlsx) and CSV.\nIts look follows GridCraft's; its icons are its own.");
+    ask("OK", "%s", tr("Ledger 0.3\nA spreadsheet for the Amiga (68040 or better, MUI)\n\nReads and writes Excel workbooks (.xlsx) and CSV.\nIts look follows GridCraft's; its icons are its own."));
     break;
   case ID_NEXTWIN: break;          /* (main's loop) */
   case ID_UNDO: case ID_REDO: {
@@ -1548,7 +1548,7 @@ static void command(ULONG id)
       ref_text(a.r1, a.c1, 1, 1, ref);
       if (a.r1 != a.r2 || a.c1 != a.c2) { strcat(ref, ":"); ref_text(a.r2, a.c2, 1, 1, ref + strlen(ref)); }
       snprintf(txt, sizeof txt, "'%s'!%s", cur_sheet()->name, ref);
-      if (!book_define_name(book, u, txt, SHEET_SELF)) ask("OK", "%s", "That isn't a cell address, and it can't be a name:\na name starts with a letter and holds letters, digits, _ and . only.");
+      if (!book_define_name(book, u, txt, SHEET_SELF)) ask("OK", "%s", tr("That isn't a cell address, and it can't be a name:\na name starts with a letter and holds letters, digits, _ and . only."));
     }
     set(win, MUIA_Window_ActiveObject, (ULONG)grid);
     update_controls();
@@ -1562,7 +1562,7 @@ static void command(ULONG id)
   case ID_FXENTER:
     DoMethod(grid, MUIM_Grid_SetText, (ULONG)xget(fxbar, MUIA_String_Contents), 0);
     if (DoMethod(grid, MUIM_Grid_Commit, 1)) set(win, MUIA_Window_ActiveObject, (ULONG)grid);
-    else ask("OK", "%s", "There's a problem with this formula.\nCheck its brackets, commas and quotes.");
+    else ask("OK", "%s", tr("There's a problem with this formula.\nCheck its brackets, commas and quotes."));
     update_controls();
     break;
   case ID_FXCANCEL: DoMethod(grid, MUIM_Grid_Cancel); fx_shown[0] = 1; update_controls(); set(win, MUIA_Window_ActiveObject, (ULONG)grid); break;
@@ -1661,7 +1661,7 @@ static int win_new(Book *b, const char *path)
   if (!w) {
     if (strip) MUI_DisposeObject(strip);
     if (curwin < 0 || b != wins[curwin].book) book_free(b);
-    if (curwin >= 0) { win_load(&wins[curwin]); ask("OK", "%s", "There isn't enough memory for another window."); }
+    if (curwin >= 0) { win_load(&wins[curwin]); ask("OK", "%s", tr("There isn't enough memory for another window.")); }
     return 0;
   }
   DoMethod(app, OM_ADDMEMBER, (ULONG)w);
