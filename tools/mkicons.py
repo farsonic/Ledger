@@ -368,7 +368,7 @@ def main(pkg):
         make(os.path.join(q, f + '.info'), 'document', pic_document(), WBPROJECT, deftool='Ledger', stack=65536,
              pos=(16 + (i % 6) * 88, 84 + (i // 6) * 76))
     row = 84 + ((len(docs) + 5) // 6) * 76
-    for i, (d, emblem) in enumerate((('Fonts', 'Aa'), ('TrueType', 'TT'), ('Source', '{ }'))):
+    for i, (d, emblem) in enumerate((('Fonts', 'Aa'), ('TrueType', 'TT'), ('Dict', 'abc'), ('Source', '{ }'))):
         if os.path.isdir(os.path.join(q, d)):
             make(os.path.join(q, d + '.info'), 'drawer-' + d, pic_subdrawer(emblem), WBDRAWER, pos=(16 + i * 88, row), window=(80, 60, 460, 260))
     # previews: each icon and its selected image, on Workbench grey
