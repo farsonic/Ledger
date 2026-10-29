@@ -22,6 +22,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "layout.h"
 
 /* ------------------------------------------------------------------ */
 /* the lists */
@@ -67,20 +68,22 @@ static const char *const fillnames[] = { "No Fill", "Yellow", "Light Yellow", "L
 static const ULONG fillvals[] = { 0xFF000000, 0xFFFF00, 0xFFF2CC, 0xE2EFDA, 0x70AD47, 0xDDEBF7, 0x4472C4, 0xFCE4D6, 0xF4B084,
                                   0xF2F2F2, 0xBFBFBF, 0xE4DFEC, 0x203764, 0x000000, COLOR_MORE };
 static const char *const borders[] = { "Bottom Border", "Top Border", "Left Border", "Right Border", "No Border", "All Borders", "Outside Borders",
-                                       "Thick Outside Borders", "Bottom Double Border", "Thick Bottom Border", "Top and Bottom Border" };
+                                       "Thick Outside Borders", "Bottom Double Border", "Thick Bottom Border", "Top and Bottom Border",
+                                       "Draw Border", "Draw Border Grid", "Erase Border" };
 static const char *const merges[] = { "Merge & Centre", "Merge Across", "Merge Cells", "Unmerge Cells" };
 static const char *const numfmts[] = { "General", "Number", "Currency", "Accounting", "Short Date", "Long Date", "Time", "Percentage",
                                        "Fraction", "Scientific", "Text", "More Number Formats..." };
 static const char *const inserts[] = { "Insert Cells...", "Insert Sheet Rows", "Insert Sheet Columns", "Insert Sheet" };
 static const char *const deletes[] = { "Delete Cells...", "Delete Sheet Rows", "Delete Sheet Columns", "Delete Sheet" };
 static const char *const formats[] = { "Row Height...", "AutoFit Row Height", "Column Width...", "AutoFit Column Width", "Default Width...",
-                                       "Hide Rows", "Hide Columns", "Unhide Rows", "Unhide Columns", "Rename Sheet", "Tab Colour...", "Format Cells..." };
+                                       "Hide Rows", "Hide Columns", "Unhide Rows", "Unhide Columns", "Rename Sheet", "Tab Colour...", "Format Cells...",
+                                       "Hide Sheet", "Unhide Sheet...", "Move or Copy Sheet..." };
 static const char *const autosums[] = { "Sum", "Average", "Count Numbers", "Max", "Min", "More Functions..." };
-static const char *const fills[] = { "Down", "Right", "Up", "Left", "Series..." };
-static const char *const clears[] = { "Clear All", "Clear Formats", "Clear Contents" };
+static const char *const fills[] = { "Down", "Right", "Up", "Left", "Series...", "Justify" };
+static const char *const clears[] = { "Clear All", "Clear Formats", "Clear Contents", "Clear Notes", "Clear Hyperlinks" };
 static const char *const sorts[] = { "Sort A to Z", "Sort Z to A", "Custom Sort...", "Filter", "Clear Filter", "Reapply" };
-static const char *const finds[] = { "Find...", "Replace...", "Go To..." };
-static const char *const pastes[] = { "Paste", "Paste Values", "Paste Formulas", "Paste Formatting", "Transpose" };
+static const char *const finds[] = { "Find...", "Replace...", "Go To...", "Go To Special..." };
+static const char *const pastes[] = { "Paste", "Paste Values", "Paste Formulas", "Paste Formatting", "Transpose", "Paste Special..." };
 static const char *const symbols[] = { "\251  Copyright", "\256  Registered", "\247  Section", "\266  Pilcrow", "\243  Pound", "\244  Currency",
                                        "\245  Yen", "\260  Degree", "\261  Plus or minus", "\327  Times", "\367  Divide", "\275  One half",
                                        "\274  One quarter", "\276  Three quarters", "\265  Micro", "\267  Middle dot" };
@@ -132,6 +135,8 @@ static const List lists[] = {
   { fn_date, N(fn_date), PL_TEXT, NULL }, { fn_lookup, N(fn_lookup), PL_TEXT, NULL }, { fn_math, N(fn_math), PL_TEXT, NULL },
   { fn_more, N(fn_more), PL_TEXT, NULL }, { cellstyles, N(cellstyles), PL_CELLSTYLE, NULL }, { condfmts, N(condfmts), PL_TEXT, NULL },
 };
+/* a list by number: Ledger's own here, or (from LXL_FIRST) layout.h's */
+static const List *list_of(int k) { return k >= LXL_FIRST && k < LXL_LAST ? (const List *)(const void *)&lx_lists[k - LXL_FIRST] : &lists[k]; }
 /* each cell style's look: fill, font colour, bold, a line under it (0 none, 1 thin, 2 thick, 3 double
    over a thin top), its size in points (0 as it is) */
 static const struct { ULONG fill, color; u8 bold, line, size; } stylelook[] = {
@@ -194,10 +199,13 @@ static const Item h_font[] = {
   { K_FIELD, S_SMALL, 0, L_SIZES, NULL, ID_SIZEDD, 0, 0, 0, 34, "Font size" },
   { K_BUTTON, S_ICON, IC_GROW, 0, NULL, ID_GROW, 0, 0, 0, 0, "Increase font size" },
   { K_BUTTON, S_ICON, IC_SHRINK, 0, NULL, ID_SHRINK, 0, 0, 0, 0, "Decrease font size" },
+  { K_BUTTON, S_ICON, IC_SUPER, 0, NULL, ID_LX_SUPER, 0, 0, 0, 0, "Superscript" },
+  { K_BUTTON, S_ICON, IC_SUB, 0, NULL, ID_LX_SUB, 0, 0, 0, 0, "Subscript" },
   { K_BUTTON, S_ICON, IC_BOLD, 0, NULL, ID_BOLD, RB_BOLD, 0, F_ROW1, 0, "Bold (Amiga-B)" },
   { K_BUTTON, S_ICON, IC_ITALIC, 0, NULL, ID_ITALIC, RB_ITALIC, 0, F_ROW1, 0, "Italic (Amiga-I)" },
   { K_BUTTON, S_ICON, IC_UNDERLINE, 0, NULL, ID_UNDERLINE, RB_UNDERLINE, 0, F_ROW1, 0, "Underline (Amiga-U)" },
   { K_BUTTON, S_ICON, IC_STRIKE, 0, NULL, ID_STRIKE, RB_STRIKE, 0, F_ROW1, 0, "Strikethrough" },
+  { K_BUTTON, S_ICON, IC_DBLUNDER, 0, NULL, ID_LX_DBLUNDER, 0, 0, F_ROW1, 0, "Double underline" },
   { K_DROP, S_ICON, IC_TBORDERS, L_BORDERS, NULL, ID_BORDERDD, 0, 0, F_ROW1, 0, "Borders" },
   { K_DROP, S_ICON, IC_FILLCOLOR, L_FILLS, NULL, ID_FILLCOLOR, 0, 0, F_ROW1, 0, "Fill colour" },
   { K_DROP, S_ICON, IC_FONTCOLOR, L_COLORS, NULL, ID_FONTCOLOR, 0, 0, F_ROW1, 0, "Font colour" },
@@ -207,6 +215,7 @@ static const Item h_align[] = {
   { K_BUTTON, S_ICON, IC_ALIGNMID, 0, NULL, ID_AMIDDLE, RB_AMIDDLE, 0, 0, 0, "Middle align" },
   { K_BUTTON, S_ICON, IC_ALIGNBOT, 0, NULL, ID_ABOTTOM, RB_ABOTTOM, 0, 0, 0, "Bottom align" },
   { K_BUTTON, S_ICON, IC_WRAPTEXT, 0, NULL, ID_WRAP, RB_WRAP, 0, 0, 0, "Wrap text" },
+  { K_DROP, S_ICON, IC_TEXTORIENT, LXL_TEXTORIENT, NULL, ID_LX_TEXTORIENTDD, 0, 0, 0, 0, "Orientation: text at an angle or upright" },
   { K_BUTTON, S_ICON, IC_LEFT, 0, NULL, ID_LEFT, RB_ALEFT, 0, F_ROW1, 0, "Align left" },
   { K_BUTTON, S_ICON, IC_CENTER, 0, NULL, ID_CENTER, RB_ACENTER, 0, F_ROW1, 0, "Centre" },
   { K_BUTTON, S_ICON, IC_RIGHT, 0, NULL, ID_RIGHT, RB_ARIGHT, 0, F_ROW1, 0, "Align right" },
@@ -217,6 +226,7 @@ static const Item h_align[] = {
 static const Item h_num[] = {
   { K_FIELD, S_SMALL, 0, L_NUMFMTS, NULL, ID_NUMFMTDD, 0, 0, 0, 104, "Number format" },
   { K_BUTTON, S_ICON, IC_CURRENCY, 0, NULL, ID_CURRENCY, 0, 0, F_ROW1, 0, "Currency format" },
+  { K_BUTTON, S_ICON, IC_ACCOUNTING, 0, NULL, ID_LX_ACCOUNTING, 0, 0, F_ROW1, 0, "Accounting number format" },
   { K_BUTTON, S_ICON, IC_PERCENT, 0, NULL, ID_PERCENT, 0, 0, F_ROW1, 0, "Percent style" },
   { K_BUTTON, S_ICON, IC_COMMA, 0, NULL, ID_COMMA, 0, 0, F_ROW1, 0, "Comma style: thousands separators" },
   { K_BUTTON, S_ICON, IC_INCDEC, 0, NULL, ID_INCDEC, 0, 0, F_ROW1, 0, "Increase decimal" },
@@ -225,6 +235,7 @@ static const Item h_num[] = {
 static const Item h_styles[] = {
   { K_DROP, S_LARGE, IC_CONDFMT, L_CONDFMTS, "Conditional Formatting", ID_CONDDD, 0, 0, 0, 0, "Conditional formatting" },
   { K_DROP, S_LARGE, IC_CELLSTYLES, L_CELLSTYLES, "Cell Styles", ID_CELLSTYLEDD, 0, 0, 0, 0, "Cell styles" },
+  { K_DROP, S_SMALL, IC_NEWSTYLE, LXL_MYSTYLES, "My Styles", ID_LX_MYSTYLEDD, 0, 0, 0, 0, "Your own cell styles, and New Cell Style: the active cell's look under a name" },
 };
 static const Item h_cells[] = {
   { K_DROP, S_SMALL, IC_INSERTCELLS, L_INSERTS, "Insert", ID_INSERTDD, 0, 0, 0, 0, "Insert cells, rows, columns or a sheet" },
@@ -261,29 +272,58 @@ static const Item i_names[] = {
 static const Item i_links[] = {
   { K_BUTTON, S_LARGE, IC_LINK, 0, "Link", ID_LINK, 0, 0, 0, 0, "A link to a web page, a mail address or a place in the workbook" },
   { K_BUTTON, S_LARGE, IC_COMMENT, 0, "Note", ID_NOTENEW, 0, 0, 0, 0, "A note on the active cell" },
+  { K_BUTTON, S_LARGE, IC_SHOWCOMMENTS, 0, "Comment", ID_LX_COMMENTNEW, 0, 0, 0, 0, "A comment on the active cell: a conversation others can reply to" },
+};
+static const Item i_text[] = {
+  { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
 };
 static const Group insert[] = { { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Functions", G_COLS, i_fn, N(i_fn) },
-                                { "Links", G_COLS, i_links, N(i_links) }, { "Names", G_COLS, i_names, N(i_names) } };
-/* Page Layout (the printing settings aren't here: Ledger doesn't print) */
+                                { "Links", G_COLS, i_links, N(i_links) }, { "Names", G_COLS, i_names, N(i_names) }, { "Text", G_COLS, i_text, N(i_text) } };
+/* Page Layout: themes, the page setup (Ledger doesn't print, but PDF export, Page Break Preview and
+   Excel use it), scaling, the sheet options, and Ledger's sheet tools */
+static const Item p_themes[] = {
+  { K_DROP, S_LARGE, IC_THEMES, LXL_THEMES, "Themes", ID_LX_THEMEDD, 0, 0, 0, 0, "Themes: a set of colours and fonts for the whole workbook" },
+  { K_DROP, S_SMALL, IC_COLORSETS, LXL_THEMECOLORS, "Colours", ID_LX_COLORSDD, 0, 0, 0, 0, "Theme colours: the palette the colour lists offer" },
+  { K_DROP, S_SMALL, IC_THEMEFONTS, LXL_THEMEFONTS, "Fonts", ID_LX_FONTSDD, 0, 0, 0, 0, "Theme fonts: the headings' and the cells' font" },
+};
+static const Item p_setup[] = {
+  { K_DROP, S_LARGE, IC_MARGINS, LXL_MARGINS, "Margins", ID_LX_MARGINSDD, 0, 0, 0, 0, "Margins: the space round the cells on each page" },
+  { K_DROP, S_LARGE, IC_ORIENT, LXL_ORIENT, "Orientation", ID_LX_ORIENTDD, 0, 0, 0, 0, "Pages upright (portrait) or on their side (landscape)" },
+  { K_DROP, S_LARGE, IC_SIZE, LXL_PAPERS, "Size", ID_LX_SIZEDD, 0, 0, 0, 0, "Paper size" },
+  { K_DROP, S_LARGE, IC_PRINTAREA, LXL_AREA, "Print Area", ID_LX_AREADD, 0, 0, 0, 0, "The cells that make the pages" },
+  { K_DROP, S_LARGE, IC_BREAKS, LXL_BREAKS, "Breaks", ID_LX_BREAKSDD, 0, 0, 0, 0, "Page breaks above and left of the active cell" },
+  { K_BUTTON, S_LARGE, IC_PRINTTITLES, 0, "Print Titles", ID_LX_TITLES, 0, 0, 0, 0, "Rows and columns repeated on every page" },
+  { K_BUTTON, S_LARGE, IC_PAGESETUPDLG, 0, "Page Setup", ID_LX_PAGESETUP, 0, 0, 0, 0, "Page Setup: page, margins, header and footer, sheet" },
+};
+static const Item p_fit[] = {
+  { K_DROP, S_SMALL, IC_FITWIDTH, LXL_FITW, "Width", ID_LX_FITWDD, 0, 0, 0, 0, "Fit the pages to this many pages wide" },
+  { K_DROP, S_SMALL, IC_FITHEIGHT, LXL_FITH, "Height", ID_LX_FITHDD, 0, 0, 0, 0, "Fit the pages to this many pages tall" },
+  { K_DROP, S_SMALL, IC_ZOOM, LXL_SCALE, "Scale", ID_LX_SCALEDD, 0, 0, 0, 0, "Make the pages' contents bigger or smaller" },
+};
 static const Item p_opts[] = {
-  { K_BUTTON, S_SMALL, 0, 0, "Gridlines", ID_GRIDLINES, RB_GRIDLINES, 0, F_CHECK, 0, "Show the gridlines between cells" },
-  { K_BUTTON, S_SMALL, 0, 0, "Headings", ID_HEADINGS, RB_HEADINGS, 0, F_CHECK, 0, "Show the row numbers and column letters" },
-  { K_BUTTON, S_SMALL, 0, 0, "Zero Values", ID_SHOWZEROS, RB_ZEROS, 0, F_CHECK, 0, "Show zeros (else cells that are 0 look empty)" },
+  { K_LABEL, S_SMALL, 0, 0, "Gridlines", 0, 0, 0, 0, 0, NULL },
+  { K_BUTTON, S_SMALL, 0, 0, "View", ID_LX_VIEWGRID, LXB_VIEWGRID, 0, F_CHECK, 0, "Show the gridlines between cells" },
+  { K_BUTTON, S_SMALL, 0, 0, "Print", ID_LX_PRINTGRID, LXB_PRINTGRID, 0, F_CHECK, 0, "Gridlines on the pages (PDF export)" },
+  { K_LABEL, S_SMALL, 0, 0, "Headings", 0, 0, 0, F_NEWCOL, 0, NULL },
+  { K_BUTTON, S_SMALL, 0, 0, "View", ID_LX_VIEWHEAD, LXB_VIEWHEAD, 0, F_CHECK, 0, "Show the row numbers and column letters" },
+  { K_BUTTON, S_SMALL, 0, 0, "Print", ID_LX_PRINTHEAD, LXB_PRINTHEAD, 0, F_CHECK, 0, "Row numbers and column letters on the pages (PDF export)" },
+  { K_BUTTON, S_SMALL, 0, 0, "Zero Values", ID_SHOWZEROS, RB_ZEROS, 0, F_CHECK | F_NEWCOL, 0, "Show zeros (else cells that are 0 look empty)" },
 };
 static const Item p_sheet[] = {
   { K_BUTTON, S_LARGE, IC_RENAME, 0, "Rename", ID_RENAMESHEET, 0, 0, 0, 0, "Rename this sheet" },
   { K_DROP, S_LARGE, IC_TABCOLOR, L_TABCOLORS, "Tab Colour", ID_TABCOLORDD, 0, 0, 0, 0, "The colour of this sheet's tab" },
   { K_BUTTON, S_SMALL, IC_HIDE, 0, "Hide", ID_HIDESHEET, 0, 0, 0, 0, "Hide this sheet" },
   { K_BUTTON, S_SMALL, IC_UNHIDE, 0, "Unhide", ID_UNHIDESHEET, 0, 0, 0, 0, "Show a hidden sheet" },
-  { K_BUTTON, S_SMALL, IC_COPY, 0, "Duplicate", ID_DUPSHEET, 0, 0, 0, 0, "A copy of this sheet" },
+  { K_BUTTON, S_SMALL, IC_COPY, 0, "Move or Copy", ID_LX_MOVECOPY, 0, 0, 0, 0, "Move this sheet, or copy it, within the workbook or to another one" },
 };
 static const Item p_arrange[] = {
   { K_BUTTON, S_SMALL, IC_ARROWLEFT, 0, "Move Left", ID_MOVESHEETL, 0, 0, 0, 0, "Move this sheet one place left" },
   { K_BUTTON, S_SMALL, IC_ARROWRIGHT, 0, "Move Right", ID_MOVESHEETR, 0, 0, 0, 0, "Move this sheet one place right" },
   { K_BUTTON, S_SMALL, IC_DELETECELLS, 0, "Delete", ID_DELSHEET, 0, 0, 0, 0, "Delete this sheet" },
 };
-static const Group playout[] = { { "Sheet Options", G_COLS, p_opts, N(p_opts) }, { "Sheet", G_COLS, p_sheet, N(p_sheet) },
-                                 { "Arrange", G_COLS, p_arrange, N(p_arrange) } };
+static const Group playout[] = { { "Themes", G_COLS, p_themes, N(p_themes) }, { "Page Setup", G_COLS, p_setup, N(p_setup) },
+                                 { "Scale to Fit", G_COLS, p_fit, N(p_fit) }, { "Sheet Options", G_COLS, p_opts, N(p_opts) },
+                                 { "Sheet", G_COLS, p_sheet, N(p_sheet) }, { "Arrange", G_COLS, p_arrange, N(p_arrange) } };
 /* Formulas */
 static const Item f_lib[] = {
   { K_BUTTON, S_LARGE, IC_FX, 0, "Insert Function", ID_FUNCTION, 0, 0, 0, 0, "Insert a function (Shift-F3)" },
@@ -295,17 +335,27 @@ static const Item f_lib[] = {
   { K_DROP, S_SMALL, IC_LOOKUP, L_FNLOOKUP, "Lookup & Reference", ID_FN_LOOKUP, 0, 0, 0, 0, "Lookup and reference functions" },
   { K_DROP, S_SMALL, IC_MATHFN, L_FNMATH, "Math & Trig", ID_FN_MATH, 0, 0, 0, 0, "Maths and trigonometry functions" },
   { K_DROP, S_SMALL, IC_MOREFN, L_FNMORE, "More Functions", ID_FN_MORE, 0, 0, F_NEWCOL, 0, "Statistical and information functions" },
+  { K_DROP, S_SMALL, IC_RECENTFN, LXL_RECENT, "Recently Used", ID_LX_RECENTDD, 0, 0, 0, 0, "The functions you used last" },
 };
 static const Item f_names[] = {
   { K_BUTTON, S_LARGE, IC_NAMES, 0, "Name Manager", ID_NAMES, 0, 0, 0, 0, "The workbook's names: add, change, delete" },
   { K_BUTTON, S_SMALL, IC_DEFNAME, 0, "Define Name", ID_DEFNAME, 0, 0, 0, 0, "Give the selection a name to use in formulas" },
+  { K_DROP, S_SMALL, IC_USEINFORMULA, LXL_USENAMES, "Use in Formula", ID_LX_USENAMEDD, 0, 0, 0, 0, "Type one of the workbook's names into the formula" },
+  { K_BUTTON, S_SMALL, IC_NAMESFROMSEL, 0, "Create from Selection", ID_LX_CREATENAMES, 0, 0, 0, 0, "Name rows or columns after the labels at their edge" },
 };
 static const Item f_audit[] = {
-  { K_BUTTON, S_LARGE, IC_SHOWFORMULAS, 0, "Show Formulas", ID_SHOWFORMULAS, RB_FORMULAS, 0, 0, 0, "Show formulas in the cells instead of their results (Ctrl-`)" },
+  { K_BUTTON, S_SMALL, IC_TRACEPREC, 0, "Trace Precedents", ID_LX_TRACEPREC, 0, 0, 0, 0, "Arrows from the cells the active cell's formula uses" },
+  { K_BUTTON, S_SMALL, IC_TRACEDEP, 0, "Trace Dependents", ID_LX_TRACEDEP, 0, 0, 0, 0, "Arrows to the cells whose formulas use the active cell" },
+  { K_DROP, S_SMALL, IC_REMOVEARROWS, LXL_REMOVE, "Remove Arrows", ID_LX_REMOVEDD, 0, LXB_ARROWS, F_SPLIT, 0, "Take the tracer arrows away" },
+  { K_BUTTON, S_SMALL, IC_SHOWFORMULAS, 0, "Show Formulas", ID_SHOWFORMULAS, RB_FORMULAS, 0, F_NEWCOL, 0, "Show formulas in the cells instead of their results (Ctrl-`)" },
+  { K_BUTTON, S_SMALL, IC_ERRCHECK, 0, "Error Checking", ID_LX_ERRCHECK, 0, 0, 0, 0, "Go through the cells showing errors" },
+  { K_BUTTON, S_SMALL, IC_EVALUATE, 0, "Evaluate Formula", ID_LX_EVALUATE, 0, LXB_HASFORMULA, 0, 0, "Work out the active cell's formula one step at a time" },
+  { K_BUTTON, S_LARGE, IC_WATCH, 0, "Watch Window", ID_LX_WATCH, 0, 0, 0, 0, "Keep an eye on chosen cells' values in a window of their own" },
 };
 static const Item f_calc[] = {
-  { K_BUTTON, S_LARGE, IC_CALCNOW, 0, "Calculate Now", ID_CALCNOW, 0, 0, 0, 0, "Work out every formula again (F9)" },
-  { K_DROP, S_SMALL, IC_CALCOPTS, L_CALCS, "Options", ID_CALCDD, 0, 0, 0, 0, "Calculation options: automatic or manual" },
+  { K_DROP, S_LARGE, IC_CALCOPTS, LXL_CALCOPTS, "Calculation Options", ID_LX_CALCOPTDD, 0, 0, 0, 0, "Calculation: automatic, or manual (F9)" },
+  { K_BUTTON, S_SMALL, IC_CALCNOW, 0, "Calculate Now", ID_CALCNOW, 0, 0, 0, 0, "Work out every formula again (F9)" },
+  { K_BUTTON, S_SMALL, IC_CALCSHEET, 0, "Calculate Sheet", ID_LX_CALCSHEET, 0, 0, 0, 0, "Work out this sheet's formulas again (Shift-F9)" },
 };
 static const Group formulas[] = { { "Function Library", G_COLS, f_lib, N(f_lib) }, { "Defined Names", G_COLS, f_names, N(f_names) },
                                   { "Formula Auditing", G_COLS, f_audit, N(f_audit) }, { "Calculation", G_COLS, f_calc, N(f_calc) } };
@@ -329,7 +379,12 @@ static const Group data[] = { { "Get Data", G_COLS, d_get, N(d_get) }, { "Sort",
                               { "Data Tools", G_COLS, d_tools, N(d_tools) } };
 /* Review */
 static const Item r_proof[] = {
-  { K_BUTTON, S_LARGE, IC_STATS, 0, "Workbook Statistics", ID_STATS, 0, 0, 0, 0, "Counts of sheets, cells, formulas and names" },
+  { K_BUTTON, S_LARGE, IC_SPELLING, 0, "Spelling", ID_LX_SPELLING, 0, 0, 0, 0, "Check the spelling of the text in the cells (F7)" },
+  { K_BUTTON, S_SMALL, IC_THESAURUS, 0, "Thesaurus", ID_LX_THESAURUS, 0, 0, 0, 0, "Words related to the one in the active cell" },
+  { K_BUTTON, S_SMALL, IC_STATS, 0, "Workbook Statistics", ID_STATS, 0, 0, 0, 0, "Counts of sheets, cells, formulas and names" },
+};
+static const Item r_access[] = {
+  { K_BUTTON, S_LARGE, IC_ACCESS, 0, "Check Accessibility", ID_LX_ACCESS, 0, 0, 0, 0, "Things that make the workbook hard to read for people with disabilities" },
 };
 static const Item r_find[] = {
   { K_BUTTON, S_LARGE, IC_FIND, 0, "Find", ID_FIND, 0, 0, 0, 0, "Find (Amiga-F)" },
@@ -341,30 +396,54 @@ static const Item r_notes[] = {
   { K_BUTTON, S_SMALL, IC_DELETE, 0, "Delete", ID_NOTEDEL, 0, RB_HASNOTE, 0, 0, "Take the active cell's note off" },
   { K_BUTTON, S_SMALL, IC_PREV, 0, "Previous", ID_NOTEPREV, 0, 0, 0, 0, "Go to the note before this one" },
   { K_BUTTON, S_SMALL, IC_NEXT, 0, "Next", ID_NOTENEXT, 0, 0, 0, 0, "Go to the next note" },
-  { K_BUTTON, S_LARGE, IC_SHOWCOMMENTS, 0, "Show All Notes", ID_NOTESHOW, RB_NOTES, 0, 0, 0, "Show every note beside its cell" },
+  { K_BUTTON, S_SMALL, IC_SHOWNOTE, 0, "Show/Hide Note", ID_LX_NOTESHOWHIDE, LXB_NOTESHOWN, RB_HASNOTE, F_NEWCOL, 0, "Keep the active cell's note shown, or hide it again" },
+  { K_BUTTON, S_SMALL, IC_SHOWCOMMENTS, 0, "Show All Notes", ID_NOTESHOW, RB_NOTES, 0, 0, 0, "Show every note beside its cell" },
+  { K_BUTTON, S_SMALL, IC_COMMENT, 0, "Convert to Comments", ID_LX_CONVERTNOTES, 0, 0, 0, 0, "Turn the workbook's notes into comments that can have replies" },
 };
-static const Group review[] = { { "Proofing", G_COLS, r_proof, N(r_proof) }, { "Notes", G_COLS, r_notes, N(r_notes) }, { "Find", G_COLS, r_find, N(r_find) } };
+static const Item r_comments[] = {
+  { K_BUTTON, S_LARGE, IC_COMMENT, 0, "New Comment", ID_LX_COMMENTNEW, 0, 0, 0, 0, "Start a conversation on the active cell, or reply to its comment" },
+  { K_BUTTON, S_SMALL, IC_DELETE, 0, "Delete", ID_LX_COMMENTDEL, 0, LXB_COMMENTS, 0, 0, "Delete the active cell's comment and its replies" },
+  { K_BUTTON, S_SMALL, IC_PREV, 0, "Previous", ID_LX_COMMENTPREV, 0, 0, 0, 0, "Go to the comment before this one" },
+  { K_BUTTON, S_SMALL, IC_NEXT, 0, "Next", ID_LX_COMMENTNEXT, 0, 0, 0, 0, "Go to the next comment" },
+  { K_BUTTON, S_LARGE, IC_SHOWCOMMENTS, 0, "Show Comments", ID_LX_COMMENTSHOW, 0, 0, 0, 0, "Every comment of the workbook with its replies" },
+};
+static const Group review[] = { { "Proofing", G_COLS, r_proof, N(r_proof) }, { "Accessibility", G_COLS, r_access, N(r_access) },
+                                { "Comments", G_COLS, r_comments, N(r_comments) }, { "Notes", G_COLS, r_notes, N(r_notes) }, { "Find", G_COLS, r_find, N(r_find) } };
 /* View */
+static const Item v_views[] = {
+  { K_BUTTON, S_LARGE, IC_NORMALVIEW, 0, "Normal", ID_LX_NORMAL, LXB_NORMAL, 0, 0, 0, "The sheet as cells, without pages" },
+  { K_BUTTON, S_LARGE, IC_PBPVIEW, 0, "Page Break Preview", ID_LX_PBP, LXB_PBP, 0, 0, 0, "Where the pages break: drag the blue lines to move the breaks" },
+  { K_BUTTON, S_LARGE, IC_PRINTLAYOUT, 0, "Page Layout", ID_LX_PAGELAYOUT, LXB_PAGELAYOUT, 0, 0, 0, "The sheet as pages, with their margins, headers and footers" },
+  { K_BUTTON, S_LARGE, IC_CUSTOMVIEWS, 0, "Custom Views", ID_LX_CUSTOMVIEWS, 0, 0, 0, 0, "Keep the way the workbook is shown under a name, to come back to" },
+};
 static const Item v_show[] = {
+  { K_BUTTON, S_SMALL, 0, 0, "Ruler", ID_LX_RULER, LXB_RULER, 0, F_CHECK, 0, "Show the rulers in Page Layout view" },
   { K_BUTTON, S_SMALL, 0, 0, "Formula Bar", ID_FORMULABAR, RB_FORMULABAR, 0, F_CHECK, 0, "Show the formula bar" },
   { K_BUTTON, S_SMALL, 0, 0, "Gridlines", ID_GRIDLINES, RB_GRIDLINES, 0, F_CHECK, 0, "Show the gridlines between cells" },
-  { K_BUTTON, S_SMALL, 0, 0, "Headings", ID_HEADINGS, RB_HEADINGS, 0, F_CHECK, 0, "Show the row numbers and column letters" },
+  { K_BUTTON, S_SMALL, 0, 0, "Headings", ID_HEADINGS, RB_HEADINGS, 0, F_CHECK | F_NEWCOL, 0, "Show the row numbers and column letters" },
 };
 static const Item v_zoom[] = {
-  { K_DROP, S_LARGE, IC_ZOOM, L_ZOOMS, "Zoom", ID_ZOOMDD, 0, 0, 0, 0, "Zoom" },
+  { K_DROP, S_LARGE, IC_ZOOM, L_ZOOMS, "Zoom", ID_ZOOMDD, 0, 0, F_SPLIT, 0, "Zoom" },
   { K_BUTTON, S_LARGE, IC_ZOOM100, 0, "100%", ID_ZOOM100, 0, 0, 0, 0, "Back to 100%" },
   { K_BUTTON, S_LARGE, IC_ZOOMSEL, 0, "Zoom to Selection", ID_ZOOMSEL, 0, 0, 0, 0, "Zoom so the selection fills the window" },
 };
 static const Item v_window[] = {
-  { K_DROP, S_LARGE, IC_FREEZE, L_FREEZES, "Freeze Panes", ID_FREEZEDD, RB_FROZEN, 0, 0, 0, "Keep rows and columns in sight as the rest scrolls" },
-  { K_BUTTON, S_SMALL, IC_NEW, 0, "New Window", ID_NEW, 0, 0, F_NEWCOL, 0, "A new workbook in a window of its own" },
-  { K_BUTTON, S_SMALL, IC_NEXT, 0, "Switch Windows", ID_NEXTWIN, 0, 0, 0, 0, "The next workbook window (Amiga-`)" },
+  { K_BUTTON, S_SMALL, IC_NEWWINDOW, 0, "New Window", ID_LX_NEWWIN, 0, 0, 0, 0, "Another window on this workbook" },
+  { K_BUTTON, S_SMALL, IC_ARRANGE, 0, "Arrange All", ID_LX_ARRANGE, 0, 0, 0, 0, "Put the workbook windows side by side, one above another, or tiled" },
+  { K_DROP, S_SMALL, IC_FREEZE, L_FREEZES, "Freeze Panes", ID_FREEZEDD, RB_FROZEN, 0, 0, 0, "Keep rows and columns in sight as the rest scrolls" },
+  { K_BUTTON, S_SMALL, IC_SPLIT, 0, "Split", ID_LX_SPLIT, LXB_SPLIT, 0, F_NEWCOL, 0, "Split the window at the active cell into panes" },
+  { K_BUTTON, S_SMALL, IC_HIDE, 0, "Hide", ID_LX_HIDEWIN, 0, 0, 0, 0, "Hide this workbook window" },
+  { K_BUTTON, S_SMALL, IC_UNHIDE, 0, "Unhide", ID_LX_UNHIDEWIN, 0, 0, 0, 0, "Show a hidden workbook window" },
+  { K_BUTTON, S_SMALL, IC_SIDEBYSIDE, 0, "View Side by Side", ID_LX_SIDEBYSIDE, LXB_SIDEBYSIDE, LXB_MANYWIN, F_NEWCOL, 0, "Two workbook windows next to each other, to compare them" },
+  { K_BUTTON, S_SMALL, IC_SYNCSCROLL, 0, "Synchronous Scrolling", ID_LX_SYNCSCROLL, LXB_SYNC, LXB_SIDEBYSIDE, 0, 0, "Scroll both windows together" },
+  { K_BUTTON, S_SMALL, IC_RESETWIN, 0, "Reset Window Position", ID_LX_RESETWIN, 0, LXB_SIDEBYSIDE, 0, 0, "Put the windows side by side again" },
+  { K_DROP, S_LARGE, IC_SWITCHWIN, LXL_SWITCH, "Switch Windows", ID_LX_SWITCHDD, 0, 0, 0, 0, "Go to another workbook window (Amiga-`)" },
 };
 static const Item v_theme[] = {
   { K_BUTTON, S_LARGE, IC_DARK, 0, "Dark Mode", ID_DARKUI, RB_DARK, 0, 0, 0, "Ledger in dark colours, easier on the eyes at night" },
 };
-static const Group view[] = { { "Show", G_COLS, v_show, N(v_show) }, { "Zoom", G_COLS, v_zoom, N(v_zoom) },
-                              { "Window", G_COLS, v_window, N(v_window) }, { "Theme", G_COLS, v_theme, N(v_theme) } };
+static const Group view[] = { { "Workbook Views", G_COLS, v_views, N(v_views) }, { "Show", G_COLS, v_show, N(v_show) },
+                              { "Zoom", G_COLS, v_zoom, N(v_zoom) }, { "Window", G_COLS, v_window, N(v_window) }, { "Theme", G_COLS, v_theme, N(v_theme) } };
 
 /* the longer explanations in the help bubbles; tools not listed show their Item help */
 static const struct { UWORD id; const char *tip; } tips[] = {
@@ -432,7 +511,7 @@ const char *ribbon_entry(ULONG id, LONG v)
       for (i = 0; i < tabs[t].groups[g].n; i++) {
         const Item *it = &tabs[t].groups[g].items[i];
         if (it->id == id && it->list) {
-          const List *l = &lists[it->list];
+          const List *l = list_of(it->list);
           if (l->kind == PL_FONTS) return ribbon_font_name((int)v);
           return v >= 0 && v < l->n ? l->labels[v] : NULL;
         }
@@ -465,6 +544,7 @@ struct RData {
   List glist; const char *glabels[33]; char gbuf[32][48]; int gidx[32];
   const Item *popdirect;         /* the tool a list is open for when it isn't a placed item */
   const Item *defer;             /* a tool's list to open once the group's list has closed */
+  ULONG lxhash;                  /* layout.h's check states when last drawn */
 };
 #define MUIM_Ribbon_Open (QTAG + 0x311)   /* (internal) the deferred list opened */
 static struct MUI_CustomClass *rcls, *pcls;
@@ -475,7 +555,7 @@ static int rowh(void) { return fh() + 7; }
 static int bodyh(void) { return 3 * rowh() + 4; }
 static int caph(void) { return fh() + 3; }
 
-static int bit_on(struct RData *d, int b) { return (d->st.on & RBIT(b)) != 0; }
+static int bit_on(struct RData *d, int b) { return b >= LXB_FIRST ? lx_bit(b) : (d->st.on & RBIT(b)) != 0; }
 static int item_on(struct RData *d, const Item *it) { return it->st && bit_on(d, it->st); }
 static int item_enabled(struct RData *d, const Item *it) { return !it->en || bit_on(d, it->en); }
 
@@ -812,7 +892,7 @@ static void open_list(struct RData *d, Object *obj, int k)
   const Item *it = nth_item(d, k, NULL);
   if (!it) return;
   d->popgroup = -1; d->popdirect = NULL;
-  open_list_l(d, obj, k, &lists[it->list]);
+  open_list_l(d, obj, k, list_of(it->list));
 }
 /* a collapsed group's list: its tools by name */
 static void open_group(struct RData *d, Object *obj, int k)
@@ -1058,6 +1138,8 @@ static ULONG split_id(UWORD id)
   case ID_PASTEDD: return ID_PASTE;
   case ID_MERGEDD: return ID_MERGECENTER;
   case ID_AUTOSUMDD: return ID_AUTOSUM;
+  case ID_LX_REMOVEDD: return ID_LX_REMOVEARROWS;
+  case ID_ZOOMDD: return ID_LX_ZOOMDLG;
   }
   return id;
 }
@@ -1162,6 +1244,7 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
     d = INST_DATA(cl, obj);
     while ((t = NextTagItem(&tags)))
       if (t->ti_Tag == MUIA_Ribbon_Tab && t->ti_Data < NTABS) { d->tab = (int)t->ti_Data; if (_win(obj)) MUI_Redraw(obj, MADF_DRAWOBJECT); }
+      else if (t->ti_Tag == MUIA_Ribbon_Value) d->value = (LONG)t->ti_Data;
     break;
   }
   case MUIM_AskMinMax: {
@@ -1250,12 +1333,13 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
   case MUIM_DeleteShortHelp: return 0;
   case MUIM_Ribbon_Open:
     d = INST_DATA(cl, obj);
-    if (d->defer) { const Item *it = d->defer; d->defer = NULL; d->popgroup = -1; d->popdirect = it; open_list_l(d, obj, (int)((ULONG *)msg)[1], &lists[it->list]); }
+    if (d->defer) { const Item *it = d->defer; d->defer = NULL; d->popgroup = -1; d->popdirect = it; open_list_l(d, obj, (int)((ULONG *)msg)[1], list_of(it->list)); }
     return 0;
   case MUIM_Ribbon_State: {
     struct MUIP_Ribbon_State *m = (struct MUIP_Ribbon_State *)msg;
     d = INST_DATA(cl, obj);
-    if (m->on == d->st.on && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt)) return 0;
+    if (m->on == d->st.on && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt) && lx_bits_hash() == d->lxhash) return 0;
+    d->lxhash = lx_bits_hash();
     d->st = *m;
     if (m->font) { strncpy(d->font, m->font, sizeof d->font - 1); d->font[sizeof d->font - 1] = 0; }
     if (m->numfmt) { strncpy(d->numfmt, m->numfmt, sizeof d->numfmt - 1); d->numfmt[sizeof d->numfmt - 1] = 0; }

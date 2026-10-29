@@ -4,12 +4,15 @@ from cases import C, R
 # functions Excel only takes ranges for (it won't accept array constants there)
 RANGE_ONLY = {'ROW','COLUMN','COUNTIF','COUNTIFS','SUMIF','SUMIFS','AVERAGEIF','AVERAGEIFS','MAXIFS','MINIFS','OFFSET','COUNTBLANK'}
 XLFN = {'CEILING.MATH','CONCAT','DAYS','FLOOR.MATH','IFNA','IFS','ISFORMULA','MAXIFS','MINIFS','MODE.SNGL','NUMBERVALUE','PERCENTILE.EXC','PERCENTILE.INC','QUARTILE.INC','RANK.EQ','STDEV.P','STDEV.S','SWITCH','TEXTJOIN','UNICHAR','VAR.P','VAR.S','XLOOKUP','XOR'}
-# cases_array.py: its functions' _xlfn. prefixes, and the sheet of spilling cases
-try:
-    from cases_array import XLFN as _xa
-    XLFN = XLFN | _xa
-except ImportError:
-    pass
+# (the per-file case lists can name more: XLFN in cases_<m>.py)
+import cases_stat, cases_eng, cases_fin, cases_misc, cases_array
+for _m in (cases_stat, cases_eng, cases_fin, cases_misc, cases_array): XLFN |= set(getattr(_m, 'XLFN', ()))
+# a case's name with brackets in it is a template: @ stands for the arguments, e.g. 'INDEX(LINEST(@),2,1)'
+def call(fn, args): return fn.replace('@', args) if '(' in fn else '%s(%s)' % (fn, args)
+# and every function whose table entry in core/func*.c is flagged FF_XLFN
+import glob, os
+for _f in glob.glob(os.path.join(sys.argv[1], '..', '..', 'core', 'func*.c')):
+    XLFN |= set(re.findall(r'\{ "([A-Z0-9._]+)", \d+, \d+, [^,}]*FF_XLFN', open(_f).read()))
 from openpyxl.worksheet.formula import ArrayFormula
 BH, BW = 10, 9         # a spilling case's block on sheet S: rows, columns for each of its two forms
 wb = openpyxl.Workbook(); T = wb.active; T.title = 'T'; D = wb.create_sheet('Data'); S = None; srow = 1
@@ -56,8 +59,8 @@ for case in C:
                 scol += 1
         fn = ('_xlfn.' if name in XLFN else '') + name
         S.cell(srow, 1, name)
-        lf = '=%s(%s)' % (fn, ','.join(la)) if not refonly else None
-        rf = '=%s(%s)' % (fn, ','.join(ra)) if not opts.get('nocells') else None
+        lf = '=' + call(fn, ','.join(la)) if not refonly else None
+        rf = '=' + call(fn, ','.join(ra)) if not opts.get('nocells') else None
         for f, c0 in ((lf, 2), (rf, 3 + BW)):
             if f:
                 a1 = S.cell(srow, c0).coordinate
@@ -82,8 +85,8 @@ for case in C:
             col += 1
     T.cell(row, 1, name)
     fn = ('_xlfn.' if name in XLFN else '') + name
-    if not refonly: T.cell(row, 2, '=%s(%s)' % (fn, ','.join(la)))
-    if not opts.get('nocells'): T.cell(row, 3, '=%s(%s)' % (fn, ','.join(ra)))
+    if not refonly: T.cell(row, 2, '=' + call(fn, ','.join(la)))
+    if not opts.get('nocells'): T.cell(row, 3, '=' + call(fn, ','.join(ra)))
     meta.append((row, name, T.cell(row, 2).value, T.cell(row, 3).value, opts) if opts else (row, name, T.cell(row, 2).value, T.cell(row, 3).value))
     row += 1
 wb.save(sys.argv[2])

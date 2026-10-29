@@ -39,6 +39,7 @@ for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'excel
     if line.strip() and not line.startswith('#'):
         k, why = line.rstrip('\n').split('\t', 1); known[k] = why
 bad = []; n = 0; explained = 0; byexcel = 0; lolacks = 0
+seen = {}
 def want(x):
     # an expected value written in a case (Excel's documented result)
     if isinstance(x, bool): return 'B:' + ('TRUE' if x else 'FALSE')
@@ -121,6 +122,9 @@ for m in meta:
             elif not ok: bad.append((row, name, 'literal' if k == 0 else 'cells', form, ours, 'excel=%s lo=%s' % (want(o['x']), theirs)))
         continue
     lv = led.get(row, ['-', '-'])
+    # (a case can also be named by its function and place among that function's cases: DSUM#3, as
+    # cell addresses in the cells form move whenever cases are added before it)
+    seen[name] = seen.get(name, 0) + 1; nth = '%s#%d' % (name, seen[name])
     for k, (form, col) in enumerate(((fl, 2), (fr, 3))):
         if not form: continue
         n += 1
@@ -130,7 +134,8 @@ for m in meta:
             if name == 'RANDBETWEEN': ok = ours in ('N:%d' % i for i in range(1, 7))
             if name == 'NOW': ok = ok and theirs.startswith('N:') and abs(float(ours[2:]) - float(theirs[2:])) < 0.01
         else: ok = same(ours, theirs)
-        if not ok and form in known: explained += 1
+        # (a cells form is explained by its literal twin's line too: cell addresses move as cases are added)
+        if not ok and (form in known or nth in known or (k == 1 and fl in known)): explained += 1
         elif not ok: bad.append((row, name, 'literal' if k == 0 else 'cells', form, ours, theirs))
     # the two forms against each other
     if fl and fr and name not in VOLATILE and not same(lv[0], lv[1]) and 'LIT:' + name in known: explained += 1

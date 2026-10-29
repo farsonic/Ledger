@@ -50,7 +50,7 @@ int   calc_is_union(const Value *v);
    (func_array.c: TRIMRANGE and the trim reference operators) */
 Value calc_trim(Ctx *cx, const Value *v, int rows, int cols);
 /* a new array value of rows by cols (elements empty); V_ERR #NUM! if too big */
-Value arr_value(int rows, int cols);
+Value arr_make(int rows, int cols);
 /* the spill table: which arguments of a function take single values and so map over arrays in
    dynamic-array formulas ("NAME mask", mask letters s = single value, a = anything, the last letter
    repeating); func_array.c */

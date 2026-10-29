@@ -4,11 +4,11 @@
 =_xlfn.CONCAT(E48,F48,G48)	the same, from cells
 =COUNT(E56,F56,G56,H56)	Excel doesn't count text in cells, even "2"
 =COUNT({1;"2";"x";TRUE;5})	Excel counts only the numbers in an array
-=COUNT(Data!A95:A99)	nor text or TRUE in a range
+COUNT#2	nor text or TRUE in a range
 =DOLLAR(-1234.567,1)	Excel's own example shows negatives in brackets
 =DOLLAR(E80,F80)	the same, from cells
 =LARGE({3;1;4;1;5;9;2;6},9)	Excel: #NUM! when k is past the end
-=LARGE(Data!A193:A200,E162)	the same, from cells
+LARGE#2	the same, from cells
 =LN(0)	Excel: #NUM!
 =LN(E171)	the same, from cells
 =MATCH("b*",{"apple";"banana";"cherry";"apple"},0)	Excel matches wildcards in arrays too
@@ -29,17 +29,365 @@
 =SUM("3",TRUE)	Excel adds text numbers and logicals typed into the call
 =SUM(E297,F297)	but not those in cells
 =SUM({1;"3";TRUE})	nor those in an array
-=SUM(Data!A459:A461)	nor in a range
+SUM#4	nor in a range
 =TYPE(TRUE)	Excel: 4 for a logical
 =TYPE(E332)	the same, from a cell
 =_xlfn.XLOOKUP(3,{1;2;3},{"a";"b";"c"})	this LibreOffice has no XLOOKUP: checked by hand
-=_xlfn.XLOOKUP(E355,Data!A583:A585,Data!A587:A589)	(checked by hand)
+XLOOKUP#1	(checked by hand)
 =_xlfn.XLOOKUP(9,{1;2;3},{"a";"b";"c"},"none")	(checked by hand)
-=_xlfn.XLOOKUP(E356,Data!A591:A593,Data!A595:A597,F356)	(checked by hand)
+XLOOKUP#2	(checked by hand)
 =_xlfn.XLOOKUP(2.5,{1;2;3},{"a";"b";"c"},"none",1)	(checked by hand)
-=_xlfn.XLOOKUP(E357,Data!A599:A601,Data!A603:A605,F357,G357)	(checked by hand)
+XLOOKUP#3	(checked by hand)
 # literal and cells forms differ on purpose
 LIT:COUNT	typed-in text numbers and logicals count; in cells they don't
 LIT:COUNTA	"" typed in is a value; an empty cell isn't
 LIT:ISBLANK	"" typed in isn't blank; an empty cell is
 LIT:SUM	as COUNT
+# statistical functions (cases_stat.py)
+=_xlfn.NORM.DIST(1,0,0,TRUE)	Excel: #NUM! when standard_dev <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.NORM.DIST(E379,F379,G379,H379)	the same, from cells
+=_xlfn.NORM.INV(0,40,1.5)	Excel: #NUM! when probability <= 0 or >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.NORM.INV(E385,F385,G385)	the same, from cells
+=_xlfn.NORM.S.INV(1)	Excel: #NUM! when probability >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.NORM.S.INV(E400)	the same, from cells
+=STANDARDIZE(1,2,0)	Excel: #NUM! when standard_dev <= 0; LibreOffice gives #DIV/0!
+=STANDARDIZE(E410,F410,G410)	the same, from cells
+=_xlfn.LOGNORM.DIST(0,3.5,1.2,TRUE)	Excel: #NUM! when x <= 0; LibreOffice gives 0
+=_xlfn.LOGNORM.DIST(E413,F413,G413,H413)	the same, from cells
+=_xlfn.LOGNORM.INV(1,3.5,1.2)	Excel: #NUM! when probability >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.LOGNORM.INV(E417,F417,G417)	the same, from cells
+=_xlfn.CONFIDENCE.NORM(1,2.5,50)	Excel: #NUM! when alpha >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.CONFIDENCE.NORM(E420,F420,G420)	the same, from cells
+=FISHER(1)	Excel: #NUM! when x >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=FISHER(E427)	the same, from cells
+=_xlfn.T.DIST(1,0,TRUE)	Excel: #NUM! when deg_freedom < 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.T.DIST(E434,F434,G434)	the same, from cells
+=_xlfn.T.DIST.2T(-1,60)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.T.DIST.2T(E437,F437)	the same, from cells
+=TDIST(1,60,3)	Excel: #NUM! when tails is not 1 or 2; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=TDIST(E442,F442,G442)	the same, from cells
+=TDIST(-1,60,1)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=TDIST(E443,F443,G443)	the same, from cells
+=_xlfn.T.INV(0,3)	Excel: #NUM! when probability <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.T.INV(E448,F448)	the same, from cells
+=_xlfn.CHISQ.DIST(-1,2,TRUE)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.CHISQ.DIST(E456,F456,G456)	the same, from cells
+=CHIDIST(3,0)	Excel: #NUM! when deg_freedom < 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=CHIDIST(E460,F460)	the same, from cells
+=CHIINV(1.5,10)	Excel: #NUM! when probability > 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=CHIINV(E468,F468)	the same, from cells
+=_xlfn.F.DIST(2,0,5,TRUE)	Excel: #NUM! when deg_freedom1 < 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.F.DIST(E473,F473,G473,H473)	the same, from cells
+=_xlfn.GAMMA(0)	Excel: #NUM! for 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.GAMMA(E484)	the same, from cells
+=_xlfn.GAMMA(-2)	Excel: #NUM! for a negative integer; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.GAMMA(E485)	the same, from cells
+=GAMMALN(0)	Excel: #NUM! when x <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=GAMMALN(E494)	the same, from cells
+=_xlfn.BETA.DIST(4,8,10,TRUE,1,3)	Excel: #NUM! when x > B; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.BETA.DIST(E511,F511,G511,H511,I511,J511)	the same, from cells
+=_xlfn.BETA.INV(0,4,5)	Excel: #NUM! when probability <= 0; LibreOffice gives 0
+=_xlfn.BETA.INV(E518,F518,G518)	the same, from cells
+=_xlfn.EXPON.DIST(-1,10,TRUE)	Excel: #NUM! when x < 0; LibreOffice gives 0
+=_xlfn.EXPON.DIST(E522,F522,G522)	the same, from cells
+=WEIBULL(-1,20,100,TRUE)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=WEIBULL(E529,F529,G529,H529)	the same, from cells
+=_xlfn.BINOM.DIST(11,10,0.5,TRUE)	Excel: #NUM! when number_s > trials; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.BINOM.DIST(E533,F533,G533,H533)	the same, from cells
+=_xlfn.BINOM.DIST.RANGE(60,0.75,48)	LibreOffice has no BINOM.DIST.RANGE; Excel's documented example gives 0.0839749674
+=_xlfn.BINOM.DIST.RANGE(E539,F539,G539)	the same, from cells
+=_xlfn.BINOM.DIST.RANGE(60,0.75,45,50)	LibreOffice has no BINOM.DIST.RANGE; Excel's documented example gives 0.523629793
+=_xlfn.BINOM.DIST.RANGE(E540,F540,G540,H540)	the same, from cells
+=_xlfn.BINOM.DIST.RANGE(60,0.75,50,45)	LibreOffice has no BINOM.DIST.RANGE; Excel: #NUM! when number_s2 < number_s
+=_xlfn.BINOM.DIST.RANGE(E541,F541,G541,H541)	the same, from cells
+=CRITBINOM(6,1.5,0.75)	Excel: #NUM! when probability_s > 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=CRITBINOM(E547,F547,G547)	the same, from cells
+=NEGBINOMDIST(10,0,0.25)	Excel: #NUM! when number_s < 1; LibreOffice gives 0
+=NEGBINOMDIST(E552,F552,G552)	the same, from cells
+=_xlfn.POISSON.DIST(0,0,FALSE)	Excel allows mean = 0 (only mean < 0 is #NUM!): P(X=0) = 1; LibreOffice raises Err:502
+=_xlfn.POISSON.DIST(E555,F555,G555)	the same, from cells
+=POISSON(-1,5,TRUE)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=POISSON(E558,F558,G558)	the same, from cells
+=_xlfn.HYPGEOM.DIST(5,4,8,20,TRUE)	Excel: #NUM! when sample_s > number_sample; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.HYPGEOM.DIST(E561,F561,G561,H561,I561)	the same, from cells
+=DEVSQ({1;"x";3;TRUE;"";7})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
+DEVSQ#3	the same, from cells
+=SKEW({1;"x";3;TRUE;"";7})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
+SKEW#4	the same, from cells
+=GEOMEAN(4,0)	Excel: #NUM! when a value is <= 0; LibreOffice gives 0
+=GEOMEAN(E579,F579)	the same, from cells
+=HARMEAN(-1,2)	Excel: #NUM! when a value is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=HARMEAN(E582,F582)	the same, from cells
+=TRIMMEAN({3;1;4;1;5;9;2;6},1)	Excel: #NUM! when percent >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+TRIMMEAN#4	the same, from cells
+=_xlfn.PERMUTATIONA(-1,2)	Excel: #NUM! for a negative number; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.PERMUTATIONA(E595,F595)	the same, from cells
+=_xlfn.PERCENTRANK.INC({3;1;4;1;5;9;2;6},8.3,2)	Excel truncates to significance digits (0.9666 -> 0.96); LibreOffice rounds
+PERCENTRANK.INC#3	the same, from cells
+=_xlfn.PERCENTRANK.INC({3;1;4;1;5;9;2;6},10)	Excel: #N/A when x is outside the values; LibreOffice raises its own Err:502 (saved as #VALUE!)
+PERCENTRANK.INC#4	the same, from cells
+=_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},4)	Excel truncates to significance digits (0.5555 -> 0.555); LibreOffice rounds
+PERCENTRANK.EXC#1	the same, from cells
+=_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},2.5)	Excel truncates to significance digits (0.3888 -> 0.388); LibreOffice rounds
+PERCENTRANK.EXC#2	the same, from cells
+=_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},0)	Excel: #N/A when x is outside the values; LibreOffice raises its own Err:502 (saved as #VALUE!)
+PERCENTRANK.EXC#4	the same, from cells
+=_xlfn.QUARTILE.EXC({3;1;4;1;5;9;2;6},0)	Excel: #NUM! when quart <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+QUARTILE.EXC#4	the same, from cells
+=_xlfn.QUARTILE.EXC({1;2},1)	Excel: #NUM! when the quartile falls outside the data; LibreOffice raises its own Err:502 (saved as #VALUE!)
+QUARTILE.EXC#5	the same, from cells
+=_xlfn.MODE.MULT({1;2;3})	Excel: #N/A when no value repeats; LibreOffice raises its own Err:502 (saved as #VALUE!)
+MODE.MULT#2	the same, from cells
+=PROB({0;1;2;3},{0.2;0.3;0.1;0.3},1,3)	Excel: #NUM! when the probabilities do not add up to 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+PROB#3	the same, from cells
+=PEARSON({1;2;3},{1;2})	Excel: #N/A when the arrays have different numbers of points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+PEARSON#4	the same, from cells
+=SLOPE({1;"x";3;TRUE;"";7},{1;2;3;4;5;6})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
+SLOPE#3	the same, from cells
+=STEYX({1;2},{3;4})	Excel: #DIV/0! for fewer than three points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+STEYX#3	the same, from cells
+=_xlfn.COVARIANCE.S({1},{2})	Excel: #DIV/0! for fewer than two points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+COVARIANCE.S#2	the same, from cells
+=_xlfn.T.TEST({3;4;5;8;9;1;2;4;5},{6;19;3;2;14;4;5;17;1},3,1)	Excel: #NUM! when tails is not 1 or 2; LibreOffice raises its own Err:502 (saved as #VALUE!)
+T.TEST#5	the same, from cells
+=_xlfn.T.TEST({3;4;5;8;9;1;2;4;5},{6;19;3;2;14;4;5;17},2,1)	Excel: #N/A for a paired test of arrays of different sizes; LibreOffice raises its own Err:502 (saved as #VALUE!)
+T.TEST#6	the same, from cells
+=_xlfn.F.TEST({1},{6;19;3;2;14;4;5;17;1})	Excel: #DIV/0! for fewer than two points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+F.TEST#3	the same, from cells
+=_xlfn.CHISQ.TEST({58,35;11,25;10,23},{45.35,47.65;17.56,18.44})	Excel: #N/A when the ranges have different numbers of points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+CHISQ.TEST#3	the same, from cells
+=LOGEST({1;-2},{1;2})	Excel: #NUM! when a known_y is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+LOGEST#2	the same, from cells
+=GROWTH({1;0},{1;2},3)	Excel: #NUM! when a known_y is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+GROWTH#3	the same, from cells
+=_xlfn.FORECAST.ETS(10,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12})	Excel: #NUM! when target_date is before the end of the timeline; LibreOffice gives the fitted value
+FORECAST.ETS#5	the same, from cells
+=_xlfn.FORECAST.ETS(13,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11})	Excel: #N/A when values and timeline differ in size; LibreOffice raises its own Err:502 (saved as #VALUE!)
+FORECAST.ETS#6	the same, from cells
+=_xlfn.FORECAST.ETS.STAT({10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12},9)	Excel: #NUM! when statistic_type is not 1 to 8; LibreOffice gives 1
+FORECAST.ETS.STAT#3	the same, from cells
+=_xlfn.FORECAST.ETS.CONFINT(13,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12},1)	Excel: #NUM! when confidence_level is not between 0 and 1; LibreOffice gives 0
+FORECAST.ETS.CONFINT#1	the same, from cells
+=USDOLLAR(1234.567)	LibreOffice has no USDOLLAR; Excel gives what DOLLAR gives
+=USDOLLAR(E733)	the same, from cells
+=USDOLLAR(1234.567,-2)	LibreOffice has no USDOLLAR; Excel gives what DOLLAR gives
+=USDOLLAR(E734,F734)	the same, from cells
+# --- engineering, maths, date, text, information, web, cube and add-in functions (func_eng.c, func_misc.c);
+# literal forms only: compare.py takes a cells form as explained by its literal twin
+=BIN2DEC("102")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=DEC2BIN(512)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=DEC2BIN(5,0)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=DEC2BIN(5,11)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=DEC2HEX(64,1)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=DEC2HEX(549755813888)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=HEX2BIN("200")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=HEX2DEC("G1")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=HEX2DEC(TRUE)	Excel: #VALUE! for a logical value; LibreOffice takes TRUE as 1
+=OCT2BIN("1000")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=OCT2DEC("8")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.BASE(-1,2)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.BASE(10,37)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.DECIMAL("12",2)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.BITAND(-1,5)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.BITAND(1.5,1)	Excel: #NUM! for a fractional argument; LibreOffice truncates it
+=_xlfn.BITOR(281474976710656,1)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.BITLSHIFT(1,48)	Excel: #NUM! when the result passes 2^48-1 or the shift passes 53; LibreOffice shifts anyway
+=_xlfn.BITLSHIFT(1,54)	Excel: #NUM! when the result passes 2^48-1 or the shift passes 53; LibreOffice shifts anyway
+=CONVERT(1,"lbm","kg")	Excel uses the exact international pound (453.59237 g); LibreOffice keeps older factors
+=CONVERT(2.5,"ft","sec")	Excel: #N/A for an unknown unit or units of different kinds (LibreOffice #VALUE!)
+=CONVERT(1,"atm","mmHg")	Excel uses the conventional mmHg (133.322387415 Pa); LibreOffice keeps older factors
+=CONVERT(1,"psi","Pa")	Excel uses psi from the exact pound-force; LibreOffice keeps older factors
+=CONVERT(1,"lbf","N")	Excel uses the exact pound-force (4.4482216152605 N); LibreOffice keeps older factors
+=CONVERT(1,"BTU","J")	Excel uses the International Table BTU (1055.05585262 J); LibreOffice keeps older factors
+=CONVERT(1,"HP","W")	Excel uses the mechanical horsepower (745.69987158227 W); LibreOffice keeps older factors
+=CONVERT(1,"ly","m")	Excel uses the Julian-year light year (9460730472580800 m); LibreOffice keeps older factors
+=CONVERT(1,"cal","J")	Excel uses the International Table calorie (4.1868 J); LibreOffice keeps older factors
+=CONVERT(1,"ozm","g")	Excel uses the exact avoirdupois ounce; LibreOffice keeps older factors
+=CONVERT(1,"stone","lbm")	Excel uses the exact stone (14 pounds); LibreOffice keeps older factors
+=CONVERT(1,"ton","kg")	Excel uses the exact short ton (2000 pounds); LibreOffice keeps older factors
+=CONVERT(1,"in","kg")	Excel: #N/A for an unknown unit or units of different kinds (LibreOffice #VALUE!)
+=CONVERT(1,"xyz","m")	Excel: #N/A for an unknown unit or units of different kinds (LibreOffice #VALUE!)
+=CONVERT(1,"m","kft")	Excel: #N/A for an unknown unit or units of different kinds (LibreOffice #VALUE!)
+=BESSELI(1,-1)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=BESSELK(0,1)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=BESSELY(-1,0)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=IMAGINARY("1+2k")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=IMARGUMENT("0")	Excel: IMARGUMENT of 0 is #DIV/0!; LibreOffice #VALUE!
+=IMDIV("1+i","0")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=IMDIV("1+i","1+j")	Excel: #VALUE! when the arguments mix the suffixes i and j
+=IMLN("0")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=IMPOWER("i",2)	Excel works powers and roots in polar form and writes exponents as E-16; LibreOffice gets an exact 2i and writes e-16
+=IMSQRT("-4")	Excel works powers and roots in polar form and writes exponents as E-16; LibreOffice gets an exact 2i and writes e-16
+=IMSIN("x")	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=ACOSH(0.5)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=ATANH(1)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.ACOTH(0.5)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.COT(0)	Excel: COT(0) is #DIV/0!; LibreOffice #NUM!
+=_xlfn.COTH(0)	Excel: COTH(0) is #DIV/0!; LibreOffice #NUM!
+=_xlfn.CSC(0)	Excel: CSC(0) is #DIV/0!; LibreOffice #NUM!
+=_xlfn.CSCH(0)	Excel: CSCH(0) is #DIV/0!; LibreOffice #NUM!
+=_xlfn.SEC(134217728)	Excel: #NUM! when |number| is 2^27 or more
+=_xlfn.ARABIC("-XIV")	Excel reads a leading minus sign (ARABIC("-MMXI") is -2011 in its documentation)
+=ROMAN(499,TRUE)	Excel: TRUE is the classic form (0) and FALSE the simplest (4); LibreOffice takes them as 1 and 0
+=ROMAN(499,FALSE)	Excel: TRUE is the classic form (0) and FALSE the simplest (4); LibreOffice takes them as 1 and 0
+=_xlfn.COMBINA(0,0)	Excel: COMBINA(0,0) is 1 (one empty selection); LibreOffice 0
+=_xlfn.COMBINA(-1,2)	Excel: #NUM! for a negative argument (LibreOffice #VALUE!)
+=FACTDOUBLE(-1)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=FACTDOUBLE(-2)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=MULTINOMIAL(-1,2)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=SQRTPI(-1)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=SUMX2MY2({1;2},{1;2;3})	Excel: #N/A when the arrays have different numbers of values (LibreOffice #VALUE!)
+=SUMXMY2({1;"a";3},{2;5;1})	Excel skips pairs with text in arrays; LibreOffice #VALUE!
+=_xlfn.PERCENTOF({1;2;3},{1;2;3;4})	LibreOffice 24.2 has no PERCENTOF (Excel 365); the value is the one Excel documents
+=_xlfn.PERCENTOF(5,20)	LibreOffice 24.2 has no PERCENTOF (Excel 365); the value is the one Excel documents
+=N(INDEX(MINVERSE({1,2;2,4}),1,1))	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.ISOWEEKNUM(-1)	Excel: #NUM! for a negative date
+=NETWORKDAYS.INTL(46322,46340,8)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=WORKDAY.INTL(DATE(2012,1,1),30,0)	Excel documents #NUM! for this argument (out of range or not valid); LibreOffice exports its invalid-argument error as #VALUE!
+=_xlfn.DBCS("abc 1")	LibreOffice 24.2 has no DBCS; Ledger makes ASCII full width, as JIS does
+=_xlfn.BAHTTEXT(101)	Excel says a final one after higher digits as "et" (101, 1000001); LibreOffice only after a tens digit
+=_xlfn.BAHTTEXT(1000001)	Excel says a final one after higher digits as "et" (101, 1000001); LibreOffice only after a tens digit
+=PHONETIC("text")	LibreOffice 24.2 has no PHONETIC; without furigana Excel returns the text itself
+=_xlfn.TEXTBEFORE("Red riding hood"," ")	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("Red riding hood"," ",2)	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("Red riding hood"," ",-1)	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("Red riding hood","x")	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("Red riding hood","x",1,0,0,"none")	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("aXbxc","x",1,1)	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("a-b","-",2,0,1)	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("abc","")	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("abc","b",0)	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("abc","b",5)	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTBEFORE("a,b;c",{",";";"},2)	LibreOffice 24.2 has no TEXTBEFORE (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTAFTER("Red riding hood"," ")	LibreOffice 24.2 has no TEXTAFTER (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTAFTER("Red riding hood"," ",-1)	LibreOffice 24.2 has no TEXTAFTER (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTAFTER("Red riding hood","RIDING",1,1)	LibreOffice 24.2 has no TEXTAFTER (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTAFTER("abc","")	LibreOffice 24.2 has no TEXTAFTER (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTAFTER("abc","",-1)	LibreOffice 24.2 has no TEXTAFTER (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTAFTER("a-b","-",-2,0,1)	LibreOffice 24.2 has no TEXTAFTER (Excel 365); the value is the one Excel documents
+=_xlfn.TEXTAFTER("abc","z")	LibreOffice 24.2 has no TEXTAFTER (Excel 365); the value is the one Excel documents
+=_xlfn.VALUETOTEXT("abc")	LibreOffice 24.2 has no VALUETOTEXT (Excel 365); the value is the one Excel documents
+=_xlfn.VALUETOTEXT("abc",1)	LibreOffice 24.2 has no VALUETOTEXT (Excel 365); the value is the one Excel documents
+=_xlfn.VALUETOTEXT(1.5)	LibreOffice 24.2 has no VALUETOTEXT (Excel 365); the value is the one Excel documents
+=_xlfn.VALUETOTEXT(TRUE,1)	LibreOffice 24.2 has no VALUETOTEXT (Excel 365); the value is the one Excel documents
+=_xlfn.VALUETOTEXT(1/0)	LibreOffice 24.2 has no VALUETOTEXT (Excel 365); the value is the one Excel documents
+=_xlfn.VALUETOTEXT(1,2)	LibreOffice 24.2 has no VALUETOTEXT (Excel 365); the value is the one Excel documents
+=_xlfn.ARRAYTOTEXT({1,"a";TRUE,2.5})	LibreOffice 24.2 has no ARRAYTOTEXT (Excel 365); the value is the one Excel documents
+=_xlfn.ARRAYTOTEXT({1,"a";TRUE,2.5},1)	LibreOffice 24.2 has no ARRAYTOTEXT (Excel 365); the value is the one Excel documents
+=_xlfn.ARRAYTOTEXT("x")	LibreOffice 24.2 has no ARRAYTOTEXT (Excel 365); the value is the one Excel documents
+=T(INDEX(_xlfn.TEXTSPLIT("a,b;c,d",",",";"),2,1))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=T(INDEX(_xlfn.TEXTSPLIT("a,b;c,d",",",";"),1,2))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=N(ROWS(_xlfn.TEXTSPLIT("a,b;c",",",";")))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=N(COLUMNS(_xlfn.TEXTSPLIT("a,b;c",",",";")))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=ISNA(INDEX(_xlfn.TEXTSPLIT("a,b;c",",",";"),2,2))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=T(INDEX(_xlfn.TEXTSPLIT("a,b;c",",",";",FALSE,0,"-"),2,2))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=N(COLUMNS(_xlfn.TEXTSPLIT("a,,b",",")))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=N(COLUMNS(_xlfn.TEXTSPLIT("a,,b",",",,TRUE)))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=T(INDEX(_xlfn.TEXTSPLIT("aXbxc","x",,FALSE,1),1,2))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=T(INDEX(_xlfn.TEXTSPLIT("a b-c",{" ","-"}),1,3))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=N(ROWS(_xlfn.TEXTSPLIT("1;2;3",,";")))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=T(_xlfn.TEXTSPLIT("abc",""))	LibreOffice 24.2 has no TEXTSPLIT (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXTEST("abc123","[0-9]+")	LibreOffice 24.2 has no REGEXTEST (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXTEST("abc","^B")	LibreOffice 24.2 has no REGEXTEST (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXTEST("abc","^B",1)	LibreOffice 24.2 has no REGEXTEST (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXTEST("abc","(")	LibreOffice 24.2 has no REGEXTEST (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXTEST("a@b.com","^[\w.]+@\w+\.\w{2,3}$")	LibreOffice 24.2 has no REGEXTEST (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXTEST("foobar","foo(?!bar)")	LibreOffice 24.2 has no REGEXTEST (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXTEST("foobaz","foo(?!bar)")	LibreOffice 24.2 has no REGEXTEST (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXEXTRACT("Tel 555-1234 or 555-9876","\d{3}-\d{4}")	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXEXTRACT("abc","\d")	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXEXTRACT("aaa","a+?")	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXEXTRACT("key=value","(\w+)=(\w+)",0)	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=T(INDEX(_xlfn.REGEXEXTRACT("key=value","(\w+)=(\w+)",2),1,2))	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=T(INDEX(_xlfn.REGEXEXTRACT("a1b22c333","[0-9]+",1),3,1))	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=N(ROWS(_xlfn.REGEXEXTRACT("a1b22c333","[0-9]+",1)))	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXEXTRACT("Hello World","WORLD",0,1)	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXEXTRACT("x(y)z","\((.)\)")	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXEXTRACT("2026-10-29","(\d+)-(\d+)",3)	LibreOffice 24.2 has no REGEXEXTRACT (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("a1b22c","[0-9]+","#")	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("2026-10-22","(\d+)-(\d+)-(\d+)","$3/$2/$1")	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("abc","x*","-")	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("a1b2","[0-9]","#",2)	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("a1b2c3","[0-9]","#",-1)	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("Hello","l","L",0,1)	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("aAa","a","x",0,1)	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("John Smith","(\w+) (\w+)","${2}, $1")	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("a.b.c","\.","$$")	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("tel: 0123","(?i)TEL","Phone")	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=_xlfn.REGEXREPLACE("aaa","(a)\1","b")	LibreOffice 24.2 has no REGEXREPLACE (Excel 365); the value is the one Excel documents
+=INFO("numfile")	Excel counts the open worksheets (the test book has two); LibreOffice 1
+=_xlfn.ENCODEURL("http://contoso.sharepoint.com/Finance/Profit and Loss Statement.xlsx")	Excel keeps . and ~ unencoded (its documentation's example); LibreOffice encodes them
+=_xlfn.ENCODEURL("AZaz09-_.~")	Excel keeps . and ~ unencoded (its documentation's example); LibreOffice encodes them
+=_xlfn.FILTERXML("<a><b>1</b><b>2</b></a>","/a/b[1]")	Excel returns numbers found by FILTERXML as numbers; LibreOffice as text
+=N(SUM(_xlfn.FILTERXML("<a><b>1</b><b>2</b></a>","//b")))	Excel returns every match (a dynamic array); LibreOffice only the first outside an array formula
+=_xlfn.FILTERXML("<r><i n='p'>7</i><i n='q'>8</i></r>","//i[@n='q']")	Excel returns numbers found by FILTERXML as numbers; LibreOffice as text
+=_xlfn.FILTERXML("<a><b>1</b></a>","//c")	Excel: #VALUE! when the XPath finds nothing; LibreOffice #N/A
+=T(INDEX(_xlfn.FILTERXML("<a><b>p</b><c><b>q</b></c></a>","//b"),2,1))	Excel returns every match (a dynamic array); LibreOffice only the first outside an array formula
+=CUBEVALUE("conn")	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
+=CUBEMEMBER("conn","[x]")	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
+=CUBESET("conn","[x]")	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
+=CUBESETCOUNT("set")	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
+=CUBERANKEDMEMBER("conn","set",1)	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
+=CUBEMEMBERPROPERTY("conn","m","p")	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
+=CUBEKPIMEMBER("conn","k",1)	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
+# financial and database functions (cases_fin.py). LibreOffice's analysis functions give #VALUE! where Excel documents #NUM!
+=ACCRINT(DATE(2008,3,5),DATE(2008,8,31),DATE(2008,5,1),0.1,1000,2,0,FALSE)	LibreOffice takes no calc_method argument; Excel's examples give 15.555556 and 7.2222222
+=ACCRINT(DATE(2008,4,5),DATE(2008,8,31),DATE(2008,5,1),0.1,1000,2,0,TRUE)	LibreOffice takes no calc_method argument; Excel's examples give 15.555556 and 7.2222222
+=ACCRINT(DATE(2008,3,1),DATE(2008,8,31),DATE(2008,5,1),0.1,1000,2,1)	Excel sums each quasi-coupon period over its actual length (its documented formula); LibreOffice divides by 366 days
+=ACCRINT(DATE(2008,5,1),DATE(2008,8,31),DATE(2008,3,1),0.1,1000,2,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=ACCRINT(DATE(2008,3,1),DATE(2008,8,31),DATE(2008,5,1),0.1,1000,3,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=ACCRINTM(DATE(2007,4,1),DATE(2009,6,15),0.1,1000,1)	Excel's actual/actual year here is YEARFRAC's (the average of the years spanned); LibreOffice uses 365 days
+=ACCRINTM(DATE(2008,4,1),DATE(2008,6,15),0,1000)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=ACCRINTM(DATE(2008,4,1),DATE(2008,6,15),0.1,1000,5)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=COUPDAYBS(DATE(2011,11,15),DATE(2011,1,25),2,1)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=COUPNUM(DATE(2011,1,25),DATE(2011,11,15),3)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=COUPDAYS(DATE(2011,1,25),DATE(2011,11,15),2,5)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=CUMIPMT(0.09/12,30*12,125000,13,12,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=CUMIPMT(0.09/12,30*12,-125000,1,12,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=CUMIPMT(0.09/12,30*12,125000,1,12,2)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DB(1000000,100000,6,7)	Excel: #NUM! for a period past the life when month is 12; LibreOffice 0
+=DB(1000000,100000,6,1,13)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DDB(2400,300,10,11)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=SYD(30000,7500,10,11)	Excel: #NUM! for a period past the life; LibreOffice 0
+=VDB(2400,300,10,3,2)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DISC(DATE(2018,10,1),DATE(2018,7,1),97.975,100)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=INTRATE(DATE(2008,2,15),DATE(2009,5,15),1000000,1014420,1)	Excel's actual/actual year here is YEARFRAC's (the average of the years spanned); LibreOffice uses the first year's length
+=PRICEDISC(DATE(2008,2,16),DATE(2010,3,1),0.0525,100,1)	Excel's actual/actual year here is YEARFRAC's (the average of the years spanned); LibreOffice uses the first year's length
+=TBILLEQ(DATE(2008,3,31),DATE(2008,12,1),0.0914)	Excel uses the bond-equivalent formula for more than half a year to maturity; LibreOffice the short one, with 30/360 days
+=TBILLEQ(DATE(2008,3,31),DATE(2009,6,1),0.0914)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=TBILLPRICE(DATE(2008,3,31),DATE(2009,3,31),0.09)	Excel counts the actual days to maturity; LibreOffice 30/360 days to the day after
+=TBILLYIELD(DATE(2008,3,31),DATE(2008,6,1),0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DOLLARDE(1.1,0)	Excel documents #DIV/0! for a fraction of 0; LibreOffice #VALUE!
+=DOLLARDE(1.1,-1)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DURATION(DATE(2018,7,1),DATE(2048,1,1),0.08,0.09,2,1)	Excel's documented example gives 10.9191453; LibreOffice works the first period out from YEARFRAC
+=DURATION(DATE(2018,8,17),DATE(2028,3,1),0.05,0.06,4,1)	Excel times each coupon from COUPDAYSNC/COUPDAYS (its example gives 10.9191453); LibreOffice works it out from YEARFRAC
+=DURATION(DATE(2018,8,17),DATE(2028,3,1),0.05,0.06,1,3)	Excel times each coupon from COUPDAYSNC/COUPDAYS (its example gives 10.9191453); LibreOffice works it out from YEARFRAC
+=MDURATION(DATE(2008,1,1),DATE(2016,1,1),0.08,0.09,2,1)	Excel's documented example gives 5.736; LibreOffice 5.734 (it works the first period out from YEARFRAC)
+=MDURATION(DATE(2018,8,17),DATE(2028,3,1),0.05,0.06,2,2)	Excel times each coupon from COUPDAYSNC/COUPDAYS; LibreOffice works it out from YEARFRAC (actual/360 here)
+=PRICE(DATE(2008,2,15),DATE(2017,11,15),0.0575,0.065,100,3,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=YIELD(DATE(2008,2,15),DATE(2008,9,15),0.0575,99.5,100,1,1)	Excel's documented closed form for one period or less, with COUPDAYS/COUPDAYBS/COUPDAYSNC; LibreOffice counts the actual/actual period differently
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,0)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,4,3)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,1,2)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,1,11),DATE(2021,3,1),DATE(2007,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,11,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,84.5,100,2,0)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,84.5,100,2,1)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,104,100,4,4)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDLPRICE(DATE(2008,2,7),DATE(2008,6,15),DATE(2007,10,15),0.0375,0.0405,100,2,1)	Excel sums over the quasi-coupon periods with their actual lengths (its documented formula); LibreOffice uses year fractions
+=ODDLPRICE(DATE(2008,2,7),DATE(2008,6,15),DATE(2008,3,15),0.0375,0.0405,100,2,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=EFFECT(0,4)	Excel documents #NUM! for a nominal rate <= 0; LibreOffice 0
+=EFFECT(0.05,0.5)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=NOMINAL(-0.05,4)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=FVSCHEDULE(100,{0.09,"x"})	Excel documents #VALUE! for anything but numbers and blanks in the schedule; LibreOffice skips text
+=ISPMT(0.1,1,0,8000000)	Excel: #DIV/0! for nper 0; LibreOffice #NUM!
+=MIRR({120000;39000},0.1,0.12)	Excel documents #DIV/0! without both a positive and a negative value; LibreOffice #VALUE!
+=_xlfn.PDURATION(0,1000,1200)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=_xlfn.RRI(0,100,50)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=XIRR({10;20},{39448;39508})	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=XNPV(0.09,{-100;20},{39448;39000})	Excel documents #NUM! for a date before the first; LibreOffice works it out
+=XNPV(0.09,{-100;20},{39448})	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+DGET#1	Excel documents #NUM! for more than one matching record; LibreOffice #VALUE!
+DSTDEV#2	Excel: #DIV/0! for a single matching record, as STDEV; LibreOffice #NUM!
+DSUM#11	Excel documents that text in criteria matches entries beginning with it ("App" finds Apple); LibreOffice matches whole cells

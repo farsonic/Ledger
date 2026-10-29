@@ -1,0 +1,87 @@
+# The functions of core/func_eng.c, one a line: NAME|category|args|description (for the Insert Function dialog)
+ACOSH|Math & Trig|number|The inverse hyperbolic cosine of a number (1 or more).
+ACOT|Math & Trig|number|The inverse cotangent of a number, in radians (0 to pi).
+ACOTH|Math & Trig|number|The inverse hyperbolic cotangent of a number (beyond -1 to 1).
+ARABIC|Math & Trig|text|The number a Roman numeral stands for.
+ASINH|Math & Trig|number|The inverse hyperbolic sine of a number.
+ATANH|Math & Trig|number|The inverse hyperbolic tangent of a number (between -1 and 1).
+BASE|Math & Trig|number, radix, [min_length]|A number written in another base (2 to 36), padded with zeros.
+BESSELI|Engineering|x, n|The modified Bessel function In(x).
+BESSELJ|Engineering|x, n|The Bessel function Jn(x).
+BESSELK|Engineering|x, n|The modified Bessel function Kn(x).
+BESSELY|Engineering|x, n|The Bessel function Yn(x) (Weber's function).
+BIN2DEC|Engineering|number|A binary number as a decimal one.
+BIN2HEX|Engineering|number, [places]|A binary number as a hexadecimal one.
+BIN2OCT|Engineering|number, [places]|A binary number as an octal one.
+BITAND|Engineering|number1, number2|The bitwise AND of two numbers.
+BITLSHIFT|Engineering|number, shift_amount|A number's bits shifted left (right for a negative shift).
+BITOR|Engineering|number1, number2|The bitwise OR of two numbers.
+BITRSHIFT|Engineering|number, shift_amount|A number's bits shifted right (left for a negative shift).
+BITXOR|Engineering|number1, number2|The bitwise exclusive OR of two numbers.
+CEILING.PRECISE|Math & Trig|number, [significance]|Rounds up to a multiple of significance, whatever its sign.
+COMBINA|Math & Trig|number, number_chosen|The number of combinations with repetitions.
+COMPLEX|Engineering|real_num, i_num, [suffix]|A complex number from its real and imaginary parts.
+CONVERT|Engineering|number, from_unit, to_unit|Converts a measurement from one unit to another.
+COT|Math & Trig|number|The cotangent of an angle in radians.
+COTH|Math & Trig|number|The hyperbolic cotangent of a number.
+CSC|Math & Trig|number|The cosecant of an angle in radians.
+CSCH|Math & Trig|number|The hyperbolic cosecant of a number.
+DEC2BIN|Engineering|number, [places]|A decimal number as a binary one.
+DEC2HEX|Engineering|number, [places]|A decimal number as a hexadecimal one.
+DEC2OCT|Engineering|number, [places]|A decimal number as an octal one.
+DECIMAL|Math & Trig|text, radix|The number written in a given base (2 to 36).
+DELTA|Engineering|number1, [number2]|1 if two numbers are equal, else 0.
+ERF|Engineering|lower_limit, [upper_limit]|The error function, from 0 or between two limits.
+ERF.PRECISE|Engineering|x|The error function from 0 to x.
+ERFC|Engineering|x|The complementary error function.
+ERFC.PRECISE|Engineering|x|The complementary error function.
+FACTDOUBLE|Math & Trig|number|The double factorial of a number (n * (n-2) * ...).
+FLOOR.PRECISE|Math & Trig|number, [significance]|Rounds down to a multiple of significance, whatever its sign.
+GESTEP|Engineering|number, [step]|1 if a number is at least the step, else 0.
+HEX2BIN|Engineering|number, [places]|A hexadecimal number as a binary one.
+HEX2DEC|Engineering|number|A hexadecimal number as a decimal one.
+HEX2OCT|Engineering|number, [places]|A hexadecimal number as an octal one.
+IMABS|Engineering|inumber|The absolute value (modulus) of a complex number.
+IMAGINARY|Engineering|inumber|The imaginary part of a complex number.
+IMARGUMENT|Engineering|inumber|The argument of a complex number, in radians.
+IMCONJUGATE|Engineering|inumber|The complex conjugate of a complex number.
+IMCOS|Engineering|inumber|The cosine of a complex number.
+IMCOSH|Engineering|inumber|The hyperbolic cosine of a complex number.
+IMCOT|Engineering|inumber|The cotangent of a complex number.
+IMCSC|Engineering|inumber|The cosecant of a complex number.
+IMCSCH|Engineering|inumber|The hyperbolic cosecant of a complex number.
+IMDIV|Engineering|inumber1, inumber2|The quotient of two complex numbers.
+IMEXP|Engineering|inumber|e raised to a complex number.
+IMLN|Engineering|inumber|The natural logarithm of a complex number.
+IMLOG10|Engineering|inumber|The base-10 logarithm of a complex number.
+IMLOG2|Engineering|inumber|The base-2 logarithm of a complex number.
+IMPOWER|Engineering|inumber, number|A complex number raised to a power.
+IMPRODUCT|Engineering|inumber1, ...|The product of complex numbers.
+IMREAL|Engineering|inumber|The real part of a complex number.
+IMSEC|Engineering|inumber|The secant of a complex number.
+IMSECH|Engineering|inumber|The hyperbolic secant of a complex number.
+IMSIN|Engineering|inumber|The sine of a complex number.
+IMSINH|Engineering|inumber|The hyperbolic sine of a complex number.
+IMSQRT|Engineering|inumber|The square root of a complex number.
+IMSUB|Engineering|inumber1, inumber2|The difference of two complex numbers.
+IMSUM|Engineering|inumber1, ...|The sum of complex numbers.
+IMTAN|Engineering|inumber|The tangent of a complex number.
+ISO.CEILING|Math & Trig|number, [significance]|Rounds up to a multiple of significance, whatever its sign.
+MDETERM|Math & Trig|array|The determinant of a square matrix.
+MINVERSE|Math & Trig|array|The inverse of a square matrix (an array).
+MMULT|Math & Trig|array1, array2|The matrix product of two arrays (an array).
+MULTINOMIAL|Math & Trig|number1, ...|The multinomial coefficient of the numbers.
+MUNIT|Math & Trig|dimension|The identity matrix of that size (an array).
+OCT2BIN|Engineering|number, [places]|An octal number as a binary one.
+OCT2DEC|Engineering|number|An octal number as a decimal one.
+OCT2HEX|Engineering|number, [places]|An octal number as a hexadecimal one.
+PERCENTOF|Math & Trig|data_subset, data_all|The sum of a subset as a fraction of the sum of all.
+PERMUTATIONA|Statistical|number, number_chosen|The number of permutations with repetitions.
+ROMAN|Math & Trig|number, [form]|A number as a Roman numeral (form 0 classic to 4 simplest).
+SEC|Math & Trig|number|The secant of an angle in radians.
+SECH|Math & Trig|number|The hyperbolic secant of a number.
+SERIESSUM|Math & Trig|x, n, m, coefficients|The sum of a power series.
+SQRTPI|Math & Trig|number|The square root of a number times pi.
+SUMX2MY2|Math & Trig|array_x, array_y|The sum of the differences of the squares of pairs.
+SUMX2PY2|Math & Trig|array_x, array_y|The sum of the sums of the squares of pairs.
+SUMXMY2|Math & Trig|array_x, array_y|The sum of the squares of the differences of pairs.

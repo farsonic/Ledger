@@ -107,7 +107,7 @@ static Value f_sequence(Ctx *cx, Value *a, int n)
   if (rows < 0 || cols < 0) return val_err(E_VALUE);
   if (rows == 0 || cols == 0) return val_err(E_CALC);
   if (rows * cols > 1000000.0) return val_err(E_NUM);
-  v = arr_value((int)rows, (int)cols);
+  v = arr_make((int)rows, (int)cols);
   if (v.t != V_ARR) return v;
   for (i = 0; i < (long)rows * (long)cols; i++) v.a->v[i] = val_num(start + step * i);
   return v;
@@ -128,7 +128,7 @@ static Value f_randarray(Ctx *cx, Value *a, int n)
   if (rows == 0 || cols == 0) return val_err(E_CALC);
   if (whole && (lo != floor(lo) || hi != floor(hi))) return val_err(E_VALUE);
   if (rows * cols > 1000000.0) return val_err(E_NUM);
-  v = arr_value((int)rows, (int)cols);
+  v = arr_make((int)rows, (int)cols);
   if (v.t != V_ARR) return v;
   if (cx->arrayish) *cx->arrayish = 1;
   for (i = 0; i < (long)rows * (long)cols; i++)
@@ -146,7 +146,7 @@ static Value f_makearray(Ctx *cx, Value *a, int n)
   rows = floor(rows); cols = floor(cols);
   if (rows < 1 || cols < 1) return val_err(E_VALUE);
   if (rows * cols > 1000000.0) return val_err(E_NUM);
-  v = arr_value((int)rows, (int)cols);
+  v = arr_make((int)rows, (int)cols);
   if (v.t != V_ARR) return v;
   for (r = 0; r < rows; r++)
     for (c = 0; c < cols; c++) {
@@ -203,7 +203,7 @@ static Value f_map(Ctx *cx, Value *a, int n)
     if (rr > rows) rows = rr;
     if (cc > cols) cols = cc;
   }
-  v = arr_value(rows, cols);
+  v = arr_make(rows, cols);
   if (v.t != V_ARR) return v;
   if (!(args = (Value *)malloc((size_t)n * sizeof(Value)))) { val_free(&v); return val_err(E_NUM); }
   for (r = 0; r < rows; r++)
@@ -227,7 +227,7 @@ static Value reduce_impl(Ctx *cx, Value *a, int n, int scan)
   if (arr->t == V_ERR) return val_err(arr->e);
   acc = val_copy(&a[0]);                       /* (missing: ISOMITTED is TRUE for it) */
   arg_shape(arr, &rows, &cols);
-  if (scan) { out = arr_value(rows, cols); if (out.t != V_ARR) { val_free(&acc); return out; } }
+  if (scan) { out = arr_make(rows, cols); if (out.t != V_ARR) { val_free(&acc); return out; } }
   for (r = 0; r < rows; r++)
     for (c = 0; c < cols; c++) {
       Value args[2], x;
@@ -258,7 +258,7 @@ static Value byrc(Ctx *cx, Value *a, int n, int bycol)
   arg_shape(&a[0], &rows, &cols);
   if (a[0].t != V_REF && !(src = to_array(cx, &a[0], &err))) return val_err(err);
   cnt = bycol ? cols : rows;
-  v = bycol ? arr_value(1, cols) : arr_value(rows, 1);
+  v = bycol ? arr_make(1, cols) : arr_make(rows, 1);
   if (v.t != V_ARR) { arr_free(src); return v; }
   for (k = 0; k < cnt; k++) {
     Value line;
@@ -267,7 +267,7 @@ static Value byrc(Ctx *cx, Value *a, int n, int bycol)
       if (bycol) line.c1 = line.c2 = a[0].c1 + k; else line.r1 = line.r2 = a[0].r1 + k;
     } else {
       i32 i, len = bycol ? rows : cols;
-      line = bycol ? arr_value(rows, 1) : arr_value(1, cols);
+      line = bycol ? arr_make(rows, 1) : arr_make(1, cols);
       if (line.t == V_ARR) for (i = 0; i < len; i++) line.a->v[i] = val_copy(bycol ? EL(src, i, k) : EL(src, k, i));
     }
     v.a->v[k] = one_value(cx, calc_call(cx, &a[1], &line, 1));
@@ -725,7 +725,7 @@ static Value rowcol(Ctx *cx, Value *a, int n, int col)
   if (a[0].t != V_REF) return val_err(E_VALUE);
   cnt = col ? a[0].c2 - a[0].c1 + 1 : a[0].r2 - a[0].r1 + 1;
   if (!cx->dyn || cnt == 1) return val_num((double)(col ? a[0].c1 : a[0].r1) + 1);
-  v = col ? arr_value(1, cnt) : arr_value(cnt, 1);
+  v = col ? arr_make(1, cnt) : arr_make(cnt, 1);
   if (v.t != V_ARR) return v;
   for (k = 0; k < cnt; k++) v.a->v[k] = val_num((double)(col ? a[0].c1 : a[0].r1) + k + 1);
   return v;
@@ -1128,7 +1128,7 @@ static Value agg_rows(Ctx *cx, const Value *fn, Arr *vals, int vc, const int *ro
   Value col, v;
   int i;
   if (!n) return val_empty();
-  col = arr_value(n, 1);
+  col = arr_make(n, 1);
   if (col.t != V_ARR) return col;
   for (i = 0; i < n; i++) col.a->v[i] = val_copy(EL(vals, rows[i], vc));
   v = calc_call(cx, fn, &col, 1);
@@ -1180,7 +1180,7 @@ static Value grid_take(Grid *g)
   Value out;
   int i;
   if (!g->rows) { free(g->v); return val_err(E_CALC); }
-  out = arr_value(g->rows, g->cols);
+  out = arr_make(g->rows, g->cols);
   if (out.t == V_ARR) for (i = 0; i < g->rows * g->cols; i++) out.a->v[i] = g->v[i];
   else for (i = 0; i < g->rows * g->cols; i++) val_free(&g->v[i]);
   free(g->v);
@@ -1379,7 +1379,7 @@ const char *const func_lift_spec[] = {
   "CHAR s", "CLEAN s", "CODE s", "CONCATENATE s", "DOLLAR s", "EXACT s", "FIND s", "FINDB s", "FIXED s", "LEFT s", "LEFTB s", "LEN s",
   "LENB s", "LOWER s", "MID s", "MIDB s", "NUMBERVALUE s", "PROPER s", "REPLACE s", "REPLACEB s", "REPT s", "RIGHT s", "RIGHTB s",
   "SEARCH s", "SEARCHB s", "SUBSTITUTE s", "T s", "TEXT s", "TRIM s", "UNICHAR s", "UNICODE s", "UPPER s", "VALUE s", "ASC s", "DBCS s",
-  "JIS s", "BAHTTEXT s", "USDOLLAR s", "TEXTBEFORE s", "TEXTAFTER s", "REGEXTEST s", "REGEXEXTRACT s", "REGEXREPLACE s", "ENCODEURL s",
+  "JIS s", "BAHTTEXT s", "USDOLLAR s", "TEXTBEFORE sas", "TEXTAFTER sas", "REGEXTEST s", "REGEXEXTRACT s", "REGEXREPLACE s", "ENCODEURL s",
   "HYPERLINK s",
   /* dates */
   "DATE s", "DATEDIF s", "DATEVALUE s", "DAY s", "DAYS s", "DAYS360 s", "EDATE s", "EOMONTH s", "HOUR s", "ISOWEEKNUM s", "MINUTE s",

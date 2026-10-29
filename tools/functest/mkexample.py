@@ -26,6 +26,9 @@ from cases import C
 _g = open(os.path.join(HERE, 'gen.py')).read()
 RANGE_ONLY = eval(re.search(r'^RANGE_ONLY = (\{.*\})$', _g, re.M).group(1))
 XLFN = eval(re.search(r'^XLFN = (\{.*\})$', _g, re.M).group(1))
+import cases_stat, cases_eng, cases_fin, cases_misc, cases_array
+for _m in (cases_stat, cases_eng, cases_fin, cases_misc, cases_array): XLFN |= set(getattr(_m, 'XLFN', ()))
+def call(fn, args): return fn.replace('@', args) if '(' in fn else '%s(%s)' % (fn, args)   # (as gen.py)
 
 out = sys.argv[1]
 work = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.environ.get('TMPDIR', '/tmp'), 'ledger-mkexample')
@@ -88,8 +91,8 @@ def build(expected=None, notes=None):
                 la.append(a); argcells.append((col, a)); ra.append('%s%%d' % openpyxl.utils.get_column_letter(col)); col += 1
         fn = ('_xlfn.' if name in XLFN else '') + name
         forms = []
-        if not refonly: forms.append(('typed', '=%s(%s)' % (fn, ','.join(la))))
-        if args: forms.append(('cells', '=%s(%s)' % (fn, ','.join(ra))))
+        if not refonly: forms.append(('typed', '=' + call(fn, ','.join(la))))
+        if args: forms.append(('cells', '=' + call(fn, ','.join(ra))))
         for form, f in forms:
             if form == 'cells':
                 f = f.replace('%d', str(r))

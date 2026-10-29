@@ -8,6 +8,7 @@
  * further passes, so the C stack stays small on the Amiga.
  */
 #include "calc.h"
+#include "pagesetup.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -180,7 +181,7 @@ static const Value *read_cell(Book *b, int sheet, i32 r, i32 c, int depth)
   }
   if (!cell) return &g_empty;
   if (cell->f && cell->calcgen != b->calcgen) {
-    if (cell->calcstate) { g_circular = 1; return &g_zero; }       /* Excel shows 0 for a circular reference */
+    if (cell->calcstate) { g_circular = 1; return b->lx && b->lx->iterate ? &cell->v : &g_zero; }   /* Excel shows 0 for a circular reference (iterating: the last value) */
     compute_cell(b, sheet, r, c, cell, depth + 1);
     cell = sheet_cell(b->sh[sheet], r, c);
     if (!cell) return &g_empty;
@@ -276,6 +277,41 @@ static void compute_cell(Book *b, int sheet, i32 r, i32 c, Cell *cell, int depth
   if ((nr != oldr || nc != oldc) && ((long)nr * nc > 1 || (long)oldr * oldc > 1)) g_spill_changed = 1;
   if (g_cut == cuts) cell->calcgen = b->calcgen;      /* complete unless a chain below it was cut */
 }
+/* iterative calculation (File > Options): circular formulas worked out again and again, each from
+   the others' last values, until no number changes by more than the maximum change or the
+   maximum number of iterations is reached */
+static void calc_iterate(Book *b)
+{
+  static int busy;
+  int it, s;
+  if (busy) return;
+  busy = 1;
+  for (it = 1; it < b->lx->maxiter; it++) {
+    double change = 0;
+    i32 r;
+    b->calcgen++;
+    if (!b->calcgen) b->calcgen = 1;
+    for (s = 0; s < b->nsh; s++) {
+      Sheet *sh = b->sh[s];
+      for (r = 0; r < sh->nrows; r++) {
+        int i;
+        if (!sh->rows[r]) continue;
+        for (i = 0; i < sh->rows[r]->n; i++) {
+          Cell *cell = &sh->rows[r]->c[i];
+          double old = cell->v.t == V_NUM ? cell->v.n : 0;
+          if (!cell->f || cell->calcgen == b->calcgen) continue;
+          cell->calcstate = 0;
+          compute_cell(b, s, r, cell->col, cell, 0);
+          if (!sh->rows[r]) break;
+          cell = &sh->rows[r]->c[i];
+          if (cell->v.t == V_NUM && fabs(cell->v.n - old) > change) change = fabs(cell->v.n - old);
+        }
+      }
+    }
+    if (change <= b->lx->maxchange) break;
+  }
+  busy = 0;
+}
 void book_recalc(Book *b)
 {
   int pass, s, gen;
@@ -312,6 +348,7 @@ void book_recalc(Book *b)
     }
     if (!g_spill_changed) break;
   }
+  if (g_circular && b->lx && b->lx->iterate) calc_iterate(b);
   free(g_hints); g_hints = NULL; g_nhints = 0;
 }
 int book_circular(void) { return g_circular; }
@@ -438,7 +475,7 @@ void to_text(Book *b, const Value *v, Buf *out)
 /* ------------------------------------------------------------------ scalars, arrays, shapes */
 int calc_is_union(const Value *v) { return v->t == V_ARR && v->a && v->a->rows * v->a->cols > 0 && v->a->v[0].t == V_REF; }
 static Value cell_element_or_self(const Value *v) { return v->t == V_LAMBDA ? val_err(E_CALC) : val_copy(v); }
-Value arr_value(int rows, int cols)
+Value arr_make(int rows, int cols)
 {
   Value v = val_empty();
   if (!(v.a = arr_new(rows, cols))) return val_err(E_NUM);
@@ -1027,7 +1064,7 @@ static Value lift(Ctx *cx, const FuncDef *fd, const char *mask, Value *args, int
       if (ar > rows) rows = ar;
       if (ac > cols) cols = ac;
     }
-  out = arr_value(rows, cols);
+  out = arr_make(rows, cols);
   if (out.t != V_ARR) return out;
   if (cx->arrayish) *cx->arrayish = 1;
   if (!(tmp = (Value *)malloc((size_t)argc * sizeof(Value) + (size_t)argc))) { val_free(&out); return val_err(E_NUM); }
@@ -1249,7 +1286,7 @@ static Value make_union(const Value *a, const Value *b)
   if (a->t == V_ERR) return val_err(a->e);
   if (b->t == V_ERR) return val_err(b->e);
   if ((a->t != V_REF && !calc_is_union(a)) || (b->t != V_REF && !calc_is_union(b))) return val_err(E_VALUE);
-  v = arr_value(1, na + nb);
+  v = arr_make(1, na + nb);
   if (v.t != V_ARR) return v;
   for (i = 0; i < na; i++) v.a->v[i] = calc_is_union(a) ? a->a->v[i] : *a;
   for (i = 0; i < nb; i++) v.a->v[na + i] = calc_is_union(b) ? b->a->v[i] : *b;
