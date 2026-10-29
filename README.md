@@ -130,7 +130,7 @@ Ledger 0.3 closes the gap with GridCraft: every function it has, every ribbon co
 - **Formulas and Review:** trace precedents and dependents, Evaluate Formula, Error Checking, Watch Window, Go To Special, spelling and thesaurus, threaded comments as well as notes.
 - **View:** split panes, new windows on the same workbook, arrange, side by side, custom views.
 - **Files:** opens old Excel .xls (BIFF8) and OpenDocument .ods workbooks.
-- **Languages:** the interface in English, German, French, Spanish and Italian.
+- **Languages:** the interface in English, German, French, Spanish and Italian, in Excel's own words for each. Ledger follows the Locale preferences, or choose in File > Options > Language (kept in Ledger.prefs as `language=de`, `fr`, `es` or `it`).
 - **FunctionTests.xlsx** now has 3,503 tests of all 514 functions (including spills and lambdas). Ledger passes every one, natively and on a 68040; LibreOffice passes all but the 791 rows whose notes say why (Excel's documented answer where LibreOffice differs, or a function LibreOffice hasn't got).
 - **On the 68040:** vbcc's floor and ceil went wrong past 2,147,483,647 (they go through a 32-bit number); Ledger now has its own, so big numbers convert, round and spell out (BAHTTEXT) right.
 
