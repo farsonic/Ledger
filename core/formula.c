@@ -321,6 +321,7 @@ static void parse_primary(P *ps)
     const char *st = ++ps->p;
     while (isalnum((u8)*ps->p) || *ps->p == '_' || *ps->p == '.' || (u8)*ps->p >= 0x80) ps->p++;
     if (ps->p == st || *ps->p != ']') { fail(ps); return; }
+    if (ps->p - st > 6 && !strncasecmp(st, "_xlpm.", 6)) st += 6;
     t.op = T_NAME; t.flags = TN_OPT | TN_LOCAL;
     t.s = str_ndup(st, (size_t)(ps->p - st));
     ps->p++;

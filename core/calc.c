@@ -1007,6 +1007,9 @@ static int is_multi(const Value *v)
 {
   return (v->t == V_REF && (v->r1 != v->r2 || v->c1 != v->c2)) || (v->t == V_ARR && v->a && v->a->rows * v->a->cols > 1 && !calc_is_union(v));
 }
+/* an argument a function of single values maps over: in a dynamic-array formula any array or
+   range; in a formula from before dynamic arrays only arrays (a range meets the formula's row) */
+static int liftable(const Ctx *cx, const Value *v) { return is_multi(v) && (cx->dyn || v->t == V_ARR); }
 static char mask_at(const char *m, int i) { size_t n = strlen(m); return n ? m[(size_t)i < n ? (size_t)i : n - 1] : 'a'; }
 /* a function of single values given arrays: called for each element (a single row or column
    stretching across, #N/A past the end of a shorter one) */
@@ -1017,7 +1020,7 @@ static Value lift(Ctx *cx, const FuncDef *fd, const char *mask, Value *args, int
   Value out, *tmp;
   u8 *own;
   for (i = 0; i < argc; i++)
-    if (mask_at(mask, i) == 's' && is_multi(&args[i])) {
+    if (mask_at(mask, i) == 's' && liftable(cx, &args[i])) {
       i32 ar, ac;
       arg_shape(&args[i], &ar, &ac);
       if (ar > rows) rows = ar;
@@ -1035,7 +1038,7 @@ static Value lift(Ctx *cx, const FuncDef *fd, const char *mask, Value *args, int
       for (i = 0; i < argc; i++) {
         own[i] = 0;
         tmp[i] = args[i];
-        if (mask_at(mask, i) == 's' && is_multi(&args[i])) {
+        if (mask_at(mask, i) == 's' && liftable(cx, &args[i])) {
           i32 ar, ac, rr, cc;
           arg_shape(&args[i], &ar, &ac);
           rr = ar == 1 ? 0 : r; cc = ac == 1 ? 0 : c;
@@ -1061,10 +1064,10 @@ static Value call_func(Ctx *cx, int id, Value *args, int argc)
   if (id < 0 || id >= func_count) return val_err(E_NAME);
   fd = &func_table[id];
   if (argc < fd->minargs || argc > fd->maxargs) return val_err(E_VALUE);
-  if (cx->dyn && g_lift && g_lift[id]) {
+  if (g_lift && g_lift[id]) {
     int i;
     for (i = 0; i < argc; i++)
-      if (mask_at(g_lift[id], i) == 's' && is_multi(&args[i])) return lift(cx, fd, g_lift[id], args, argc);
+      if (mask_at(g_lift[id], i) == 's' && liftable(cx, &args[i])) return lift(cx, fd, g_lift[id], args, argc);
   }
   return fd->fn(cx, args, argc);
 }
@@ -1140,7 +1143,7 @@ static Value lazy_call(Ctx *cx, const Formula *f, int j)
   /* IF and friends: the deciding argument first; given an array (dynamic arrays) every argument is
      worked out and the function maps over the elements */
   c = ARG(0);
-  if (cx->dyn && is_multi(&c)) {
+  if (liftable(cx, &c)) {
     Value *args = (Value *)malloc((size_t)argc * sizeof(Value));
     if (!args) { val_free(&c); return val_err(E_NUM); }
     args[0] = c;
@@ -1182,7 +1185,7 @@ static Value lazy_call(Ctx *cx, const Formula *f, int j)
       int b;
       if (k) {
         c = ARG(k);
-        if (cx->dyn && is_multi(&c)) {
+        if (liftable(cx, &c)) {
           /* an array condition further on: everything worked out, mapped */
           Value *args = (Value *)malloc((size_t)argc * sizeof(Value));
           int i;
@@ -1208,7 +1211,7 @@ static Value lazy_call(Ctx *cx, const Formula *f, int j)
     for (k = 1; k + 1 < argc; k += 2) {
       Value cv = ARG(k), cs;
       int eq;
-      if (cx->dyn && is_multi(&cv)) {
+      if (liftable(cx, &cv)) {
         Value *args = (Value *)malloc((size_t)argc * sizeof(Value));
         int i;
         val_free(&cv);
