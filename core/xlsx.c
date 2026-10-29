@@ -9,6 +9,7 @@
 #include "xlsx.h"
 #include "calc.h"
 #include "cond.h"
+#include "data.h"
 #include "zip.h"
 #include "xml.h"
 #include <stdlib.h>
@@ -439,6 +440,7 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
         ci = &s->cols[c - 1];
         if (w) { double wd = strtod(w, NULL); if (wd >= 0 && wd < 256) { ci->width = (u16)(wd * 7 + 0.5); ci->custom = 1; } }
         if (hid && (!strcmp(hid, "1") || !strcmp(hid, "true"))) ci->hidden = 1;
+        outline_xlsx_read_line(&x, &ci->outline, &ci->collapsed);
         if (st) { int xi = atoi(st); if (xi >= 0 && xi < rd->nxf) ci->style = (u16)rd->xf_style[xi]; }
       }
     } else if (!strcmp(n, "row")) {
@@ -449,7 +451,9 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
       next_col = 0;
       {
         const char *ht = xml_attr(&x, "ht"), *hid = xml_attr(&x, "hidden"), *st = xml_attr(&x, "s"), *cf = xml_attr(&x, "customFormat"), *ch = xml_attr(&x, "customHeight");
-        if (ht || (hid && atoi(hid)) || (st && cf && atoi(cf))) {
+        u8 olev = 0, ocol = 0;
+        outline_xlsx_read_line(&x, &olev, &ocol);
+        if (ht || (hid && atoi(hid)) || (st && cf && atoi(cf)) || olev || ocol) {
           Row *row;
           Cell *dummy = NULL;
           (void)dummy;
@@ -458,6 +462,7 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
           sheet_cell_clear(s, cur_row, 0);
           if (ht && (ch ? atoi(ch) : 1)) { double h = strtod(ht, NULL); if (h >= 0 && h < 410) { row->height = (u16)(h * 4 / 3 + 0.5); row->custom = 1; } }
           if (hid && atoi(hid)) row->hidden = 1;
+          row->outline = olev; row->collapsed = ocol;
           if (st && cf && atoi(cf)) { int xi = atoi(st); if (xi >= 0 && xi < rd->nxf) row->style = (u16)rd->xf_style[xi]; }
         }
       }
@@ -646,6 +651,14 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
       if (cr[curc].type == CF_BAR) { if (!ncolor) cr[curc].bar[0] = col; }
       else if (ncolor < 3) cr[curc].bar[ncolor == 0 ? 0 : ncolor == 1 ? (ncfvo >= 3 ? 1 : 2) : 2] = col;
       ncolor++;
+    } else if (!strcmp(n, "outlinePr")) {
+      outline_xlsx_read_pr(s, &x);
+    } else if (!strcmp(n, "sheetProtection")) {
+      prot_xlsx_read_sheet(s, &x);
+    } else if (!strcmp(n, "dataValidation")) {
+      dv_xlsx_read(rd->b, sheet, &x);
+    } else if (!strcmp(n, "scenarios")) {
+      scen_xlsx_read(s, &x);
     } else if (!strcmp(n, "sheetData") && x.pending_end) {
       /* empty */
     }
@@ -839,6 +852,8 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
     } else if (!strcmp(x.name, "workbookPr")) {
       const char *v = xml_attr(&x, "date1904");
       if (v && (!strcmp(v, "1") || !strcmp(v, "true"))) b->date1904 = 1;
+    } else if (!strcmp(x.name, "workbookProtection")) {
+      prot_xlsx_read_book(b, &x);
     } else if (!strcmp(x.name, "calcPr")) {
       const char *v = xml_attr(&x, "calcMode");
       if (v && !strcmp(v, "manual")) b->manualcalc = 0;      /* Ledger recalculates on load anyway */
@@ -976,6 +991,7 @@ static void file_formula(Book *b, int sheet, const Formula *f, Buf *o)
   }
   buf_free(&t);
 }
+void xlsx_formula_text(Book *b, int sheet, const Formula *f, Buf *o) { file_formula(b, sheet, f, o); }
 static void color_attr(Buf *o, const char *tag, u32 c)
 {
   if (c == COLOR_AUTO) buf_printf(o, "<%s auto=\"1\"/>", tag);
@@ -1221,7 +1237,12 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   buf_adds(o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
               "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" "
               "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">");
-  if (s->tabcolor) buf_printf(o, "<sheetPr><tabColor rgb=\"FF%06lX\"/></sheetPr>", (unsigned long)(s->tabcolor & 0xFFFFFF));
+  if (s->tabcolor || s->sumabove || s->sumleft) {
+    buf_adds(o, "<sheetPr>");
+    if (s->tabcolor) buf_printf(o, "<tabColor rgb=\"FF%06lX\"/>", (unsigned long)(s->tabcolor & 0xFFFFFF));
+    outline_xlsx_sheetpr(s, o);
+    buf_adds(o, "</sheetPr>");
+  }
   if (lr >= 0 && lc >= 0) {
     Rect d; d.r1 = 0; d.c1 = 0; d.r2 = lr; d.c2 = lc;
     rect_text(d, ref);
@@ -1243,6 +1264,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   buf_printf(o, "<selection activeCell=\"%s\" sqref=\"%s\"/></sheetView></sheetViews>", ref, ref);
   buf_printf(o, "<sheetFormatPr defaultRowHeight=\"%g\"", s->defheight * 0.75);
   if (s->defwidth != 64) buf_printf(o, " defaultColWidth=\"%g\"", floor(s->defwidth / 7.0 * 256) / 256);
+  outline_xlsx_formatpr(s, o);
   buf_adds(o, "/>");
   /* columns: runs of equal settings */
   {
@@ -1251,12 +1273,13 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
     while (c < s->ncols) {
       ColInfo *ci = &s->cols[c];
       i32 e = c;
-      if (!ci->custom && !ci->hidden && !ci->style) { c++; continue; }
+      if (!ci->custom && !ci->hidden && !ci->style && !ci->outline && !ci->collapsed) { c++; continue; }
       while (e + 1 < s->ncols && !memcmp(&s->cols[e + 1], ci, sizeof *ci)) e++;
       if (!open) { buf_adds(o, "<cols>"); open = 1; }
       buf_printf(o, "<col min=\"%ld\" max=\"%ld\" width=\"%g\"%s%s", (long)c + 1, (long)e + 1,
                  floor((ci->width ? ci->width : s->defwidth) / 7.0 * 256 + 0.5) / 256, ci->custom ? " customWidth=\"1\"" : "", ci->hidden ? " hidden=\"1\"" : "");
       if (ci->style) buf_printf(o, " style=\"%d\"", ci->style);
+      outline_xlsx_row_attrs(ci->outline, ci->collapsed, o);
       buf_adds(o, "/>");
       c = e + 1;
     }
@@ -1265,11 +1288,12 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   buf_adds(o, "<sheetData>");
   for (r = 0; r < s->nrows; r++) {
     Row *row = s->rows[r];
-    if (!row || (!row->n && !row->custom && !row->hidden && !row->filtered && !row->style)) continue;
+    if (!row || (!row->n && !row->custom && !row->hidden && !row->filtered && !row->style && !row->outline && !row->collapsed)) continue;
     buf_printf(o, "<row r=\"%ld\"", (long)r + 1);
     if (row->custom && row->height) buf_printf(o, " ht=\"%g\" customHeight=\"1\"", row->height * 0.75);
     if (row->hidden || row->filtered) buf_adds(o, " hidden=\"1\"");
     if (row->style) buf_printf(o, " s=\"%d\" customFormat=\"1\"", row->style);
+    outline_xlsx_row_attrs(row->outline, row->collapsed, o);
     buf_adds(o, ">");
     for (i = 0; i < row->n; i++) {
       Cell *c = &row->c[i];
@@ -1310,6 +1334,8 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
     buf_adds(o, "</row>");
   }
   buf_adds(o, "</sheetData>");
+  prot_xlsx_write_sheet(s, o);
+  scen_xlsx_write(s, o);
   if (s->filter.r1 >= 0) {
     /* the AutoFilter: its range and the values each filtered column lets through */
     rect_text(s->filter, ref);
@@ -1337,6 +1363,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
     for (k = 0; k < si; k++) for (i = 0; i < b->sh[k]->ncfs; i++) dxf += has_dxf(&b->sh[k]->cfs[i]);
     write_cond(b, si, dxf, o);
   }
+  dv_xlsx_write(b, si, o);
   if (s->nlinks) {
     /* links: out through the sheet's relationships (rIdL1...), or to a place in the workbook */
     buf_adds(o, "<hyperlinks>");
@@ -1481,6 +1508,7 @@ u8 *xlsx_save(Book *b, size_t *len)
                "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" "
                "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">");
   if (b->date1904) buf_adds(&o, "<workbookPr date1904=\"1\"/>");
+  prot_xlsx_write_book(b, &o);
   buf_printf(&o, "<bookViews><workbookView activeTab=\"%d\"/></bookViews><sheets>", b->active);
   for (i = 0; i < b->nsh; i++) {
     buf_adds(&o, "<sheet name=\""); xesc(&o, b->sh[i]->name);

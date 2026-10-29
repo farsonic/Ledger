@@ -5,6 +5,7 @@
 #include "book.h"
 #include "calc.h"
 #include "cond.h"
+#include "data.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -574,6 +575,7 @@ static void sheet_free(Sheet *s)
   cond_free_all(s->cfs, s->ncfs);
   notes_free(s->notes, s->nnotes);
   links_free(s->links, s->nlinks);
+  data_sheet_free(s);
   free(s);
 }
 /* a deep copy of a sheet, for undo (NULL out of memory) */
@@ -593,6 +595,7 @@ static Sheet *sheet_clone(const Sheet *s)
   if (!c->notes) c->nnotes = 0;
   c->links = links_copy(s->links, s->nlinks);
   if (!c->links) c->nlinks = 0;
+  data_sheet_clone(c, s);
   if (s->nrows && !(c->rows = (Row **)calloc((size_t)s->nrows, sizeof(Row *)))) goto fail;
   c->nrows = s->nrows;
   for (r = 0; r < s->nrows; r++) {
@@ -731,6 +734,7 @@ int sheet_merge_at(Sheet *s, i32 r, i32 c, Rect *m)
     if (r >= s->merges[i].r1 && r <= s->merges[i].r2 && c >= s->merges[i].c1 && c <= s->merges[i].c2) { if (m) *m = s->merges[i]; return 1; }
   return 0;
 }
+Row *sheet_row(Sheet *s, i32 r, int make) { return make ? row_make(s, r) : r >= 0 && r < s->nrows ? s->rows[r] : NULL; }
 /* column info for c, made if absent */
 static ColInfo *col_make(Sheet *s, i32 c)
 {
@@ -744,6 +748,7 @@ static ColInfo *col_make(Sheet *s, i32 c)
   }
   return &s->cols[c];
 }
+ColInfo *sheet_col(Sheet *s, i32 c, int make) { return make ? col_make(s, c) : c >= 0 && c < s->ncols ? &s->cols[c] : NULL; }
 
 /* ------------------------------------------------------------------ the book */
 Book *book_new(void)
@@ -923,6 +928,7 @@ static void undo_book(Book *b)
   u->active = b->active;
   u->kind = U_BOOK;
 }
+void book_note_book(Book *b) { undo_book(b); }
 /* apply step u (taking it off from), and push its opposite onto to */
 static int undo_apply(Book *b, UndoStep **from, UndoStep **to, int *sheet, Rect *area)
 {
@@ -998,6 +1004,7 @@ static void each_formula(Book *b, void (*fn)(Formula *f, int home, void *arg), v
       if (sh->rows[r]) for (i = 0; i < sh->rows[r]->n; i++) if (sh->rows[r]->c[i].f) fn(sh->rows[r]->c[i].f, s, arg);
     /* conditional formatting's formulas too */
     for (i = 0; i < sh->ncfs; i++) { if (sh->cfs[i].f1) fn(sh->cfs[i].f1, s, arg); if (sh->cfs[i].f2) fn(sh->cfs[i].f2, s, arg); }
+    data_each_formula(sh, s, fn, arg);          /* (data validation's) */
   }
   for (i = 0; i < b->nnames; i++) if (b->names[i].f) fn(b->names[i].f, b->names[i].sheet == SHEET_SELF ? 0 : b->names[i].sheet, arg);
 }
@@ -1719,6 +1726,7 @@ static int insdel(Book *b, int sheet, int rows, i32 at, i32 n)
   if (rows) move_rows(s, at, n); else move_cols(s, at, n);
   move_extras(s, rows, at, n);
   cond_shift_areas(s, rows, at, n);
+  data_shift(s, rows, at, n);
   sh.target = sheet; sh.rows = rows; sh.at = at; sh.n = n;
   each_formula(b, shift_formula, &sh);
   book_end(b);

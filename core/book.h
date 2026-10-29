@@ -115,8 +115,8 @@ typedef struct {
   u32 calcgen;                    /* the recalculation that last computed it */
   u8 calcstate;                   /* 0 idle, 1 being computed (circularity check) */
 } Cell;
-typedef struct { Cell *c; int n, cap; u16 height; u16 style; u8 hidden, custom, filtered; } Row;   /* filtered: hidden by the AutoFilter */
-typedef struct { u16 width; u16 style; u8 hidden, custom; } ColInfo;
+typedef struct { Cell *c; int n, cap; u16 height; u16 style; u8 hidden, custom, filtered, outline, collapsed; } Row;   /* filtered: hidden by the AutoFilter; outline: level 0-7 (outline.c); collapsed: its group's detail hidden */
+typedef struct { u16 width; u16 style; u8 hidden, custom, outline, collapsed; } ColInfo;
 typedef struct { i32 r1, c1, r2, c2; } Rect;
 /* an AutoFilter column's choice: the shown values (as the cells show them, UTF-8) that pass, and
    whether empty cells do */
@@ -165,6 +165,13 @@ typedef struct {
   Rect sel;
   i32 top, left;                  /* the scroll position when last shown */
   u16 zoom;                       /* per cent */
+  /* the Data tab's tools (data.h): validation rules, scenarios, the outline's summary side, protection */
+  struct DVRule *dvs; int ndvs;
+  struct Scenario *scens; int nscens;
+  u8 sumabove, sumleft;           /* outline summaries above / left of their detail (Excel's default: below / right) */
+  u8 protect;                     /* sheet protected: locked cells can't be changed */
+  u16 pwhash, protallow;          /* its password's legacy hash (0 none); what users may still do (PA_ bits) */
+  char protkey[144];              /* or a newer file's password check, "SHA-512:spin:salt:hash" ("" none) */
 } Sheet;
 
 typedef struct { char name[64]; u16 sheet; char *formula_text; Formula *f; } Name;   /* sheet: SHEET_SELF = workbook scope */
@@ -190,6 +197,9 @@ typedef struct {
   UndoStep *open;                 /* the step being recorded (book_begin .. book_end) */
   int nesting;
   double now_override;            /* tests: NOW() returns this when non-zero */
+  u8 lockstruct;                  /* workbook structure protected (sheets can't be added, moved, renamed...) */
+  u16 bookpwhash;                 /* its password's legacy hash (0 none) */
+  char bookkey[144];              /* or a newer file's password check (as Sheet.protkey) */
 } Book;
 
 Book  *book_new(void);                    /* one empty sheet, "Sheet1" */
@@ -216,11 +226,14 @@ int    sheet_cell_style(Sheet *s, i32 r, i32 c);            /* the cell's, else 
 u16    sheet_col_width(Sheet *s, i32 c);                     /* pixels (0 when hidden) */
 u16    sheet_row_height(Sheet *s, i32 r);
 int    sheet_merge_at(Sheet *s, i32 r, i32 c, Rect *m);     /* the merged area holding r,c, if any */
+Row   *sheet_row(Sheet *s, i32 r, int make);                /* row r's info (made if make); NULL if absent */
+ColInfo *sheet_col(Sheet *s, i32 c, int make);
 
 /* editing through the book (recorded for undo; formulas are recomputed unless manual calc) */
 void   book_begin(Book *b);               /* group the following changes into one undo step */
 void   book_end(Book *b);
 void   book_note_sheet(Book *b, int sheet);   /* (inside a step) the whole sheet noted for undo before it changes */
+void   book_note_book(Book *b);              /* (inside a step) every sheet noted (rows inserted and deleted, sheets added) */
 /* what the user typed into a cell: a formula ("=..."), a number, date, percentage, TRUE/FALSE, an
    error, or text ("'..." forces text). An empty string clears the value (keeping the format).
    Typing a date or percentage into a General cell gives it a matching number format, as in Excel.
