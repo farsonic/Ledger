@@ -1918,7 +1918,7 @@ extern const FuncDef func_stat_defs[], func_eng_defs[], func_fin_defs[], func_mi
 extern const int func_stat_count, func_eng_count, func_fin_count, func_misc_count, func_array_count;
 extern const FuncDef table_func_defs[];
 extern const int table_func_count;
-#define MAXFUNCS 640
+#define MAXFUNCS 1024
 static FuncDef merged[MAXFUNCS];
 const FuncDef *func_table = merged;
 int func_count;

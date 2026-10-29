@@ -87,6 +87,7 @@ typedef struct {
   char name[32];                  /* font family (UTF-8) */
   u16 size;                       /* tenths of a point (110 = 11 pt) */
   u8 bold, italic, underline, strike;   /* underline: 0 none, 1 single, 2 double */
+  u8 vert;                        /* 0 normal, 1 superscript, 2 subscript */
   u32 color;                      /* 0xRRGGBB, or COLOR_AUTO */
 } Font;
 #define COLOR_AUTO 0xFF000000UL
@@ -128,8 +129,9 @@ typedef struct { i32 col; int n; char **vals; u8 blanks; } FilterCol;
 enum { CF_CELL, CF_TEXT, CF_NOTTEXT, CF_BEGINS, CF_ENDS, CF_DUP, CF_UNIQUE, CF_TOP, CF_AVERAGE, CF_BLANKS, CF_NOBLANKS,
        CF_ERRORS, CF_NOERRORS, CF_EXPR, CF_BAR, CF_SCALE, CF_N };
 enum { CO_BETWEEN, CO_NOTBETWEEN, CO_EQ, CO_NE, CO_GT, CO_LT, CO_GE, CO_LE, CO_N };
-/* a note on a cell (Excel's notes, once called comments): who wrote it and what it says (UTF-8) */
-typedef struct { i32 r, c; char *author, *text; } Note;
+/* a note on a cell (Excel's notes, once called comments): who wrote it and what it says (UTF-8).
+   A threaded comment (comments.h) is a note with threaded set and its replies */
+typedef struct { i32 r, c; char *author, *text; u8 threaded, visible, resolved; char *replies; } Note;
 /* a hyperlink on a cell: a web or mail address, or a place in the workbook ("#Sheet2!A1"), and its tip */
 typedef struct { i32 r, c; char *target, *tip; } Link;
 typedef struct CondCache CondCache;
@@ -169,6 +171,7 @@ typedef struct {
   Rect sel;
   i32 top, left;                  /* the scroll position when last shown */
   u16 zoom;                       /* per cent */
+  struct PageSetup *page;         /* page setup (pagesetup.h), NULL: the defaults */
 } Sheet;
 
 typedef struct { char name[64]; u16 sheet; char *formula_text; Formula *f; } Name;   /* sheet: SHEET_SELF = workbook scope */
@@ -194,6 +197,7 @@ typedef struct {
   UndoStep *open;                 /* the step being recorded (book_begin .. book_end) */
   int nesting;
   double now_override;            /* tests: NOW() returns this when non-zero */
+  struct LayoutBook *lx;          /* more properties, the theme, calculation options (pagesetup.h), NULL: defaults */
 } Book;
 
 Book  *book_new(void);                    /* one empty sheet, "Sheet1" */

@@ -4,6 +4,15 @@ from cases import C, R
 # functions Excel only takes ranges for (it won't accept array constants there)
 RANGE_ONLY = {'ROW','COLUMN','COUNTIF','COUNTIFS','SUMIF','SUMIFS','AVERAGEIF','AVERAGEIFS','MAXIFS','MINIFS','OFFSET','COUNTBLANK'}
 XLFN = {'CEILING.MATH','CONCAT','DAYS','FLOOR.MATH','IFNA','IFS','ISFORMULA','MAXIFS','MINIFS','MODE.SNGL','NUMBERVALUE','PERCENTILE.EXC','PERCENTILE.INC','QUARTILE.INC','RANK.EQ','STDEV.P','STDEV.S','SWITCH','TEXTJOIN','UNICHAR','VAR.P','VAR.S','XLOOKUP','XOR'}
+# (the per-file case lists can name more: XLFN in cases_<m>.py)
+import cases_stat, cases_eng, cases_fin, cases_misc, cases_array
+for _m in (cases_stat, cases_eng, cases_fin, cases_misc, cases_array): XLFN |= set(getattr(_m, 'XLFN', ()))
+# a case's name with brackets in it is a template: @ stands for the arguments, e.g. 'INDEX(LINEST(@),2,1)'
+def call(fn, args): return fn.replace('@', args) if '(' in fn else '%s(%s)' % (fn, args)
+# and every function whose table entry in core/func*.c is flagged FF_XLFN
+import glob, os
+for _f in glob.glob(os.path.join(sys.argv[1], '..', '..', 'core', 'func*.c')):
+    XLFN |= set(re.findall(r'\{ "([A-Z0-9._]+)", \d+, \d+, [^,}]*FF_XLFN', open(_f).read()))
 wb = openpyxl.Workbook(); T = wb.active; T.title = 'T'; D = wb.create_sheet('Data')
 num = re.compile(r'^-?\d+(\.\d+)?$')
 def put(ws, cell, frag):
@@ -41,8 +50,8 @@ for case in C:
             col += 1
     T.cell(row, 1, name)
     fn = ('_xlfn.' if name in XLFN else '') + name
-    if not refonly: T.cell(row, 2, '=%s(%s)' % (fn, ','.join(la)))
-    T.cell(row, 3, '=%s(%s)' % (fn, ','.join(ra)))
+    if not refonly: T.cell(row, 2, '=' + call(fn, ','.join(la)))
+    T.cell(row, 3, '=' + call(fn, ','.join(ra)))
     meta.append((row, name, T.cell(row, 2).value, T.cell(row, 3).value))
     row += 1
 wb.save(sys.argv[2])

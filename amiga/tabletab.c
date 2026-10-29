@@ -16,6 +16,9 @@
 #include "lang.h"
 #include "ids.h"
 #include "tabletab.h"
+#include "layout.h"
+/* (the command ranges mustn't meet) */
+typedef char tbl_ids_clear_of_lx[ID_LX_LAST <= ID_TBL_FIRST ? 1 : -1];
 #include "../core/table.h"
 #include "../core/pivot.h"
 
