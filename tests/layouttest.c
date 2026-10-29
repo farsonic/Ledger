@@ -267,8 +267,24 @@ static void audit_tests(void)
   ok("accessibility: default sheet name", n == 1 && strstr(t, "Sheet1\tDefault sheet name"));
   book_free(b);
 }
+static void iterate_tests(void)
+{
+  Book *b = book_new();
+  LayoutBook *x = book_lx(b);
+  book_input(b, 0, 0, 0, "=B1/2+1", NULL);
+  book_input(b, 0, 0, 1, "=A1", NULL);
+  ok("iterate: off, a circular reference is 0", cell_value(b, 0, 0, 1)->n < 1.5);
+  x->iterate = 1; x->maxiter = 100; x->maxchange = 0.0001;
+  book_recalc(b);
+  ok("iterate: converges", fabs(cell_value(b, 0, 0, 0)->n - 2) < 0.001);
+  x->maxiter = 1;
+  book_input(b, 0, 1, 0, "=A2+1", NULL);
+  ok("iterate: one iteration only", cell_value(b, 0, 1, 0)->n <= 2);
+  book_free(b);
+}
 static void layout_tests(void)
 {
+  iterate_tests();
   audit_tests();
   spell_tests();
   pagesetup_tests();
