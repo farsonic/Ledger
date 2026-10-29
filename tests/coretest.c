@@ -786,6 +786,58 @@ static void links(void)
   book_free(b);
 }
 
+/* financial and database functions (func_fin.c): Excel's documented examples, and checks
+   LibreOffice can't make (computed criteria, odd first periods) */
+static void fin_db(void)
+{
+  Book *b = book_new();
+  ok("ODDFPRICE Excel example", near(evn(b, "ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)"), 113.597717474079));
+  ok("ODDFYIELD Excel example", fabs(evn(b, "ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,84.5,100,2,0)") - 0.0772) < 5e-5);
+  ok("ODDFPRICE of a regular first period is PRICE", near(evn(b, "ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,9,1),DATE(2009,3,1),0.0785,0.0625,100,2,1)"),
+     evn(b, "PRICE(DATE(2008,11,11),DATE(2021,3,1),0.0785,0.0625,100,2,1)")));
+  ok("ODDFPRICE of a regular first period is PRICE (30/360)", near(evn(b, "ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,9,1),DATE(2008,12,1),0.0785,0.0625,100,4,0)"),
+     evn(b, "PRICE(DATE(2008,11,11),DATE(2021,3,1),0.0785,0.0625,100,4,0)")));
+  /* a long first period of two whole quasi-periods, settlement in the first: the same cash flows as
+     a regular bond but for the coupon of the first quasi-period, paid a period later */
+  ok("ODDFPRICE long first period", near(evn(b, "ODDFPRICE(DATE(2008,5,1),DATE(2021,3,1),DATE(2008,3,1),DATE(2009,3,1),0.08,0.06,100,2,0)"),
+     evn(b, "PRICE(DATE(2008,5,1),DATE(2021,3,1),0.08,0.06,100,2,0)-4/1.03^(120/180)+4/1.03^(1+120/180)")));
+  ok("ODDFYIELD inverts ODDFPRICE", near(evn(b, "ODDFYIELD(DATE(2008,5,1),DATE(2021,3,1),DATE(2008,3,1),DATE(2009,3,1),0.08,"
+     "ODDFPRICE(DATE(2008,5,1),DATE(2021,3,1),DATE(2008,3,1),DATE(2009,3,1),0.08,0.06,100,2,0),100,2,0)"), 0.06));
+  ok("ODDLPRICE Excel example", fabs(evn(b, "ODDLPRICE(DATE(2008,2,7),DATE(2008,6,15),DATE(2007,10,15),0.0375,0.0405,100,2,0)") - 99.87829) < 5e-6);
+  ok("ODDLYIELD Excel example", fabs(evn(b, "ODDLYIELD(DATE(2008,4,20),DATE(2008,6,15),DATE(2007,12,24),0.0375,99.875,100,2,0)") - 0.045192) < 5e-7);
+  ok("DURATION Excel example", fabs(evn(b, "DURATION(DATE(2018,7,1),DATE(2048,1,1),0.08,0.09,2,1)") - 10.9191453) < 5e-8);
+  ok("MIRR Excel example", fabs(evn(b, "MIRR({-120000,39000,30000,21000,37000,46000},0.1,0.12)") - 0.126094) < 5e-7);
+  ok("XIRR Excel example", fabs(evn(b, "XIRR({-10000,2750,4250,3250,2750},{39448,39508,39751,39859,39904},0.1)") - 0.373362535) < 5e-9);
+  ok("PDURATION is _xlfn.", (func_table[func_lookup("PDURATION")].flags & FF_XLFN) != 0);
+  /* database functions: Excel's example table */
+  put(b, "A5", "Tree"); put(b, "B5", "Height"); put(b, "C5", "Age"); put(b, "D5", "Yield"); put(b, "E5", "Profit");
+  put(b, "A6", "Apple"); put(b, "B6", "18"); put(b, "C6", "20"); put(b, "D6", "14"); put(b, "E6", "105");
+  put(b, "A7", "Pear"); put(b, "B7", "12"); put(b, "C7", "12"); put(b, "D7", "10"); put(b, "E7", "96");
+  put(b, "A8", "Cherry"); put(b, "B8", "13"); put(b, "C8", "14"); put(b, "D8", "9"); put(b, "E8", "105");
+  put(b, "A9", "Apple"); put(b, "B9", "14"); put(b, "C9", "15"); put(b, "D9", "10"); put(b, "E9", "75");
+  put(b, "A10", "Pear"); put(b, "B10", "9"); put(b, "C10", "8"); put(b, "D10", "8"); put(b, "E10", "76.8");
+  put(b, "A11", "Apple"); put(b, "B11", "8"); put(b, "C11", "9"); put(b, "D11", "6"); put(b, "E11", "45");
+  put(b, "A1", "Tree"); put(b, "B1", "Height"); put(b, "C1", "Age"); put(b, "D1", "Yield"); put(b, "E1", "Profit"); put(b, "F1", "Height");
+  put(b, "A2", "=\"=Apple\""); put(b, "B2", ">10"); put(b, "F2", "<16"); put(b, "A3", "=\"=Pear\"");
+  ok("DCOUNT Excel example", evn(b, "DCOUNT(A5:E11,\"Age\",A1:F2)") == 1);
+  ok("DCOUNT with the field left out counts records", evn(b, "DCOUNT(A5:E11,,A1:F2)") == 1 && evn(b, "DCOUNTA(A5:E11,,A1:A3)") == 5);
+  ok("DMAX Excel example", evn(b, "DMAX(A5:E11,\"Profit\",A1:F3)") == 96);
+  ok("DSUM Excel example", evn(b, "DSUM(A5:E11,\"Profit\",A1:A2)") == 225 && evn(b, "DSUM(A5:E11,\"Profit\",A1:F2)") == 75);
+  ok("DAVERAGE by field number", evn(b, "DAVERAGE(A5:E11,3,A5:E11)") == 13);
+  ok("DSTDEV Excel example", fabs(evn(b, "DSTDEV(A5:E11,\"Yield\",A1:A3)") - 2.96647939483827) < 1e-12);
+  put(b, "G1", "Tree"); put(b, "G2", "Plum");
+  ok("DGET: more than one match is #NUM!, none #VALUE!", evn(b, "DGET(A5:E11,\"Yield\",A1:A3)") == -1000 - E_NUM && evn(b, "DGET(A5:E11,\"Yield\",G1:G2)") == -1000 - E_VALUE);
+  put(b, "G2", "Ch");
+  ok("text criteria match the beginning", evn(b, "DGET(A5:E11,\"Yield\",G1:G2)") == 9);
+  ok("DGET of a missing field is #VALUE!", evn(b, "DGET(A5:E11,\"Price\",G1:G2)") == -1000 - E_VALUE);
+  /* computed criteria: a formula under a heading that isn't a field, about the first record */
+  put(b, "H1", "Big"); put(b, "H2", "=E6>AVERAGE($E$6:$E$11)");
+  ok("computed criteria", near(evn(b, "DSUM(A5:E11,\"Profit\",H1:H2)"), 306) && evn(b, "DCOUNT(A5:E11,\"Age\",H1:H2)") == 3);
+  put(b, "I1", "Tree"); put(b, "I2", "Apple");
+  ok("computed criteria AND a field", near(evn(b, "DSUM(A5:E11,\"Profit\",H1:I2)"), 105));
+  book_free(b);
+}
+
 static void templates(void)
 {
   Book *b;
@@ -846,6 +898,7 @@ int main(void)
   files();
   ops();
   templates();
+  fin_db();
   autofilter();
   condfmt();
   notes();

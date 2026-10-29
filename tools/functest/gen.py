@@ -9,6 +9,10 @@ import cases_stat, cases_eng, cases_fin, cases_misc, cases_array
 for _m in (cases_stat, cases_eng, cases_fin, cases_misc, cases_array): XLFN |= set(getattr(_m, 'XLFN', ()))
 # a case's name with brackets in it is a template: @ stands for the arguments, e.g. 'INDEX(LINEST(@),2,1)'
 def call(fn, args): return fn.replace('@', args) if '(' in fn else '%s(%s)' % (fn, args)
+# and every function whose table entry in core/func*.c is flagged FF_XLFN
+import glob, os
+for _f in glob.glob(os.path.join(sys.argv[1], '..', '..', 'core', 'func*.c')):
+    XLFN |= set(re.findall(r'\{ "([A-Z0-9._]+)", \d+, \d+, [^,}]*FF_XLFN', open(_f).read()))
 wb = openpyxl.Workbook(); T = wb.active; T.title = 'T'; D = wb.create_sheet('Data')
 num = re.compile(r'^-?\d+(\.\d+)?$')
 def put(ws, cell, frag):

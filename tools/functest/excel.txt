@@ -4,11 +4,11 @@
 =_xlfn.CONCAT(E48,F48,G48)	the same, from cells
 =COUNT(E56,F56,G56,H56)	Excel doesn't count text in cells, even "2"
 =COUNT({1;"2";"x";TRUE;5})	Excel counts only the numbers in an array
-=COUNT(Data!A95:A99)	nor text or TRUE in a range
+COUNT#2	nor text or TRUE in a range
 =DOLLAR(-1234.567,1)	Excel's own example shows negatives in brackets
 =DOLLAR(E80,F80)	the same, from cells
 =LARGE({3;1;4;1;5;9;2;6},9)	Excel: #NUM! when k is past the end
-=LARGE(Data!A193:A200,E162)	the same, from cells
+LARGE#2	the same, from cells
 =LN(0)	Excel: #NUM!
 =LN(E171)	the same, from cells
 =MATCH("b*",{"apple";"banana";"cherry";"apple"},0)	Excel matches wildcards in arrays too
@@ -29,15 +29,15 @@
 =SUM("3",TRUE)	Excel adds text numbers and logicals typed into the call
 =SUM(E297,F297)	but not those in cells
 =SUM({1;"3";TRUE})	nor those in an array
-=SUM(Data!A459:A461)	nor in a range
+SUM#4	nor in a range
 =TYPE(TRUE)	Excel: 4 for a logical
 =TYPE(E332)	the same, from a cell
 =_xlfn.XLOOKUP(3,{1;2;3},{"a";"b";"c"})	this LibreOffice has no XLOOKUP: checked by hand
-=_xlfn.XLOOKUP(E355,Data!A583:A585,Data!A587:A589)	(checked by hand)
+XLOOKUP#1	(checked by hand)
 =_xlfn.XLOOKUP(9,{1;2;3},{"a";"b";"c"},"none")	(checked by hand)
-=_xlfn.XLOOKUP(E356,Data!A591:A593,Data!A595:A597,F356)	(checked by hand)
+XLOOKUP#2	(checked by hand)
 =_xlfn.XLOOKUP(2.5,{1;2;3},{"a";"b";"c"},"none",1)	(checked by hand)
-=_xlfn.XLOOKUP(E357,Data!A599:A601,Data!A603:A605,F357,G357)	(checked by hand)
+XLOOKUP#3	(checked by hand)
 # literal and cells forms differ on purpose
 LIT:COUNT	typed-in text numbers and logicals count; in cells they don't
 LIT:COUNTA	"" typed in is a value; an empty cell isn't
@@ -111,63 +111,63 @@ LIT:SUM	as COUNT
 =_xlfn.HYPGEOM.DIST(5,4,8,20,TRUE)	Excel: #NUM! when sample_s > number_sample; LibreOffice raises its own Err:502 (saved as #VALUE!)
 =_xlfn.HYPGEOM.DIST(E561,F561,G561,H561,I561)	the same, from cells
 =DEVSQ({1;"x";3;TRUE;"";7})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
-=DEVSQ(Data!A620:A625)	the same, from cells
+DEVSQ#3	the same, from cells
 =SKEW({1;"x";3;TRUE;"";7})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
-=SKEW(Data!A636:A641)	the same, from cells
+SKEW#4	the same, from cells
 =GEOMEAN(4,0)	Excel: #NUM! when a value is <= 0; LibreOffice gives 0
 =GEOMEAN(E579,F579)	the same, from cells
 =HARMEAN(-1,2)	Excel: #NUM! when a value is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
 =HARMEAN(E582,F582)	the same, from cells
 =TRIMMEAN({3;1;4;1;5;9;2;6},1)	Excel: #NUM! when percent >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=TRIMMEAN(Data!A709:A716,E586)	the same, from cells
+TRIMMEAN#4	the same, from cells
 =_xlfn.PERMUTATIONA(-1,2)	Excel: #NUM! for a negative number; LibreOffice raises its own Err:502 (saved as #VALUE!)
 =_xlfn.PERMUTATIONA(E595,F595)	the same, from cells
 =_xlfn.PERCENTRANK.INC({3;1;4;1;5;9;2;6},8.3,2)	Excel truncates to significance digits (0.9666 -> 0.96); LibreOffice rounds
-=_xlfn.PERCENTRANK.INC(Data!A802:A809,E602,F602)	the same, from cells
+PERCENTRANK.INC#3	the same, from cells
 =_xlfn.PERCENTRANK.INC({3;1;4;1;5;9;2;6},10)	Excel: #N/A when x is outside the values; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.PERCENTRANK.INC(Data!A811:A818,E603)	the same, from cells
+PERCENTRANK.INC#4	the same, from cells
 =_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},4)	Excel truncates to significance digits (0.5555 -> 0.555); LibreOffice rounds
-=_xlfn.PERCENTRANK.EXC(Data!A856:A863,E608)	the same, from cells
+PERCENTRANK.EXC#1	the same, from cells
 =_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},2.5)	Excel truncates to significance digits (0.3888 -> 0.388); LibreOffice rounds
-=_xlfn.PERCENTRANK.EXC(Data!A865:A872,E609)	the same, from cells
+PERCENTRANK.EXC#2	the same, from cells
 =_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},0)	Excel: #N/A when x is outside the values; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.PERCENTRANK.EXC(Data!A883:A890,E611)	the same, from cells
+PERCENTRANK.EXC#4	the same, from cells
 =_xlfn.QUARTILE.EXC({3;1;4;1;5;9;2;6},0)	Excel: #NUM! when quart <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.QUARTILE.EXC(Data!A919:A926,E615)	the same, from cells
+QUARTILE.EXC#4	the same, from cells
 =_xlfn.QUARTILE.EXC({1;2},1)	Excel: #NUM! when the quartile falls outside the data; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.QUARTILE.EXC(Data!A928:A929,E616)	the same, from cells
+QUARTILE.EXC#5	the same, from cells
 =_xlfn.MODE.MULT({1;2;3})	Excel: #N/A when no value repeats; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.MODE.MULT(Data!A983:A985)	the same, from cells
+MODE.MULT#2	the same, from cells
 =PROB({0;1;2;3},{0.2;0.3;0.1;0.3},1,3)	Excel: #NUM! when the probabilities do not add up to 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=PROB(Data!A1085:A1088,Data!A1090:A1093,E630,F630)	the same, from cells
+PROB#3	the same, from cells
 =PEARSON({1;2;3},{1;2})	Excel: #N/A when the arrays have different numbers of points; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=PEARSON(Data!A1139:A1141,Data!A1143:A1144)	the same, from cells
+PEARSON#4	the same, from cells
 =SLOPE({1;"x";3;TRUE;"";7},{1;2;3;4;5;6})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
-=SLOPE(Data!A1222:A1227,Data!A1229:A1234)	the same, from cells
+SLOPE#3	the same, from cells
 =STEYX({1;2},{3;4})	Excel: #DIV/0! for fewer than three points; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=STEYX(Data!A1318:A1319,Data!A1321:A1322)	the same, from cells
+STEYX#3	the same, from cells
 =_xlfn.COVARIANCE.S({1},{2})	Excel: #DIV/0! for fewer than two points; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.COVARIANCE.S(Data!A1398:A1398,Data!A1400:A1400)	the same, from cells
+COVARIANCE.S#2	the same, from cells
 =_xlfn.T.TEST({3;4;5;8;9;1;2;4;5},{6;19;3;2;14;4;5;17;1},3,1)	Excel: #NUM! when tails is not 1 or 2; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.T.TEST(Data!A1538:A1546,Data!A1548:A1556,E658,F658)	the same, from cells
+T.TEST#5	the same, from cells
 =_xlfn.T.TEST({3;4;5;8;9;1;2;4;5},{6;19;3;2;14;4;5;17},2,1)	Excel: #N/A for a paired test of arrays of different sizes; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.T.TEST(Data!A1558:A1566,Data!A1568:A1575,E659,F659)	the same, from cells
+T.TEST#6	the same, from cells
 =_xlfn.F.TEST({1},{6;19;3;2;14;4;5;17;1})	Excel: #DIV/0! for fewer than two points; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.F.TEST(Data!A1668:A1668,Data!A1670:A1678)	the same, from cells
+F.TEST#3	the same, from cells
 =_xlfn.CHISQ.TEST({58,35;11,25;10,23},{45.35,47.65;17.56,18.44})	Excel: #N/A when the ranges have different numbers of points; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.CHISQ.TEST(Data!A1748:B1750,Data!A1752:B1753)	the same, from cells
+CHISQ.TEST#3	the same, from cells
 =LOGEST({1;-2},{1;2})	Excel: #NUM! when a known_y is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=LOGEST(Data!A2308:A2309,Data!A2311:A2312)	the same, from cells
+LOGEST#2	the same, from cells
 =GROWTH({1;0},{1;2},3)	Excel: #NUM! when a known_y is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=GROWTH(Data!A2525:A2526,Data!A2528:A2529,E720)	the same, from cells
+GROWTH#3	the same, from cells
 =_xlfn.FORECAST.ETS(10,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12})	Excel: #NUM! when target_date is before the end of the timeline; LibreOffice gives the fitted value
-=_xlfn.FORECAST.ETS(E725,Data!A2651:A2662,Data!A2664:A2675)	the same, from cells
+FORECAST.ETS#5	the same, from cells
 =_xlfn.FORECAST.ETS(13,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11})	Excel: #N/A when values and timeline differ in size; LibreOffice raises its own Err:502 (saved as #VALUE!)
-=_xlfn.FORECAST.ETS(E726,Data!A2677:A2688,Data!A2690:A2700)	the same, from cells
+FORECAST.ETS#6	the same, from cells
 =_xlfn.FORECAST.ETS.STAT({10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12},9)	Excel: #NUM! when statistic_type is not 1 to 8; LibreOffice gives 1
-=_xlfn.FORECAST.ETS.STAT(Data!A2814:A2825,Data!A2827:A2838,E731)	the same, from cells
+FORECAST.ETS.STAT#3	the same, from cells
 =_xlfn.FORECAST.ETS.CONFINT(13,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12},1)	Excel: #NUM! when confidence_level is not between 0 and 1; LibreOffice gives 0
-=_xlfn.FORECAST.ETS.CONFINT(E732,Data!A2840:A2851,Data!A2853:A2864,F732)	the same, from cells
+FORECAST.ETS.CONFINT#1	the same, from cells
 =USDOLLAR(1234.567)	LibreOffice has no USDOLLAR; Excel gives what DOLLAR gives
 =USDOLLAR(E733)	the same, from cells
 =USDOLLAR(1234.567,-2)	LibreOffice has no USDOLLAR; Excel gives what DOLLAR gives
@@ -330,3 +330,64 @@ LIT:SUM	as COUNT
 =CUBERANKEDMEMBER("conn","set",1)	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
 =CUBEMEMBERPROPERTY("conn","m","p")	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
 =CUBEKPIMEMBER("conn","k",1)	LibreOffice has no cube functions; without a cube connection Excel returns #N/A
+# financial and database functions (cases_fin.py). LibreOffice's analysis functions give #VALUE! where Excel documents #NUM!
+=ACCRINT(DATE(2008,3,5),DATE(2008,8,31),DATE(2008,5,1),0.1,1000,2,0,FALSE)	LibreOffice takes no calc_method argument; Excel's examples give 15.555556 and 7.2222222
+=ACCRINT(DATE(2008,4,5),DATE(2008,8,31),DATE(2008,5,1),0.1,1000,2,0,TRUE)	LibreOffice takes no calc_method argument; Excel's examples give 15.555556 and 7.2222222
+=ACCRINT(DATE(2008,3,1),DATE(2008,8,31),DATE(2008,5,1),0.1,1000,2,1)	Excel sums each quasi-coupon period over its actual length (its documented formula); LibreOffice divides by 366 days
+=ACCRINT(DATE(2008,5,1),DATE(2008,8,31),DATE(2008,3,1),0.1,1000,2,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=ACCRINT(DATE(2008,3,1),DATE(2008,8,31),DATE(2008,5,1),0.1,1000,3,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=ACCRINTM(DATE(2007,4,1),DATE(2009,6,15),0.1,1000,1)	Excel's actual/actual year here is YEARFRAC's (the average of the years spanned); LibreOffice uses 365 days
+=ACCRINTM(DATE(2008,4,1),DATE(2008,6,15),0,1000)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=ACCRINTM(DATE(2008,4,1),DATE(2008,6,15),0.1,1000,5)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=COUPDAYBS(DATE(2011,11,15),DATE(2011,1,25),2,1)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=COUPNUM(DATE(2011,1,25),DATE(2011,11,15),3)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=COUPDAYS(DATE(2011,1,25),DATE(2011,11,15),2,5)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=CUMIPMT(0.09/12,30*12,125000,13,12,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=CUMIPMT(0.09/12,30*12,-125000,1,12,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=CUMIPMT(0.09/12,30*12,125000,1,12,2)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DB(1000000,100000,6,7)	Excel: #NUM! for a period past the life when month is 12; LibreOffice 0
+=DB(1000000,100000,6,1,13)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DDB(2400,300,10,11)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=SYD(30000,7500,10,11)	Excel: #NUM! for a period past the life; LibreOffice 0
+=VDB(2400,300,10,3,2)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DISC(DATE(2018,10,1),DATE(2018,7,1),97.975,100)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=INTRATE(DATE(2008,2,15),DATE(2009,5,15),1000000,1014420,1)	Excel's actual/actual year here is YEARFRAC's (the average of the years spanned); LibreOffice uses the first year's length
+=PRICEDISC(DATE(2008,2,16),DATE(2010,3,1),0.0525,100,1)	Excel's actual/actual year here is YEARFRAC's (the average of the years spanned); LibreOffice uses the first year's length
+=TBILLEQ(DATE(2008,3,31),DATE(2008,12,1),0.0914)	Excel uses the bond-equivalent formula for more than half a year to maturity; LibreOffice the short one, with 30/360 days
+=TBILLEQ(DATE(2008,3,31),DATE(2009,6,1),0.0914)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=TBILLPRICE(DATE(2008,3,31),DATE(2009,3,31),0.09)	Excel counts the actual days to maturity; LibreOffice 30/360 days to the day after
+=TBILLYIELD(DATE(2008,3,31),DATE(2008,6,1),0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DOLLARDE(1.1,0)	Excel documents #DIV/0! for a fraction of 0; LibreOffice #VALUE!
+=DOLLARDE(1.1,-1)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=DURATION(DATE(2018,7,1),DATE(2048,1,1),0.08,0.09,2,1)	Excel's documented example gives 10.9191453; LibreOffice works the first period out from YEARFRAC
+=DURATION(DATE(2018,8,17),DATE(2028,3,1),0.05,0.06,4,1)	Excel times each coupon from COUPDAYSNC/COUPDAYS (its example gives 10.9191453); LibreOffice works it out from YEARFRAC
+=DURATION(DATE(2018,8,17),DATE(2028,3,1),0.05,0.06,1,3)	Excel times each coupon from COUPDAYSNC/COUPDAYS (its example gives 10.9191453); LibreOffice works it out from YEARFRAC
+=MDURATION(DATE(2008,1,1),DATE(2016,1,1),0.08,0.09,2,1)	Excel's documented example gives 5.736; LibreOffice 5.734 (it works the first period out from YEARFRAC)
+=MDURATION(DATE(2018,8,17),DATE(2028,3,1),0.05,0.06,2,2)	Excel times each coupon from COUPDAYSNC/COUPDAYS; LibreOffice works it out from YEARFRAC (actual/360 here)
+=PRICE(DATE(2008,2,15),DATE(2017,11,15),0.0575,0.065,100,3,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=YIELD(DATE(2008,2,15),DATE(2008,9,15),0.0575,99.5,100,1,1)	Excel's documented closed form for one period or less, with COUPDAYS/COUPDAYBS/COUPDAYSNC; LibreOffice counts the actual/actual period differently
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,0)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,4,3)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,1,2)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,1,11),DATE(2021,3,1),DATE(2007,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,11,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,84.5,100,2,0)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,84.5,100,2,1)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,104,100,4,4)	LibreOffice 24.2 gives #VALUE! for odd first periods; Ledger follows Excel's formulas (its examples: ODDFPRICE 113.597717, ODDFYIELD 0.0772)
+=ODDLPRICE(DATE(2008,2,7),DATE(2008,6,15),DATE(2007,10,15),0.0375,0.0405,100,2,1)	Excel sums over the quasi-coupon periods with their actual lengths (its documented formula); LibreOffice uses year fractions
+=ODDLPRICE(DATE(2008,2,7),DATE(2008,6,15),DATE(2008,3,15),0.0375,0.0405,100,2,0)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=EFFECT(0,4)	Excel documents #NUM! for a nominal rate <= 0; LibreOffice 0
+=EFFECT(0.05,0.5)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=NOMINAL(-0.05,4)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=FVSCHEDULE(100,{0.09,"x"})	Excel documents #VALUE! for anything but numbers and blanks in the schedule; LibreOffice skips text
+=ISPMT(0.1,1,0,8000000)	Excel: #DIV/0! for nper 0; LibreOffice #NUM!
+=MIRR({120000;39000},0.1,0.12)	Excel documents #DIV/0! without both a positive and a negative value; LibreOffice #VALUE!
+=_xlfn.PDURATION(0,1000,1200)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=_xlfn.RRI(0,100,50)	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=XIRR({10;20},{39448;39508})	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+=XNPV(0.09,{-100;20},{39448;39000})	Excel documents #NUM! for a date before the first; LibreOffice works it out
+=XNPV(0.09,{-100;20},{39448})	Excel documents #NUM! for this argument; LibreOffice gives #VALUE!
+DGET#1	Excel documents #NUM! for more than one matching record; LibreOffice #VALUE!
+DSTDEV#2	Excel: #DIV/0! for a single matching record, as STDEV; LibreOffice #NUM!
+DSUM#11	Excel documents that text in criteria matches entries beginning with it ("App" finds Apple); LibreOffice matches whole cells
