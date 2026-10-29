@@ -1613,9 +1613,10 @@ u8 *xlsx_save(Book *b, size_t *len)
     buf_printf(&o, "\" sheetId=\"%d\"%s r:id=\"rId%d\"/>", i + 1, b->sh[i]->hidden ? " state=\"hidden\"" : "", i + 1);
   }
   buf_adds(&o, "</sheets>");
-  if (b->nnames || page_has_names(b)) {
+  if (b->nnames || page_has_names(b) || tablexml_has_names(b)) {
     buf_adds(&o, "<definedNames>");
     page_write_names(b, &o);
+    tablexml_names(b, &o);         /* slicers' caches */
     for (i = 0; i < b->nnames; i++) {
       Name *n = &b->names[i];
       Buf ft;
@@ -1631,12 +1632,11 @@ u8 *xlsx_save(Book *b, size_t *len)
     }
     buf_adds(&o, "</definedNames>");
   }
-  buf_adds(&o, "<calcPr calcId=\"191029\"/>");
-  tablexml_workbook(b, &o);
   buf_adds(&o, "<calcPr calcId=\"191029\"");
   page_write_calcpr(b, &o);
   buf_adds(&o, "/>");
   page_write_book_views(b, &o);
+  tablexml_workbook(b, &o);        /* pivot caches, slicer caches (last, as the schema orders them) */
   buf_adds(&o, "</workbook>");
   zip_add(&w, "xl/workbook.xml", o.data, o.len);
   o.len = 0;

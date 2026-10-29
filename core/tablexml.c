@@ -12,6 +12,7 @@
 #include "pivot.h"
 #include "xml.h"
 #include "ops.h"
+#include "slicer.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -37,6 +38,183 @@ static int first_table(Book *b, int si) { int s, n = 1; for (s = 0; s < si; s++)
 static int first_pivot(Book *b, int si) { int s, n = 1; for (s = 0; s < si; s++) n += b->sh[s]->npivots; return n; }
 static int total_pivots(Book *b) { return first_pivot(b, b->nsh) - 1; }
 
+/* ------------------------------------------------------------------ writing: slicers */
+/* Slicers as Excel writes them (GridCraft keeps none in files): each sheet's pivot table slicers in
+   one xl/slicers part and its table slicers in another (listed in the worksheet's extLst), a
+   slicer cache for each (xl/slicerCaches, listed in the workbook's extLst) holding its source and
+   selection, a defined name for each cache, and the slicer's frame in the drawing */
+#define NS_X14 "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+#define NS_X15 "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"
+static int sheet_slicers(Book *b, int si, int onpivot)
+{
+  int i, n = 0;
+  for (i = 0; i < drw_count(b->sh[si]); i++) { DObj *o = drw_obj(b->sh[si], i); if (o->kind == OB_SLICER && o->slicer && (onpivot < 0 || o->slicer->onpivot == onpivot)) n++; }
+  return n;
+}
+/* the number of the first slicer cache of sheet si (1 on), and of its slicer parts */
+static int first_slcache(Book *b, int si) { int s, n = 1; for (s = 0; s < si; s++) n += sheet_slicers(b, s, -1); return n; }
+static int slpart(Book *b, int si, int onpivot)
+{
+  int s, n = 1;
+  for (s = 0; s < si; s++) n += (sheet_slicers(b, s, 1) > 0) + (sheet_slicers(b, s, 0) > 0);
+  return n + (onpivot ? 0 : sheet_slicers(b, si, 1) > 0);
+}
+static void slcache_name(const Slicer *s, char *out, size_t cap)
+{
+  char *p;
+  snprintf(out, cap, "Slicer_%s", s->name);
+  for (p = out + 7; *p; p++) if (!isalnum((u8)*p) && *p != '_' && (u8)*p < 0x80) *p = '_';
+}
+static int slicer_uses(Book *b, const char *pivot, const char *field)
+{
+  int s, i;
+  for (s = 0; s < b->nsh; s++)
+    for (i = 0; i < drw_count(b->sh[s]); i++) {
+      DObj *o = drw_obj(b->sh[s], i);
+      if (o->kind == OB_SLICER && o->slicer && o->slicer->onpivot && str_ieq(o->slicer->source, pivot) && str_ieq(o->slicer->field, field)) return 1;
+    }
+  return 0;
+}
+static void slicer_parts_ct(Book *b, Buf *o)
+{
+  int s, i, n = 0;
+  for (s = 0; s < b->nsh; s++) {
+    if (sheet_slicers(b, s, 1)) buf_printf(o, "<Override PartName=\"/xl/slicers/slicer%d.xml\" ContentType=\"application/vnd.ms-excel.slicer+xml\"/>", slpart(b, s, 1));
+    if (sheet_slicers(b, s, 0)) buf_printf(o, "<Override PartName=\"/xl/slicers/slicer%d.xml\" ContentType=\"application/vnd.ms-excel.slicer+xml\"/>", slpart(b, s, 0));
+    n += sheet_slicers(b, s, -1);
+  }
+  for (i = 1; i <= n; i++) buf_printf(o, "<Override PartName=\"/xl/slicerCaches/slicerCache%d.xml\" ContentType=\"application/vnd.ms-excel.slicerCache+xml\"/>", i);
+}
+int tablexml_has_names(Book *b) { return first_slcache(b, b->nsh) > 1; }
+void tablexml_names(Book *b, Buf *o)
+{
+  int s, i;
+  char nm[80];
+  for (s = 0; s < b->nsh; s++)
+    for (i = 0; i < drw_count(b->sh[s]); i++) {
+      DObj *ob = drw_obj(b->sh[s], i);
+      if (ob->kind != OB_SLICER || !ob->slicer) continue;
+      slcache_name(ob->slicer, nm, sizeof nm);
+      buf_adds(o, "<definedName name=\""); esc(o, nm); buf_adds(o, "\">#N/A</definedName>");
+    }
+}
+static void slicer_workbook_ext(Book *b, Buf *o)
+{
+  int s, i, k, j, any;
+  if (!tablexml_has_names(b)) return;
+  buf_adds(o, "<extLst>");
+  for (k = 1; k >= 0; k--) {
+    for (any = 0, s = 0; s < b->nsh; s++) any += sheet_slicers(b, s, k);
+    if (!any) continue;
+    buf_adds(o, k ? "<ext uri=\"{BBE1A952-AA13-448e-AADC-164F8A28A991}\" xmlns:x14=\"" NS_X14 "\"><x14:slicerCaches>"
+                  : "<ext uri=\"{46BE6895-7355-4a93-B00E-2C351335B9C9}\" xmlns:x15=\"" NS_X15 "\"><x15:slicerCaches xmlns:x14=\"" NS_X14 "\">");
+    for (s = 0; s < b->nsh; s++)
+      for (j = first_slcache(b, s), i = 0; i < drw_count(b->sh[s]); i++) {
+        DObj *ob = drw_obj(b->sh[s], i);
+        if (ob->kind != OB_SLICER || !ob->slicer) continue;
+        if (ob->slicer->onpivot == k) buf_printf(o, "<x14:slicerCache r:id=\"rIdSC%d\"/>", j);
+        j++;
+      }
+    buf_adds(o, k ? "</x14:slicerCaches></ext>" : "</x15:slicerCaches></ext>");
+  }
+  buf_adds(o, "</extLst>");
+}
+int tablexml_has_sheet_ext(Book *b, int si) { return sheet_slicers(b, si, -1) > 0; }
+void tablexml_sheet_ext(Book *b, int si, Buf *o)
+{
+  if (sheet_slicers(b, si, 1)) buf_adds(o, "<ext uri=\"{A8765BA9-456A-4dab-B4F3-ACF838C121DE}\" xmlns:x14=\"" NS_X14 "\"><x14:slicerList><x14:slicer r:id=\"rIdSL1\"/></x14:slicerList></ext>");
+  if (sheet_slicers(b, si, 0)) buf_adds(o, "<ext uri=\"{3A4CF648-6AED-40f4-86FF-DC5316D8AED3}\" xmlns:x15=\"" NS_X15 "\"><x14:slicerList xmlns:x14=\"" NS_X14 "\"><x14:slicer r:id=\"rIdSL2\"/></x14:slicerList></ext>");
+}
+static void slicer_sheet_rels(Book *b, int si, Buf *o)
+{
+  if (sheet_slicers(b, si, 1)) buf_printf(o, "<Relationship Id=\"rIdSL1\" Type=\"http://schemas.microsoft.com/office/2007/relationships/slicer\" Target=\"../slicers/slicer%d.xml\"/>", slpart(b, si, 1));
+  if (sheet_slicers(b, si, 0)) buf_printf(o, "<Relationship Id=\"rIdSL2\" Type=\"http://schemas.microsoft.com/office/2007/relationships/slicer\" Target=\"../slicers/slicer%d.xml\"/>", slpart(b, si, 0));
+}
+static void slicer_parts(Book *b, ZipWriter *w)
+{
+  int s, i, k, j;
+  Buf o;
+  char path[64], nm[80];
+  buf_init(&o);
+  for (s = 0; s < b->nsh; s++) {
+    for (k = 1; k >= 0; k--) {
+      if (!sheet_slicers(b, s, k)) continue;
+      o.len = 0;
+      buf_adds(&o, XMLDECL "<slicers xmlns=\"" NS_X14 "\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"x\" xmlns:x=\"" NS_MAIN "\">");
+      for (i = 0; i < drw_count(b->sh[s]); i++) {
+        DObj *ob = drw_obj(b->sh[s], i);
+        Slicer *sl = ob->kind == OB_SLICER ? ob->slicer : NULL;
+        if (!sl || sl->onpivot != k) continue;
+        slcache_name(sl, nm, sizeof nm);
+        buf_adds(&o, "<slicer name=\""); esc(&o, sl->name); buf_adds(&o, "\" cache=\""); esc(&o, nm);
+        buf_adds(&o, "\" caption=\""); esc(&o, sl->caption[0] ? sl->caption : sl->field); buf_adds(&o, "\"");
+        if (sl->cols > 1) buf_printf(&o, " columnCount=\"%d\"", sl->cols);
+        if (!sl->header) buf_adds(&o, " showCaption=\"0\"");
+        buf_adds(&o, " style=\""); esc(&o, sl->style[0] ? sl->style : "SlicerStyleLight1"); buf_adds(&o, "\" rowHeight=\"241300\"/>");
+      }
+      buf_adds(&o, "</slicers>");
+      sprintf(path, "xl/slicers/slicer%d.xml", slpart(b, s, k));
+      zip_add(w, path, o.data, o.len);
+    }
+    for (j = first_slcache(b, s), i = 0; i < drw_count(b->sh[s]); i++) {
+      DObj *ob = drw_obj(b->sh[s], i);
+      Slicer *sl = ob->kind == OB_SLICER ? ob->slicer : NULL;
+      if (!sl) continue;
+      o.len = 0;
+      slcache_name(sl, nm, sizeof nm);
+      buf_adds(&o, XMLDECL "<slicerCacheDefinition xmlns=\"" NS_X14 "\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"x\" xmlns:x=\"" NS_MAIN "\" name=\"");
+      esc(&o, nm); buf_adds(&o, "\" sourceName=\""); esc(&o, sl->field); buf_adds(&o, "\">");
+      if (sl->onpivot) {
+        int ps = -1, pi = -1, q, ss, kk, nf;
+        Rect src;
+        char **names;
+        for (q = 0; q < b->nsh && pi < 0; q++) { int t; for (t = 0; t < b->sh[q]->npivots; t++) if (str_ieq(b->sh[q]->pivots[t].name, sl->source)) { ps = q; pi = t; break; } }
+        if (pi >= 0 && pivot_source(b, &b->sh[ps]->pivots[pi], &ss, &src)) {
+          LPivot *p = &b->sh[ps]->pivots[pi];
+          char **labs = NULL;
+          int nl = 0;
+          i32 r;
+          buf_adds(&o, "<pivotTables><pivotTable tabId=\""); buf_printf(&o, "%d\" name=\"", ps + 1); esc(&o, p->name); buf_adds(&o, "\"/></pivotTables>");
+          nf = pivot_fields(b, p, &names);
+          for (kk = 0; kk < nf && !str_ieq(names[kk], sl->field); kk++) ;
+          /* the cache field's shared items: labels as they first come */
+          for (r = src.r1 + 1; kk < nf && r <= src.r2; r++) {
+            char lab[256];
+            int any = 0, t;
+            i32 c;
+            for (c = src.c1; c <= src.c2 && !any; c++) if (cell_value(b, ss, r, c)->t != V_EMPTY) any = 1;
+            if (!any) continue;
+            pivot_item_label(b, cell_value(b, ss, r, src.c1 + kk), lab, sizeof lab);
+            for (t = 0; t < nl && !str_ieq(labs[t], lab); t++) ;
+            if (t == nl) { char **nn = (char **)realloc(labs, (size_t)(nl + 1) * sizeof(char *)); if (!nn) break; labs = nn; labs[nl++] = str_dup(lab); }
+          }
+          buf_printf(&o, "<data><tabular pivotCacheId=\"%d\"%s><items count=\"%d\">", first_pivot(b, ps) + pi, sl->sort == SS_DESC ? " sortOrder=\"descending\"" : "", nl);
+          for (q = 0; q < nl; q++) {
+            int on = sl->all, t;
+            for (t = 0; !on && t < sl->nsel; t++) if (str_ieq(sl->sel[t], labs[q])) on = 1;
+            buf_printf(&o, "<i x=\"%d\"%s/>", q, on ? " s=\"1\"" : "");
+          }
+          buf_adds(&o, "</items></tabular></data>");
+          pivot_strings_free(labs, nl);
+          pivot_strings_free(names, nf);
+        }
+      } else {
+        int ts, t, col;
+        LTable *tb = table_find(b, sl->source, &ts);
+        if (tb && (col = table_col(tb, sl->field)) >= 0) {
+          t = first_table(b, ts) + table_index(b, ts, tb);
+          buf_printf(&o, "<extLst><x:ext uri=\"{2F2917AC-EB37-4324-AD4E-5DD8C200BD13}\" xmlns:x15=\"" NS_X15 "\"><x15:tableSlicerCache tableId=\"%d\" column=\"%d\"%s/></x:ext></extLst>",
+                     t, col + 1, sl->sort == SS_DESC ? " sortOrder=\"descending\"" : "");
+        }
+      }
+      buf_adds(&o, "</slicerCacheDefinition>");
+      sprintf(path, "xl/slicerCaches/slicerCache%d.xml", j++);
+      zip_add(w, path, o.data, o.len);
+    }
+  }
+  buf_free(&o);
+}
+
 /* ------------------------------------------------------------------ writing: the small parts */
 void tablexml_content_types(Book *b, Buf *o)
 {
@@ -48,22 +226,28 @@ void tablexml_content_types(Book *b, Buf *o)
     buf_printf(o, "<Override PartName=\"/xl/pivotTables/pivotTable%d.xml\" ContentType=\"" CT "pivotTable+xml\"/>"
                   "<Override PartName=\"/xl/pivotCache/pivotCacheDefinition%d.xml\" ContentType=\"" CT "pivotCacheDefinition+xml\"/>"
                   "<Override PartName=\"/xl/pivotCache/pivotCacheRecords%d.xml\" ContentType=\"" CT "pivotCacheRecords+xml\"/>", i, i, i);
+  slicer_parts_ct(b, o);
 }
 void tablexml_workbook(Book *b, Buf *o)
 {
   int i, n = total_pivots(b);
-  if (!n) return;
-  buf_adds(o, "<pivotCaches>");
-  for (i = 1; i <= n; i++) buf_printf(o, "<pivotCache cacheId=\"%d\" r:id=\"rIdC%d\"/>", i, i);
-  buf_adds(o, "</pivotCaches>");
+  if (n) {
+    buf_adds(o, "<pivotCaches>");
+    for (i = 1; i <= n; i++) buf_printf(o, "<pivotCache cacheId=\"%d\" r:id=\"rIdC%d\"/>", i, i);
+    buf_adds(o, "</pivotCaches>");
+  }
+  slicer_workbook_ext(b, o);
 }
 void tablexml_workbook_rels(Book *b, Buf *o)
 {
   int i, n = total_pivots(b);
   for (i = 1; i <= n; i++)
     buf_printf(o, "<Relationship Id=\"rIdC%d\" Type=\"" NS_REL "/pivotCacheDefinition\" Target=\"pivotCache/pivotCacheDefinition%d.xml\"/>", i, i);
+  n = first_slcache(b, b->nsh) - 1;
+  for (i = 1; i <= n; i++)
+    buf_printf(o, "<Relationship Id=\"rIdSC%d\" Type=\"http://schemas.microsoft.com/office/2007/relationships/slicerCache\" Target=\"slicerCaches/slicerCache%d.xml\"/>", i, i);
 }
-int tablexml_has_rels(Book *b, int si) { return b->sh[si]->ntables || b->sh[si]->npivots; }
+int tablexml_has_rels(Book *b, int si) { return b->sh[si]->ntables || b->sh[si]->npivots || sheet_slicers(b, si, -1); }
 void tablexml_sheet_rels(Book *b, int si, Buf *o)
 {
   Sheet *s = b->sh[si];
@@ -72,6 +256,7 @@ void tablexml_sheet_rels(Book *b, int si, Buf *o)
     buf_printf(o, "<Relationship Id=\"rIdT%d\" Type=\"" NS_REL "/table\" Target=\"../tables/table%d.xml\"/>", i + 1, t0 + i);
   for (i = 0; i < s->npivots; i++)
     buf_printf(o, "<Relationship Id=\"rIdP%d\" Type=\"" NS_REL "/pivotTable\" Target=\"../pivotTables/pivotTable%d.xml\"/>", i + 1, p0 + i);
+  slicer_sheet_rels(b, si, o);
 }
 void tablexml_sheet_parts(Book *b, int si, Buf *o)
 {
@@ -322,7 +507,7 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
   for (k = 0; k < nf; k++) {
     cf[k].name = str_dup(names[k]); cf[k].col = k; cf[k].base = -1; cf[k].par = -1;
     cf[k].itemized = in_area(p->rows, p->nrows, names[k]) >= 0 || in_area(p->cols, p->ncols, names[k]) >= 0 || in_area(p->filters, p->nfilters, names[k]) >= 0
-                     || in_area(p->sfilters, p->nsfilters, names[k]) >= 0;
+                     || in_area(p->sfilters, p->nsfilters, names[k]) >= 0 || slicer_uses(b, p->name, names[k]);
   }
   /* kinds of value, and text fields itemized too */
   for (r = src.r1 + 1; r <= src.r2; r++)
@@ -684,6 +869,7 @@ void tablexml_parts(Book *b, ZipWriter *w, FileFormulaFn ff)
   buf_free(&o);
   id = 1;
   for (s = 0; s < b->nsh; s++) for (i = 0; i < b->sh[s]->npivots; i++) write_pivot(b, s, &b->sh[s]->pivots[i], id++, w);
+  slicer_parts(b, w);
 }
 
 /* ------------------------------------------------------------------ reading */
@@ -1186,13 +1372,197 @@ out:
   free(d);
   cache_free(&c);
 }
+/* ------------------------------------------------------------------ reading: slicers */
+/* slicers read from a sheet's slicers part wait here for their frame in the drawing */
+typedef struct { int sheet; Slicer *s; } PendSl;
+static PendSl *pend; static int npend;
+/* the relationships' targets of type in the workbook */
+static int book_rels(ZipReader *z, const char *type, char ***out)
+{
+  size_t len;
+  u8 *d = part(z, "xl/_rels/workbook.xml.rels", &len);
+  Xml x;
+  int n = 0;
+  *out = NULL;
+  if (!d) return 0;
+  xml_init(&x, (const char *)d, len);
+  while (xml_next(&x) != XT_EOF) {
+    const char *ty, *t, *ls;
+    char full[300];
+    if (x.type != XT_START || strcmp(x.name, "Relationship")) continue;
+    ty = xml_attr(&x, "Type"); t = xml_attr(&x, "Target");
+    if (!ty || !t) continue;
+    ls = strrchr(ty, '/');
+    if (strcmp(ls ? ls + 1 : ty, type)) continue;
+    if (t[0] == '/') snprintf(full, sizeof full, "%s", t + 1); else snprintf(full, sizeof full, "xl/%s", t);
+    tidy(full);
+    strs_push(out, &n, full);
+  }
+  xml_free(&x);
+  free(d);
+  return n;
+}
+/* a pivot cache's field's item labels, by the cache's x14 id */
+static int cache_items_by_id(Book *b, ZipReader *z, int id, const char *field, char ***out)
+{
+  char **parts;
+  int n = book_rels(z, "pivotCacheDefinition", &parts), i, k, m = 0;
+  *out = NULL;
+  for (i = 0; i < n && !*out; i++) {
+    Cache c;
+    if (!read_cache(b, z, parts[i], &c)) continue;
+    if (c.cacheid == id || (!c.cacheid && n == 1))
+      for (k = 0; k < c.nf; k++) if (str_ieq(c.names[k], field)) { int j; for (j = 0; j < c.nitems[k]; j++) strs_push(out, &m, c.items[k][j]); if (!*out) *out = (char **)calloc(1, sizeof(char *)); break; }
+    cache_free(&c);
+  }
+  pivot_strings_free(parts, n);
+  return m;
+}
+/* the slicer cache named name: its source and selection into s */
+static void read_slicer_cache(Book *b, ZipReader *z, const char *name, Slicer *s)
+{
+  char **parts;
+  int n = book_rels(z, "slicerCache", &parts), i, found = 0;
+  for (i = 0; i < n && !found; i++) {
+    size_t len;
+    u8 *d = part(z, parts[i], &len);
+    Xml x;
+    int cacheid = -1, *xs = NULL, nx = 0, nsel = 0, tableid = -1, column = -1, ok = 0;
+    char **items = NULL;
+    if (!d) continue;
+    xml_init(&x, (const char *)d, len);
+    while (xml_next(&x) != XT_EOF) {
+      if (x.type != XT_START) continue;
+      if (!strcmp(x.name, "slicerCacheDefinition")) {
+        const char *nm = xml_attr(&x, "name"), *src = xml_attr(&x, "sourceName");
+        if (!nm || !str_ieq(nm, name)) break;
+        ok = 1;
+        snprintf(s->field, sizeof s->field, "%s", src ? src : "");
+      } else if (!strcmp(x.name, "pivotTable")) {
+        const char *nm = xml_attr(&x, "name");
+        s->onpivot = 1;
+        if (nm) snprintf(s->source, sizeof s->source, "%s", nm);
+      } else if (!strcmp(x.name, "tabular")) {
+        const char *id = xml_attr(&x, "pivotCacheId"), *so = xml_attr(&x, "sortOrder");
+        cacheid = id ? atoi(id) : 0;
+        if (so && !strcmp(so, "descending")) s->sort = SS_DESC;
+      } else if (!strcmp(x.name, "i")) {
+        const char *xi = xml_attr(&x, "x");
+        int *nn = (int *)realloc(xs, (size_t)(nx + 1) * sizeof(int));
+        if (!nn) continue;
+        xs = nn;
+        xs[nx++] = attr1(&x, "s", 0) ? (xi ? atoi(xi) : 0) : -1;
+        if (attr1(&x, "s", 0)) nsel++;
+      } else if (!strcmp(x.name, "tableSlicerCache")) {
+        const char *t = xml_attr(&x, "tableId"), *c = xml_attr(&x, "column"), *so = xml_attr(&x, "sortOrder");
+        tableid = t ? atoi(t) : -1; column = c ? atoi(c) : -1;
+        if (so && !strcmp(so, "descending")) s->sort = SS_DESC;
+      }
+    }
+    xml_free(&x);
+    free(d);
+    if (ok) {
+      found = 1;
+      if (s->onpivot && cacheid >= 0 && nsel && nsel < nx) {
+        int ni = cache_items_by_id(b, z, cacheid, s->field, &items), k;
+        s->all = 0;
+        for (k = 0; k < nx; k++) if (xs[k] >= 0 && xs[k] < ni) strs_push(&s->sel, &s->nsel, items[xs[k]]);
+        if (!s->nsel) s->all = 1;
+        pivot_strings_free(items, ni);
+      } else if (!s->onpivot && tableid >= 0) {
+        /* (the table may be on a sheet not read yet: tablexml_loaded finds it) */
+        snprintf(s->field, sizeof s->field, "#%d,%d", tableid, column);
+        s->source[0] = 0;
+      }
+    }
+    free(xs);
+  }
+  pivot_strings_free(parts, n);
+}
+static void read_slicers(Book *b, ZipReader *z, const char *path, int sheet)
+{
+  size_t len;
+  u8 *d = part(z, path, &len);
+  Xml x;
+  if (!d) return;
+  xml_init(&x, (const char *)d, len);
+  while (xml_next(&x) != XT_EOF) {
+    const char *nm, *cache, *cap, *cc, *sty;
+    Slicer *s;
+    PendSl *np;
+    if (x.type != XT_START || strcmp(x.name, "slicer")) continue;
+    nm = xml_attr(&x, "name"); cache = xml_attr(&x, "cache"); cap = xml_attr(&x, "caption"); cc = xml_attr(&x, "columnCount"); sty = xml_attr(&x, "style");
+    if (!nm || !cache || !(s = slicer_new())) continue;
+    snprintf(s->name, sizeof s->name, "%s", nm);
+    if (cap) snprintf(s->caption, sizeof s->caption, "%s", cap);
+    if (cc) s->cols = (u8)(atoi(cc) < 1 ? 1 : atoi(cc) > 20 ? 20 : atoi(cc));
+    if (sty) snprintf(s->style, sizeof s->style, "%s", sty);
+    s->header = (u8)attr1(&x, "showCaption", 1);
+    read_slicer_cache(b, z, cache, s);
+    if (!s->field[0] || !(np = (PendSl *)realloc(pend, (size_t)(npend + 1) * sizeof(PendSl)))) { slicer_free(s); continue; }
+    pend = np;
+    pend[npend].sheet = sheet; pend[npend].s = s;
+    npend++;
+  }
+  xml_free(&x);
+  free(d);
+}
+struct Slicer *tablexml_slicer_take(int sheet, const char *name)
+{
+  int i;
+  for (i = 0; i < npend; i++)
+    if (pend[i].sheet == sheet && str_ieq(pend[i].s->name, name)) {
+      Slicer *s = pend[i].s;
+      pend[i] = pend[--npend];
+      return s;
+    }
+  return NULL;
+}
+/* after loading: slicers without a frame placed, table slicers' tables found, their filters made */
+static void slicers_loaded(Book *b)
+{
+  int s, i;
+  for (i = 0; i < npend; i++) {
+    DObj *o;
+    if (pend[i].sheet < b->nsh && (o = drw_new(b->sh[pend[i].sheet], OB_SLICER))) { o->slicer = pend[i].s; snprintf(o->name, sizeof o->name, "%s", o->slicer->name); o->anchor = AN_ONECELL; }
+    else slicer_free(pend[i].s);
+  }
+  free(pend); pend = NULL; npend = 0;
+  for (s = 0; s < b->nsh; s++)
+    for (i = 0; i < drw_count(b->sh[s]); i++) {
+      DObj *o = drw_obj(b->sh[s], i);
+      Slicer *sl = o->kind == OB_SLICER ? o->slicer : NULL;
+      int id, col, q, t;
+      if (!sl || sl->onpivot || sl->source[0] || sscanf(sl->field, "#%d,%d", &id, &col) != 2) continue;
+      for (q = 0; q < b->nsh; q++)
+        for (t = 0; t < b->sh[q]->ntables; t++) {
+          LTable *tb = &b->sh[q]->tables[t];
+          const FilterCol *fc;
+          if ((int)tb->id != id || col < 1 || col > tb->ncols) continue;
+          snprintf(sl->source, sizeof sl->source, "%s", tb->name);
+          snprintf(sl->field, sizeof sl->field, "%s", tb->cols[col - 1].name ? tb->cols[col - 1].name : "");
+          /* the selection is the table's filter on the column */
+          if ((fc = sheet_filter_col(b->sh[q], tb->r.c1 + col - 1))) {
+            int k;
+            sl->all = 0;
+            for (k = 0; k < fc->n; k++) strs_push(&sl->sel, &sl->nsel, fc->vals[k]);
+            if (fc->blanks) strs_push(&sl->sel, &sl->nsel, "(blank)");
+          }
+        }
+    }
+  slicers_apply_all(b);
+}
+
 void tablexml_read_rel(Book *b, ZipReader *z, const char *type, const char *target, int sheet)
 {
   if (!strcmp(type, "table")) read_table(b, z, target, sheet);
   else if (!strcmp(type, "pivotTable")) read_pivot(b, z, target, sheet);
+  else if (!strcmp(type, "slicer")) read_slicers(b, z, target, sheet);
 }
 void tablexml_loaded(Book *b)
 {
   tables_tidy_loaded(b);
   book_pivots_refresh_all(b);
+  slicers_loaded(b);
 }
+
