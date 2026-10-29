@@ -40,12 +40,14 @@ Value val_copy(const Value *v)
     if (!c.a) return val_err(E_NUM);
     for (i = 0; i < n; i++) c.a->v[i] = val_copy(&v->a->v[i]);
   }
+  else if (v->t == V_LAMBDA) calc_lambda_ref(v->a, 1);
   return c;
 }
 void val_free(Value *v)
 {
   if (v->t == V_STR) free(v->s);
   else if (v->t == V_ARR) arr_free(v->a);
+  else if (v->t == V_LAMBDA) calc_lambda_ref(v->a, -1);
   *v = val_empty();
 }
 /* an array of empties; NULL when larger than a million elements (hostile sizes) or out of memory */
@@ -506,7 +508,7 @@ static Sheet *sheet_new(const char *name)
   s->filter.r1 = -1;
   return s;
 }
-static void cell_free_contents(Cell *c) { val_free(&c->v); formula_free(c->f); c->f = NULL; }
+static void cell_free_contents(Cell *c) { val_free(&c->v); formula_free(c->f); c->f = NULL; c->spill = 0; }
 /* AutoFilter columns given back */
 static void fcols_free(FilterCol *f, int n)
 {

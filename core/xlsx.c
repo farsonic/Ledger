@@ -471,8 +471,8 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
       i32 r = cur_row, c = next_col;
       int depth = x.depth;
       Buf vtxt, ftxt;
-      int has_v = 0, has_f = 0, shared_si = -1, is_master = 0;
-      Rect master_ref;
+      int has_v = 0, has_f = 0, shared_si = -1, is_master = 0, arr_f = 0, has_cm = xml_attr(&x, "cm") != NULL;
+      Rect master_ref, arr_ref;
       char type[16];
       Cell *cell;
       int style = 0;
@@ -492,6 +492,7 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
           } else if (!strcmp(x.name, "f")) {
             const char *ft = xml_attr(&x, "t"), *si = xml_attr(&x, "si"), *fr = xml_attr(&x, "ref");
             has_f = 1;
+            if (ft && !strcmp(ft, "array") && fr && rect_ref(fr, &arr_ref)) arr_f = 1;   /* a dynamic array (cm) or {=...} */
             if (ft && !strcmp(ft, "shared") && si) {
               shared_si = atoi(si);
               if (fr && rect_ref(fr, &master_ref)) is_master = 1;
@@ -539,6 +540,12 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
           }
         }
         cell = sheet_cell(s, r, c);
+        if (f) {
+          /* without the dynamic-array mark a formula is from before dynamic arrays */
+          f->legacy = !arr_f;
+          if (arr_f) { f->sr = arr_ref.r2 - arr_ref.r1 + 1; f->sc = arr_ref.c2 - arr_ref.c1 + 1; }
+          if (arr_f && !has_cm) { f->cse = 1; f->arows = f->sr; f->acols = f->sc; }
+        }
         if (cell && f) { formula_free(cell->f); cell->f = f; }
         else formula_free(f);
       }
@@ -902,6 +909,14 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
     int pos;
     const char *t = b->names[i].formula_text;
     if (t) b->names[i].f = formula_parse(b, b->names[i].sheet == SHEET_SELF ? 0 : b->names[i].sheet, t[0] == '=' ? t + 1 : t, &pos);
+    if (b->names[i].f && strstr(t, "_xl")) {
+      /* shown without the file's prefixes (_xlfn.LAMBDA(_xlpm.x,...) as LAMBDA(x,...)) */
+      Buf nt;
+      buf_init(&nt);
+      formula_text(b, b->names[i].sheet == SHEET_SELF ? 0 : b->names[i].sheet, b->names[i].f, &nt);
+      if (nt.data) { free(b->names[i].formula_text); b->names[i].formula_text = buf_take(&nt); }
+      else buf_free(&nt);
+    }
   }
   free(names);
   for (i = 0; i < nents && i < b->nsh; i++) {
@@ -949,12 +964,29 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
     book_forget_undo(b);
   }
   if (b->active >= b->nsh) b->active = 0;
+  book_adopt_spills(b);
   book_recalc(b);
   b->dirty = 0;
   return b;
 }
 
 /* ------------------------------------------------------------------ writing */
+/* a formula files mark as a dynamic array (cm="1" and Excel's XLDAPR cell metadata): it spilled or
+   worked on arrays */
+static int xlsx_dynamic(const Formula *f) { return f && !f->legacy && !f->cse && ((long)f->sr * f->sc > 1 || f->arrayeval); }
+static int book_has_dynamic(Book *b)
+{
+  int si;
+  for (si = 0; si < b->nsh; si++) {
+    Sheet *s = b->sh[si];
+    i32 r;
+    for (r = 0; r < s->nrows; r++) {
+      int i;
+      if (s->rows[r]) for (i = 0; i < s->rows[r]->n; i++) if (xlsx_dynamic(s->rows[r]->c[i].f)) return 1;
+    }
+  }
+  return 0;
+}
 static void xesc(Buf *o, const char *s) { xml_escape(o, s, strlen(s)); }
 /* functions that files write with the _xlfn. prefix (added to Excel after 2007) */
 static const char *const xlfn[] = { "AGGREGATE", "CEILING.MATH", "CONCAT", "DAYS", "FLOOR.MATH", "IFNA", "IFS", "ISFORMULA", "MAXIFS", "MINIFS",
@@ -967,7 +999,9 @@ static void file_formula(Book *b, int sheet, const Formula *f, Buf *o)
   const char *p;
   int q = 0;
   buf_init(&t);
+  formula_file_mode = 1;
   formula_text(b, sheet, f, &t);
+  formula_file_mode = 0;
   for (p = t.data ? t.data : ""; *p; ) {
     if (*p == '"') { q = !q; buf_addc(o, *p++); continue; }
     if (!q && (isalpha((u8)*p) || *p == '_') && (p == t.data || (!isalnum((u8)p[-1]) && p[-1] != '.' && p[-1] != '_' && p[-1] != '\''))) {
@@ -1305,6 +1339,17 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
         if (v->t == V_STR) buf_adds(o, " t=\"str\"");
         else if (v->t == V_BOOL) buf_adds(o, " t=\"b\"");
         else if (v->t == V_ERR) buf_adds(o, " t=\"e\"");
+        if (xlsx_dynamic(c->f)) buf_adds(o, " cm=\"1\"");
+        if (xlsx_dynamic(c->f) || c->f->cse) {
+          /* a dynamic array or {=...}: its range (the cells of a spill keep their values) */
+          Rect ar;
+          ar.r1 = r; ar.c1 = c->col;
+          ar.r2 = r + (c->f->cse ? c->f->arows : c->f->sr) - 1; ar.c2 = c->col + (c->f->cse ? c->f->acols : c->f->sc) - 1;
+          if (ar.r2 < r || c->f->spillblocked) ar.r2 = r;
+          if (ar.c2 < c->col || c->f->spillblocked) ar.c2 = c->col;
+          rect_text(ar, ref);
+          buf_printf(o, "><f t=\"array\" ref=\"%s\">", ref);
+        } else
         buf_adds(o, "><f>");
         {
           Buf ft;
@@ -1464,7 +1509,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   ZipWriter w;
   Buf o;
   SST sst;
-  int i, *fillmap = NULL, *bordermap = NULL;
+  int i, *fillmap = NULL, *bordermap = NULL, dynamic = book_has_dynamic(b);
   char path[64];
   memset(&sst, 0, sizeof sst);
   zip_begin(&w);
@@ -1487,6 +1532,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   for (i = 0; i < b->nsh && !b->sh[i]->nnotes; i++) ;
   if (i < b->nsh) buf_adds(&o, "<Default Extension=\"vml\" ContentType=\"application/vnd.openxmlformats-officedocument.vmlDrawing\"/>");
   cm_types(b, &o);
+  if (dynamic) buf_adds(&o, "<Override PartName=\"/xl/metadata.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml\"/>");
   buf_adds(&o, "</Types>");
   zip_add(&w, "[Content_Types].xml", o.data, o.len);
   o.len = 0;
@@ -1559,6 +1605,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>", b->nsh + 2);
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\"/>", b->nsh + 3);
   cm_book_rels(b, &o, b->nsh + 4);
+  if (dynamic) buf_adds(&o, "<Relationship Id=\"rIdMeta1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata\" Target=\"metadata.xml\"/>");
   buf_adds(&o, "</Relationships>");
   zip_add(&w, "xl/_rels/workbook.xml.rels", o.data, o.len);
   /* sheets (they fill the string table) */
@@ -1593,6 +1640,18 @@ u8 *xlsx_save(Book *b, size_t *len)
   }
   buf_adds(&o, "</sst>");
   zip_add(&w, "xl/sharedStrings.xml", o.data, o.len);
+  if (dynamic) {
+    /* cm="1" points here: Excel's dynamic array properties */
+    o.len = 0;
+    buf_adds(&o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+                 "<metadata xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:xda=\"http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray\">"
+                 "<metadataTypes count=\"1\"><metadataType name=\"XLDAPR\" minSupportedVersion=\"120000\" copy=\"1\" pasteAll=\"1\" pasteValues=\"1\" merge=\"1\" "
+                 "splitFirst=\"1\" rowColShift=\"1\" clearFormats=\"1\" clearComments=\"1\" assign=\"1\" coerce=\"1\" cellMeta=\"1\"/></metadataTypes>"
+                 "<futureMetadata name=\"XLDAPR\" count=\"1\"><bk><extLst><ext uri=\"{bdbb8cdc-fa1e-496e-a857-3c3f30c029c3}\">"
+                 "<xda:dynamicArrayProperties fDynamic=\"1\" fCollapsed=\"0\"/></ext></extLst></bk></futureMetadata>"
+                 "<cellMetadata count=\"1\"><bk><rc t=\"1\" v=\"0\"/></bk></cellMetadata></metadata>");
+    zip_add(&w, "xl/metadata.xml", o.data, o.len);
+  }
   free(fillmap); free(bordermap);
   free(sst.s); free(sst.hash);
   if (o.oom || !zip_finish(&w)) { buf_free(&o); zip_free(&w); return NULL; }
