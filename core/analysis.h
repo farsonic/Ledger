@@ -74,6 +74,12 @@ const char *solver_method_name(int method);
 int  solver_lp(int n, const double *c, int m, const double *a, const u8 *sense, const double *rhs,
                const double *lo, const double *hi, const u8 *integer, double *x, double *obj);
 
+/* shared helpers: a range typed (a reference or a name; whole columns cut to what is used) on
+   defsheet or the sheet it names (toolpak.c); a new sheet named base ("Sheet4" when NULL) at index
+   at, or at the end when sheet-scoped names would lose their sheet (solver.c) */
+int  an_range(Book *b, int defsheet, const char *text, int *sheet, Rect *r);
+int  an_add_sheet(Book *b, const char *base, int at);
+
 /* ------------------------------------------------------------------ Data Analysis (toolpak.c) */
 enum {
   TP_ANOVA1, TP_ANOVA2R, TP_ANOVA2, TP_CORREL, TP_COVAR, TP_DESCR, TP_EXPSMOOTH, TP_FTEST, TP_FOURIER, TP_HISTOGRAM,

@@ -168,7 +168,142 @@ static void solver_tests(void)
   book_free(b);
 }
 
+/* a Data Analysis tool on sheet 0, its report on a new sheet named name */
+static int tp(Book *b, TPParams *p, const char *name)
+{
+  Rect w;
+  const char *why;
+  int r;
+  strcpy(p->newsheet, name);
+  r = toolpak_run(b, book_find_sheet(b, "Sheet1"), p, &w, &why);
+  if (r < 0) printf("   toolpak %s: %s\n", name, why ? why : "-2");
+  if (r >= 0 && getenv("TPDUMP") && strstr(getenv("TPDUMP"), name)) {
+    i32 y, x;
+    for (y = w.r1; y <= w.r2; y++) { printf("%s %ld:", name, (long)y + 1); for (x = w.c1; x <= w.c2; x++) { Buf o; buf_init(&o); to_text(b, cell_value(b, r, y, x), &o); printf(" | %s", o.data ? o.data : ""); buf_free(&o); } printf("\n"); }
+  }
+  return r;
+}
+static void toolpak_tests(void)
+{
+  Book *b = book_new();
+  TPParams p;
+  Rect w;
+  const char *why;
+  int i, S1;
+  char t[64];
+  /* data: A1:A5 2 3 4 5 5, B1:B5 1 3 2 5 4 (x), C1:C4 6 7 8 9 */
+  static const char *const av[] = { "2", "3", "4", "5", "5" }, *const bv[] = { "1", "3", "2", "5", "4" }, *const cv[] = { "6", "7", "8", "9" };
+  for (i = 0; i < 5; i++) { sprintf(t, "Sheet1!A%d", i + 1); put(b, t, av[i]); sprintf(t, "Sheet1!B%d", i + 1); put(b, t, bv[i]); }
+  for (i = 0; i < 4; i++) { sprintf(t, "Sheet1!C%d", i + 1); put(b, t, cv[i]); }
+  /* Descriptive Statistics against the worksheet functions */
+  toolpak_defaults(&p, TP_DESCR); strcpy(p.in1, "A1:A5"); p.kl = 2; p.ks = 1;
+  ok("toolpak: descriptive", tp(b, &p, "D") >= 0 && text_at(b, "D!A1", "Column1") && text_at(b, "D!A3", "Mean") && near(num_at(b, "D!B3"), 3.8) &&
+     near(num_at(b, "D!B4"), evn(b, "STDEV(Sheet1!A1:A5)/SQRT(5)")) && num_at(b, "D!B5") == 4 && num_at(b, "D!B6") == 5 &&
+     near(num_at(b, "D!B7"), evn(b, "STDEV(Sheet1!A1:A5)")) && near(num_at(b, "D!B9"), evn(b, "KURT(Sheet1!A1:A5)")) &&
+     near(num_at(b, "D!B10"), evn(b, "SKEW(Sheet1!A1:A5)")) && num_at(b, "D!B11") == 3 && num_at(b, "D!B14") == 19 && num_at(b, "D!B15") == 5 &&
+     text_at(b, "D!A16", "Largest(2)") && num_at(b, "D!B16") == 5 && num_at(b, "D!B17") == 2 && text_at(b, "D!A18", "Confidence Level(95.0%)") &&
+     near(num_at(b, "D!B18"), evn(b, "CONFIDENCE.T(0.05,STDEV(Sheet1!A1:A5),5)")));
+  /* Anova: Single Factor, by rows of a two-column block: groups 2 3 4 5 and 6 7 8 9 */
+  put(b, "Sheet1!E1", "2"); put(b, "Sheet1!E2", "3"); put(b, "Sheet1!E3", "4"); put(b, "Sheet1!E4", "5"); put(b, "Sheet1!F1", "6"); put(b, "Sheet1!F2", "7"); put(b, "Sheet1!F3", "8"); put(b, "Sheet1!F4", "9");
+  toolpak_defaults(&p, TP_ANOVA1); strcpy(p.in1, "E1:F4");
+  ok("toolpak: anova single factor", tp(b, &p, "AN1") >= 0 && text_at(b, "AN1!A5", "Column 1") && num_at(b, "AN1!D6") == 7.5 && num_at(b, "AN1!B11") == 32 &&
+     num_at(b, "AN1!B12") == 10 && near(num_at(b, "AN1!E11"), 19.2) && near(num_at(b, "AN1!F11"), evn(b, "F.DIST.RT(19.2,1,6)")) &&
+     near(num_at(b, "AN1!G11"), evn(b, "F.INV.RT(0.05,1,6)")) && num_at(b, "AN1!B14") == 42 && num_at(b, "AN1!C14") == 7);
+  /* two-factor without replication: rows 1 2 3 / 4 5 6 / 7 8 10 */
+  put(b, "Sheet1!H1", "1"); put(b, "Sheet1!I1", "2"); put(b, "Sheet1!J1", "3"); put(b, "Sheet1!H2", "4"); put(b, "Sheet1!I2", "5"); put(b, "Sheet1!J2", "6"); put(b, "Sheet1!H3", "7"); put(b, "Sheet1!I3", "8"); put(b, "Sheet1!J3", "10");
+  toolpak_defaults(&p, TP_ANOVA2); strcpy(p.in1, "H1:J3");
+  ok("toolpak: two-factor without replication", tp(b, &p, "AN2") >= 0 && text_at(b, "AN2!A4", "Row 1") && text_at(b, "AN2!A8", "Column 1") &&
+     near(num_at(b, "AN2!B15"), 60.22222222222223) && near(num_at(b, "AN2!B16"), 8.22222222222222) && close_to(num_at(b, "AN2!B17"), 0.4444444444444, 1e-9) &&
+     num_at(b, "AN2!C17") == 4 && near(num_at(b, "AN2!B19"), 68.88888888888889) &&
+     close_to(num_at(b, "AN2!E15"), 60.22222222222223 / 2 / (0.4444444444444444 / 4), 1e-9));
+  /* two-factor with replication: samples s1, s2 of two rows, columns C1, C2 */
+  put(b, "Sheet1!L2", "s1"); put(b, "Sheet1!L4", "s2"); put(b, "Sheet1!M1", "C1"); put(b, "Sheet1!N1", "C2");
+  put(b, "Sheet1!M2", "1"); put(b, "Sheet1!M3", "2"); put(b, "Sheet1!N2", "3"); put(b, "Sheet1!N3", "5"); put(b, "Sheet1!M4", "4"); put(b, "Sheet1!M5", "6"); put(b, "Sheet1!N4", "8"); put(b, "Sheet1!N5", "9");
+  toolpak_defaults(&p, TP_ANOVA2R); strcpy(p.in1, "L1:N5"); p.rowsper = 2;
+  ok("toolpak: two-factor with replication", tp(b, &p, "AN3") >= 0 && text_at(b, "AN3!A4", "s1") && text_at(b, "AN3!B3", "C1") && num_at(b, "AN3!D5") == 4 &&
+     num_at(b, "AN3!B7") == 1.5 && text_at(b, "AN3!A16", "Total") && num_at(b, "AN3!B25") == 32 && num_at(b, "AN3!B26") == 18 &&
+     near(num_at(b, "AN3!B27"), 0.5) && num_at(b, "AN3!B28") == 5 && num_at(b, "AN3!C28") == 4 && near(num_at(b, "AN3!E25"), 32 / 1.25) && num_at(b, "AN3!C30") == 7);
+  /* correlation and covariance */
+  toolpak_defaults(&p, TP_CORREL); strcpy(p.in1, "A1:B5");
+  ok("toolpak: correlation", tp(b, &p, "COR") >= 0 && num_at(b, "COR!B2") == 1 && near(num_at(b, "COR!B3"), evn(b, "CORREL(Sheet1!A1:A5,Sheet1!B1:B5)")) &&
+     text_at(b, "COR!C1", "Column 2") && cell_value(b, book_find_sheet(b, "COR"), 1, 2)->t == V_EMPTY);
+  toolpak_defaults(&p, TP_COVAR); strcpy(p.in1, "A1:B5");
+  ok("toolpak: covariance", tp(b, &p, "COV") >= 0 && near(num_at(b, "COV!B3"), evn(b, "COVARIANCE.P(Sheet1!A1:A5,Sheet1!B1:B5)")) &&
+     near(num_at(b, "COV!B2"), evn(b, "VAR.P(Sheet1!A1:A5)")));
+  /* regression of A on B against LINEST */
+  toolpak_defaults(&p, TP_REGRESSION); strcpy(p.in1, "A1:A5"); strcpy(p.in2, "B1:B5"); p.residuals = 1; p.stdres = 1; p.normprob = 1;
+  ok("toolpak: regression", tp(b, &p, "REG") >= 0 && text_at(b, "REG!A1", "SUMMARY OUTPUT") && near(num_at(b, "REG!B5"), evn(b, "RSQ(Sheet1!A1:A5,Sheet1!B1:B5)")) &&
+     near(num_at(b, "REG!B7"), evn(b, "STEYX(Sheet1!A1:A5,Sheet1!B1:B5)")) && num_at(b, "REG!B8") == 5 &&
+     near(num_at(b, "REG!B17"), evn(b, "INTERCEPT(Sheet1!A1:A5,Sheet1!B1:B5)")) && near(num_at(b, "REG!B18"), evn(b, "SLOPE(Sheet1!A1:A5,Sheet1!B1:B5)")) &&
+     near(num_at(b, "REG!C18"), evn(b, "INDEX(LINEST(Sheet1!A1:A5,Sheet1!B1:B5,TRUE,TRUE),2,1)")) &&
+     near(num_at(b, "REG!C17"), evn(b, "INDEX(LINEST(Sheet1!A1:A5,Sheet1!B1:B5,TRUE,TRUE),2,2)")) &&
+     near(num_at(b, "REG!E12"), evn(b, "INDEX(LINEST(Sheet1!A1:A5,Sheet1!B1:B5,TRUE,TRUE),4,1)")) &&
+     near(num_at(b, "REG!F12"), evn(b, "F.DIST.RT(INDEX(LINEST(Sheet1!A1:A5,Sheet1!B1:B5,TRUE,TRUE),4,1),1,3)")) &&
+     text_at(b, "REG!A22", "RESIDUAL OUTPUT") && text_at(b, "REG!B24", "Predicted Y") && near(num_at(b, "REG!C25"), -0.4) &&
+     text_at(b, "REG!F22", "PROBABILITY OUTPUT") && num_at(b, "REG!F25") == 10 && num_at(b, "REG!G25") == 2);
+  /* t-tests and the F-test against T.TEST and F.TEST */
+  toolpak_defaults(&p, TP_TPAIRED); strcpy(p.in1, "A1:A5"); strcpy(p.in2, "B1:B5");
+  ok("toolpak: paired t-test", tp(b, &p, "TP") >= 0 && near(num_at(b, "TP!B13"), evn(b, "T.TEST(Sheet1!A1:A5,Sheet1!B1:B5,2,1)")) && num_at(b, "TP!B9") == 4 &&
+     near(num_at(b, "TP!B14"), evn(b, "T.INV.2T(0.05,4)")) && near(num_at(b, "TP!B7"), evn(b, "CORREL(Sheet1!A1:A5,Sheet1!B1:B5)")));
+  toolpak_defaults(&p, TP_TEQUAL); strcpy(p.in1, "A1:A5"); strcpy(p.in2, "C1:C4");
+  ok("toolpak: equal variances", tp(b, &p, "TE") >= 0 && near(num_at(b, "TE!B13"), evn(b, "T.TEST(Sheet1!A1:A5,Sheet1!C1:C4,2,2)")) && num_at(b, "TE!B9") == 7 &&
+     near(num_at(b, "TE!B11"), evn(b, "T.TEST(Sheet1!A1:A5,Sheet1!C1:C4,1,2)")));
+  toolpak_defaults(&p, TP_TUNEQUAL); strcpy(p.in1, "A1:A5"); strcpy(p.in2, "C1:C4");
+  ok("toolpak: unequal variances", tp(b, &p, "TU") >= 0 && num_at(b, "TU!B8") == 7 && near(num_at(b, "TU!B12"), evn(b, "T.DIST.2T(ABS(TU!B9),7)")));
+  toolpak_defaults(&p, TP_FTEST); strcpy(p.in1, "A1:A5"); strcpy(p.in2, "C1:C4");
+  ok("toolpak: F-test", tp(b, &p, "FT") >= 0 && near(num_at(b, "FT!B9"), evn(b, "F.DIST.RT(1.02,4,3)")) && near(num_at(b, "FT!B10"), evn(b, "F.INV.RT(0.05,4,3)")) && num_at(b, "FT!C7") == 3);
+  /* z-test with known variances 1 and 2 */
+  toolpak_defaults(&p, TP_ZTEST); strcpy(p.in1, "A1:A5"); strcpy(p.in2, "C1:C4"); p.var1 = 1; p.var2 = 2;
+  ok("toolpak: z-test", tp(b, &p, "ZT") >= 0 && near(num_at(b, "ZT!B8"), (3.8 - 7.5) / sqrt(1 / 5.0 + 2 / 4.0)) && near(num_at(b, "ZT!B5"), 1) &&
+     near(num_at(b, "ZT!B11"), 2 * evn(b, "1-NORM.S.DIST(ABS(ZT!B8),TRUE)")) && near(num_at(b, "ZT!B12"), evn(b, "NORM.S.INV(0.975)")));
+  /* histogram with bins 2 and 4, cumulative and Pareto */
+  put(b, "Sheet1!P1", "2"); put(b, "Sheet1!P2", "4");
+  toolpak_defaults(&p, TP_HISTOGRAM); strcpy(p.in1, "A1:A5"); strcpy(p.in2, "P1:P2"); p.cumulative = 1; p.pareto = 1;
+  ok("toolpak: histogram", tp(b, &p, "HI") >= 0 && num_at(b, "HI!B2") == 1 && num_at(b, "HI!B3") == 2 && text_at(b, "HI!A4", "More") && num_at(b, "HI!B4") == 2 &&
+     near(num_at(b, "HI!C3"), 0.6) && shows(b, book_find_sheet(b, "HI"), 2, 2, "60.00%") && num_at(b, "HI!E2") == 2 && num_at(b, "HI!F4") == 1);
+  /* moving average, exponential smoothing */
+  toolpak_defaults(&p, TP_MOVAVG); strcpy(p.in1, "A1:A5"); p.stderrs = 1;
+  ok("toolpak: moving average", tp(b, &p, "MA") >= 0 && num_at(b, "MA!A1") == -1000 - E_NA && num_at(b, "MA!A3") == 3 && near(num_at(b, "MA!A5"), 14 / 3.0) &&
+     num_at(b, "MA!B4") == -1000 - E_NA && near(num_at(b, "MA!B5"), sqrt((1 + 1 + 1 / 9.0) / 3)));
+  toolpak_defaults(&p, TP_EXPSMOOTH); strcpy(p.in1, "A1:A5"); p.damping = 0.3;
+  ok("toolpak: exponential smoothing", tp(b, &p, "ES") >= 0 && num_at(b, "ES!A1") == -1000 - E_NA && num_at(b, "ES!A2") == 2 && near(num_at(b, "ES!A3"), 0.7 * 3 + 0.3 * 2));
+  /* rank and percentile */
+  toolpak_defaults(&p, TP_RANK); strcpy(p.in1, "A1:A5");
+  ok("toolpak: rank and percentile", tp(b, &p, "RK") >= 0 && num_at(b, "RK!A2") == 4 && num_at(b, "RK!B2") == 5 && num_at(b, "RK!C2") == 1 && num_at(b, "RK!C3") == 1 &&
+     num_at(b, "RK!A6") == 1 && num_at(b, "RK!C6") == 5 && near(num_at(b, "RK!D2"), evn(b, "PERCENTRANK.INC(Sheet1!A1:A5,5)")) && near(num_at(b, "RK!D4"), 0.5));
+  /* Fourier: 1 2 3 4 -> 10, -2+2i, -2, -2-2i; and back */
+  put(b, "Sheet1!R1", "1"); put(b, "Sheet1!R2", "2"); put(b, "Sheet1!R3", "3"); put(b, "Sheet1!R4", "4");
+  toolpak_defaults(&p, TP_FOURIER); strcpy(p.in1, "R1:R4");
+  ok("toolpak: fourier", tp(b, &p, "FO") >= 0 && text_at(b, "FO!A1", "10") && text_at(b, "FO!A2", "-2+2i") && text_at(b, "FO!A3", "-2") && text_at(b, "FO!A4", "-2-2i"));
+  toolpak_defaults(&p, TP_FOURIER); strcpy(p.in1, "FO!A1:A4"); p.inverse = 1;
+  ok("toolpak: inverse fourier", tp(b, &p, "FI") >= 0 && text_at(b, "FI!A1", "1") && text_at(b, "FI!A2", "2") && text_at(b, "FI!A4", "4"));
+  /* random numbers (a fixed seed repeats) and sampling */
+  toolpak_defaults(&p, TP_RANDOM); p.nvars = 2; p.nnums = 50; p.dist = TPD_UNIFORM; p.p1 = 10; p.p2 = 20; p.seed = 42;
+  ok("toolpak: random numbers", tp(b, &p, "RN") >= 0 && evn(b, "COUNT(RN!A1:B50)") == 100 && evn(b, "MIN(RN!A1:B50)") >= 10 && evn(b, "MAX(RN!A1:B50)") < 20 &&
+     cell_value(b, book_find_sheet(b, "RN"), 50, 0)->t == V_EMPTY);
+  p.dist = TPD_PATTERNED; p.p1 = 1; p.p2 = 3; p.p3 = 1; p.p4 = 2; p.p5 = 2; p.nvars = 1;
+  ok("toolpak: patterned", tp(b, &p, "PA") >= 0 && num_at(b, "PA!A1") == 1 && num_at(b, "PA!A2") == 1 && num_at(b, "PA!A3") == 2 && num_at(b, "PA!A7") == 1 && evn(b, "COUNT(PA!A1:A20)") == 12);
+  p.dist = TPD_BERNOULLI; p.p1 = 0.5; p.nnums = 200;
+  ok("toolpak: bernoulli", tp(b, &p, "BE") >= 0 && evn(b, "SUM(BE!A1:A200)") > 60 && evn(b, "SUM(BE!A1:A200)") < 140 && evn(b, "COUNTIF(BE!A1:A200,\">1\")") == 0);
+  toolpak_defaults(&p, TP_SAMPLING); strcpy(p.in1, "A1:A5"); p.periodic = 1; p.nsample = 2;
+  ok("toolpak: periodic sample", tp(b, &p, "SP") >= 0 && num_at(b, "SP!A1") == 3 && num_at(b, "SP!A2") == 5 && cell_value(b, book_find_sheet(b, "SP"), 2, 0)->t == V_EMPTY);
+  /* an output range: refused over data until overwrite */
+  S1 = book_find_sheet(b, "Sheet1");
+  toolpak_defaults(&p, TP_CORREL); strcpy(p.in1, "A1:B5"); p.outnew = 0; strcpy(p.out, "A20");
+  ok("toolpak: output range", toolpak_run(b, S1, &p, &w, &why) == S1 && num_at(b, "Sheet1!B21") == 1 && w.r1 == 19 && w.c2 == 2);
+  ok("toolpak: undo", book_undo(b, NULL, NULL) && cell_value(b, S1, 20, 1)->t == V_EMPTY);
+  strcpy(p.out, "A1");
+  ok("toolpak: asks before replacing", toolpak_run(b, S1, &p, &w, &why) == -2 && num_at(b, "Sheet1!A1") == 2);
+  p.overwrite = 1;
+  ok("toolpak: replaces", toolpak_run(b, S1, &p, &w, &why) == S1 && num_at(b, "Sheet1!B2") == 1);
+  book_undo(b, NULL, NULL);
+  toolpak_defaults(&p, TP_DESCR); strcpy(p.in1, "L1:N5");
+  ok("toolpak: non-numeric input", toolpak_run(b, S1, &p, &w, &why) == -1 && why);
+  book_free(b);
+}
+
 static void analysis_tests(void)
 {
   solver_tests();
+  toolpak_tests();
 }

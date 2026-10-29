@@ -573,7 +573,13 @@ static int lp_solve(int n, const double *c, int m0, const double *a, const u8 *s
     nsense[i] = sense[i]; nrhs[i] = rhs[i] - sh;
   }
   for (i = m0, k = 0; k < ny; k++) if (csign[k] > 0 && finite_(lo[cvar[k]]) && finite_(hi[cvar[k]])) { nsense[i] = SR_LE; nrhs[i] = hi[cvar[k]] - lo[cvar[k]]; i++; }
-  for (i = 0; i < m; i++) { if (nsense[i] != SR_EQ) ns++; if (nsense[i] != SR_LE) na++; scale = dmax(scale, fabs(nrhs[i])); }
+  /* rows with a negative right side are negated, so every right side is >= 0 */
+  for (i = 0; i < m; i++) {
+    if (nrhs[i] < 0 && nsense[i] != SR_EQ) nsense[i] = nsense[i] == SR_LE ? SR_GE : SR_LE;
+    if (nsense[i] != SR_EQ) ns++;
+    if (nsense[i] != SR_LE) na++;
+    scale = dmax(scale, fabs(nrhs[i]));
+  }
   w = ny + ns + na; W = w + 1;
   t = (double *)calloc((size_t)(m ? m : 1) * W, sizeof(double)); obj = (double *)calloc((size_t)W, sizeof(double));
   basis = (int *)malloc(((size_t)m + 1) * sizeof(int)); allowed = (u8 *)malloc((size_t)W); cost = (double *)calloc((size_t)W, sizeof(double));
@@ -588,7 +594,6 @@ static int lp_solve(int n, const double *c, int m0, const double *a, const u8 *s
       int bi = i - m0, cnt = 0;
       for (k = 0; k < ny; k++) if (csign[k] > 0 && finite_(lo[cvar[k]]) && finite_(hi[cvar[k]])) { if (cnt == bi) { row[k] = sg; break; } cnt++; }
     }
-    if (sg < 0 && sen != SR_EQ) sen = sen == SR_LE ? SR_GE : SR_LE;
     row[w] = nrhs[i] * sg;
     if (sen == SR_LE) { row[slack] = 1; basis[i] = slack++; }
     else if (sen == SR_GE) { row[slack++] = -1; row[art] = 1; basis[i] = art++; }
@@ -1243,6 +1248,7 @@ int an_add_sheet(Book *b, const char *base, int at)
   char nm[32];
   int i;
   for (i = 0; i < b->nnames; i++) if (b->names[i].sheet != SHEET_SELF && b->names[i].sheet >= at) { at = b->nsh; break; }
+  if (!base) return book_add_sheet(b, NULL, at);
   book_unique_sheet_name(b, base, nm);
   return book_add_sheet(b, nm, at);
 }
