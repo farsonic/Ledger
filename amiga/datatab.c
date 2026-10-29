@@ -25,6 +25,7 @@
 #include "lang.h"
 #include "ids.h"
 #include "datatab.h"
+#include "anatab.h"
 #include "../core/calc.h"
 #include "../core/cond.h"
 #include "../core/data.h"
@@ -156,6 +157,7 @@ int datatab_may(Book *b, int sheet, int what, Rect a)
   Sheet *s;
   if (!b || sheet < 0 || sheet >= b->nsh || !(s = b->sh[sheet])->protect) return 1;
   if (what == DT_CELLS ? !prot_area_locked(b, sheet, a) : what == DT_ROWS ? (s->protallow & PA_FMTROWS) != 0 : (s->protallow & PA_FMTCOLS) != 0) return 1;
+  if (what == DT_CELLS && s->neranges && anatab_unlock(b, sheet, a)) return 1;     /* (anatab) Allow Edit Ranges' passwords */
   protected_msg();
   return 0;
 }
@@ -212,7 +214,7 @@ int datatab_refused(ULONG id, LONG v)
   }
   if (!s->protect || g == G_NONE) return 0;
   switch (g) {
-  case G_CELLS: if (!prot_area_locked(book, cur_index(), cur_sel())) return 0; break;
+  case G_CELLS: if (!prot_area_locked(book, cur_index(), cur_sel()) || (s->neranges && anatab_unlock(book, cur_index(), cur_sel()))) return 0; break;
   case G_FORMAT: if (al & PA_FMTCELLS) return 0; break;
   case G_ROWS: if (al & PA_FMTROWS) return 0; break;
   case G_COLS: if (al & PA_FMTCOLS) return 0; break;

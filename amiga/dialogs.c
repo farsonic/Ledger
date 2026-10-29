@@ -408,7 +408,7 @@ void dlg_insert_function(void)
 }
 
 /* ------------------------------------------------------------------ names */
-static char nm_lines[200][160]; static const char *nm_ptrs[201]; static int nm_n;
+static char nm_lines[200][160]; static const char *nm_ptrs[201]; static int nm_n, nm_index[200];
 static Object *nm_list;
 static void nm_fill(void)
 {
@@ -416,6 +416,8 @@ static void nm_fill(void)
   nm_n = 0;
   for (i = 0; i < book->nnames && nm_n < 200; i++) {
     char a[80], b[200];
+    if (!str_ncasecmp(book->names[i].name, "solver_", 7)) continue;     /* (Solver's model: hidden names, as Excel keeps them) */
+    nm_index[nm_n] = i;
     utf8_to_latin1(book->names[i].name, (u32)strlen(book->names[i].name), a, sizeof a);
     utf8_to_latin1(book->names[i].formula_text ? book->names[i].formula_text : "", book->names[i].formula_text ? (u32)strlen(book->names[i].formula_text) : 0, b, sizeof b);
     snprintf(nm_lines[nm_n], sizeof nm_lines[0], "%s  =  %s%s", a, b, book->names[i].sheet != SHEET_SELF ? tr("  (one sheet)") : "");
@@ -429,7 +431,7 @@ static void nm_each(ULONG id)
 {
   LONG a = (LONG)xget(nm_list, MUIA_List_Active);
   if (id == ID_NAMEADD) { dlg_define_name(); nm_fill(); }
-  else if (id == ID_NAMEDEL && a >= 0 && a < book->nnames) { book_delete_name(book, (int)a); nm_fill(); refresh_all(); }
+  else if (id == ID_NAMEDEL && a >= 0 && a < nm_n) { book_delete_name(book, nm_index[a]); nm_fill(); refresh_all(); }
 }
 void dlg_names(void)
 {

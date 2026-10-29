@@ -268,7 +268,7 @@ int solver_save(Book *b, const SolverModel *m)
     if (!abs_text(b, m->sheet, c->lhs, t, sizeof t)) continue;
     k++;
     sprintf(nm, "solver_lhs%d", k); put_name(b, m->sheet, nm, t);
-    sprintf(nm, "solver_rel%d", k); sprintf(t, "%d", c->rel); put_name(b, m->sheet, nm, t);
+    sprintf(nm, "solver_rel%d", k); sprintf(t, "%d", (int)c->rel); put_name(b, m->sheet, nm, t);
     sprintf(nm, "solver_rhs%d", k);
     if (c->rel == SR_INT) strcpy(t, "\"integer\"");
     else if (c->rel == SR_BIN) strcpy(t, "\"binary\"");

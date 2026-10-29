@@ -42,6 +42,7 @@
 #include "chartview.h"
 #include "../core/data.h"
 #include "datatab.h"
+#include "anatab.h"
 
 #ifndef MUIM_GoActive
 #define MUIM_GoActive   0x8042491aUL
@@ -507,6 +508,9 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
   const char *starts[64]; int lens[64];
   if (!cell || (!cell->f && cell->v.t == V_EMPTY)) return;
   v = cell_value(b, SI(d), r, c);
+  /* (anatab) a checkbox cell's box */
+  if (v->t == V_BOOL && sty->numfmt >= 164 && !d->formulas &&
+      anatab_draw_check(rp, b, SI(d), r, c, cx0, y0, cx1, y1, pen_for(d, 0x606060), pen_for(d, 0x2B78D4), sty->fill ? pen_for(d, sty->fill & 0xFFFFFF) : pen_for(d, 0xFFFFFF))) return;
   /* conditional formatting: its colour and font styles over the cell's own */
   if (s->ncfs && cond_look(b, SI(d), r, c, &lk) && (lk.bold || lk.italic || lk.underline || lk.strike)) {
     cfnt = *fnt;
@@ -1464,6 +1468,8 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   if (ov_busy(d->ov)) { GridView gv; gv_fill(d, &gv, _rp(obj), _mleft(obj), _mtop(obj)); if (ov_key(d->ov, &gv, code, q)) return 1; }
   if (!shift) { r = s->cur_r; c = s->cur_c; }
   if (alt && shift && (code == 0x4E || code == 0x4F)) { DoMethod(_app(obj), MUIM_Application_ReturnID, code == 0x4E ? ID_GROUP : ID_UNGROUP); return 1; }
+  /* (anatab) Space ticks the selected checkboxes */
+  if (code == 0x40 && !shift && !alt && !ctrl && cell_is_checkbox(d->book, SI(d), s->cur_r, s->cur_c)) { DoMethod(_app(obj), MUIM_Application_ReturnID, ID_AN_TOGGLE); return 1; }
   switch (code) {
   case 0x4C: case 0x4D: case 0x4E: case 0x4F: {
     int dr = code == 0x4C ? -1 : code == 0x4D ? 1 : 0, dc = code == 0x4E ? 1 : code == 0x4F ? -1 : 0;
@@ -1792,6 +1798,13 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
         DoMethod(_app(obj), MUIM_Application_ReturnID, ID_LINKOPEN);
         return MUI_EventHandlerRC_Eat;
       }
+    }
+    /* (anatab) a click on a checkbox cell ticks it */
+    if (region == 0 && !shift && !(im->Qualifier & IEQUALIFIER_CONTROL) && cell_is_checkbox(d->book, SI(d), r, c) && cell_value(d->book, SI(d), r, c)->t == V_BOOL) {
+      s->cur_r = r; s->cur_c = c; d->end_r = r; d->end_c = c;
+      redraw(d); moved(d);
+      DoMethod(_app(obj), MUIM_Application_ReturnID, ID_AN_TOGGLE);
+      return MUI_EventHandlerRC_Eat;
     }
     /* the cells: a filter button opens its list (main.c) */
     if (region == 0 && (e = filter_hit(d, x, y)) >= 0) {
