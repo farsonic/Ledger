@@ -6,6 +6,7 @@
 #include "../core/pdfout.h"
 #include "../core/fonts.h"
 #include "../core/spell.h"
+#include "../core/audit.h"
 
 static Book *roundtrip(Book *b)
 {
@@ -214,8 +215,61 @@ static void spell_tests(void)
   spell_free(&sp);
   book_free(b);
 }
+static void audit_tests(void)
+{
+  Book *b = book_new();
+  AuditRef refs[16];
+  AuditCell cells[16];
+  EvalSteps e;
+  char t[256], part[256];
+  Rect a, bound;
+  int n;
+  book_add_sheet(b, "Two", -1);
+  book_input(b, 0, 0, 0, "2", NULL);           /* A1 */
+  book_input(b, 0, 1, 0, "3", NULL);           /* A2 */
+  book_input(b, 0, 2, 0, "=A1*(A2+1)", NULL);  /* A3 = 8 */
+  book_input(b, 0, 3, 0, "=SUM(A1:A3)+Two!B2", NULL);
+  book_input(b, 1, 1, 1, "=Sheet1!A1/0", NULL);
+  n = audit_precedents(b, 0, 3, 0, refs, 16);
+  ok("audit: precedents", n == 2 && refs[0].r.r1 == 0 && refs[0].r.r2 == 2 && refs[1].sheet == 1 && refs[1].r.r1 == 1 && refs[1].r.c1 == 1);
+  n = audit_dependents(b, 0, 0, 0, refs, 16);
+  ok("audit: dependents", n == 3 && refs[0].r.r1 == 2 && refs[1].r.r1 == 3 && refs[2].sheet == 1);
+  ok("eval: begins", eval_begin(&e, b, 0, 2, 0));
+  eval_text(&e, t, sizeof t); ok("eval: the formula", !strcmp(t, "=A1*(A2+1)"));
+  eval_next(&e, part, sizeof part); ok("eval: A1 first", !strcmp(part, "A1"));
+  eval_step(&e); eval_text(&e, t, sizeof t); ok("eval: A1 worked out", !strcmp(t, "=2*(A2+1)"));
+  eval_step(&e); eval_text(&e, t, sizeof t); ok("eval: A2", !strcmp(t, "=2*(3+1)"));
+  eval_next(&e, part, sizeof part); ok("eval: the sum next", !strcmp(part, "3+1"));
+  eval_step(&e); eval_step(&e); eval_text(&e, t, sizeof t); ok("eval: brackets go", !strcmp(t, "=2*4"));
+  ok("eval: not done yet", !eval_done(&e));
+  eval_step(&e); eval_text(&e, t, sizeof t); ok("eval: result", !strcmp(t, "=8") && eval_done(&e));
+  eval_end(&e);
+  eval_begin(&e, b, 0, 3, 0);
+  eval_next(&e, part, sizeof part); ok("eval: a range stays for SUM", !strcmp(part, "SUM(A1:A3)"));
+  while (eval_step(&e)) ;
+  eval_text(&e, t, sizeof t); ok("eval: error result", !strcmp(t, "=#DIV/0!"));
+  eval_end(&e);
+  n = audit_errors(b, cells, 16);
+  ok("errors: found", n == 2 && cells[0].sheet == 0 && cells[0].r == 3 && cells[1].sheet == 1 && cells[1].err == E_DIV0);
+  a.r1 = a.c1 = 0; a.r2 = a.c2 = 0;
+  ok("goto special: formulas", goto_special(b, 0, a, 0, 0, GS_FORMULAS, &bound, cells, 16) == 2 && bound.r1 == 2 && bound.r2 == 3);
+  ok("goto special: constants", goto_special(b, 0, a, 0, 0, GS_CONSTANTS, &bound, cells, 16) == 2 && bound.r2 == 1);
+  ok("goto special: errors", goto_special(b, 0, a, 0, 0, GS_ERRORS, &bound, cells, 16) == 1 && cells[0].r == 3);
+  ok("goto special: last cell", goto_special(b, 0, a, 0, 0, GS_LASTCELL, &bound, cells, 16) == 1 && bound.r1 == 3 && bound.c1 == 0);
+  ok("goto special: region", goto_special(b, 0, a, 1, 0, GS_REGION, &bound, cells, 16) == 1 && bound.r1 == 0 && bound.r2 == 3);
+  /* names from a table's headings */
+  book_input(b, 0, 0, 3, "Unit price", NULL); book_input(b, 0, 0, 4, "Qty", NULL);
+  book_input(b, 0, 1, 3, "5", NULL); book_input(b, 0, 1, 4, "7", NULL);
+  a.r1 = 0; a.r2 = 2; a.c1 = 3; a.c2 = 4;
+  ok("names: from the top row", book_create_names(b, 0, a, 1, 0, 0, 0) == 2);
+  ok("names: used", evn(b, "SUM(Unit_price)*SUM(Qty)") == 35);
+  n = audit_accessibility(b, t, sizeof t);
+  ok("accessibility: default sheet name", n == 1 && strstr(t, "Sheet1\tDefault sheet name"));
+  book_free(b);
+}
 static void layout_tests(void)
 {
+  audit_tests();
   spell_tests();
   pagesetup_tests();
   pdf_tests();
