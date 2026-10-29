@@ -139,6 +139,7 @@ void drw_free(Drawing *d)
   free(d->o);
   for (i = 0; i < d->ng; i++) spark_group_clear(&d->g[i]);
   free(d->g);
+  blob_free(d->bg);
   free(d);
 }
 Drawing *drw_copy(const Drawing *d)
@@ -147,6 +148,7 @@ Drawing *drw_copy(const Drawing *d)
   int i, k;
   if (!d || !(c = (Drawing *)calloc(1, sizeof *c))) return NULL;
   c->nextid = d->nextid;
+  c->bg = blob_ref(d->bg); c->bgtype = d->bgtype;
   if (d->n && !(c->o = (DObj *)calloc((size_t)d->n, sizeof(DObj)))) goto fail;
   for (i = 0; i < d->n; i++) { if (!dobj_copy(&c->o[i], &d->o[i])) goto fail; c->n = i + 1; }
   if (d->ng && !(c->g = (SparkGroup *)calloc((size_t)d->ng, sizeof(SparkGroup)))) goto fail;

@@ -131,7 +131,7 @@ AutoFilter, conditional formatting (highlight rules, data bars and colour scales
 
 ## What it doesn't do yet
 
-Not there yet: charts, Format as Table, pivot tables, data validation, spill (dynamic array) formulas, grouping and outlines, sheet protection, pictures, spelling, other languages for the interface and PDF export (FEATURES.md in the Source drawer lists what's left, and ticks off what's done). Printing is left out, as in Quill. Old .xls files can't be read: save them as .xlsx first.
+Not there yet: charts, Format as Table, pivot tables, data validation, spill (dynamic array) formulas, grouping and outlines, sheet protection, pictures and other languages for the interface (FEATURES.md in the Source drawer lists what's left, and ticks off what's done). Printing is left out, as in Quill, but the page setup is there (margins, paper, scaling, print area and titles, page breaks, headers and footers), for PDF export, Page Break Preview and the Page Layout view, and is saved for Excel. Old .xls files can't be read: save them as .xlsx first.
 
 ## Why C, not a port
 
@@ -164,4 +164,6 @@ python3 tools/mkicons.py <package-dir>      # the Workbench icons (needs Pillow)
 - **Ledger:** the code is new, written for this project. It borrows GridCraft's ideas but none of its code. The interface code it shares with Quill is the same author's.
 - **Its licence:** not chosen yet; the author will choose one before the code is published.
 - **TrueType fonts:** Liberation (Red Hat, Google), Carlito and Caladea, under the SIL Open Font License 1.1. See `TrueType/LICENSE-fonts.txt`.
+- **Spelling dictionary:** `Dict/british-english` is SCOWL's British English word list (Copyright 2000-2011 Kevin Atkinson and others; see `Dict/LICENSE-dict.txt`), shared with Quill, as is the spelling checker's code.
+- **GridCraft's theme palettes:** the colours of the Craft, Slate, Meadow, Ember, Ocean, Orchid and Graphite themes (Page Layout > Themes) are GridCraft's (MIT licence, (c) the GridCraft authors).
 - **Screen fonts:** the screen fonts in `Fonts/` are renderings of those fonts, so they are modified versions under the same licence, renamed QuillSerif, QuillSans, QuillMono, QuillSansC and QuillSerifC (shared with Quill).

@@ -1,0 +1,58 @@
+# The functions of core/func_fin.c, for the Insert Function dialog: NAME|category|args|description
+ACCRINT|Financial|issue, first_interest, settlement, rate, [par], frequency, [basis], [calc_method]|The accrued interest of a security that pays periodic interest.
+ACCRINTM|Financial|issue, settlement, rate, [par], [basis]|The accrued interest of a security that pays interest at maturity.
+AMORDEGRC|Financial|cost, date_purchased, first_period, salvage, period, rate, [basis]|French degressive depreciation for one accounting period.
+AMORLINC|Financial|cost, date_purchased, first_period, salvage, period, rate, [basis]|French straight-line depreciation for one accounting period.
+COUPDAYBS|Financial|settlement, maturity, frequency, [basis]|Days from the start of the coupon period to settlement.
+COUPDAYS|Financial|settlement, maturity, frequency, [basis]|Days in the coupon period that holds settlement.
+COUPDAYSNC|Financial|settlement, maturity, frequency, [basis]|Days from settlement to the next coupon date.
+COUPNCD|Financial|settlement, maturity, frequency, [basis]|The next coupon date after settlement.
+COUPNUM|Financial|settlement, maturity, frequency, [basis]|The number of coupons payable between settlement and maturity.
+COUPPCD|Financial|settlement, maturity, frequency, [basis]|The coupon date before settlement.
+CUMIPMT|Financial|rate, nper, pv, start_period, end_period, type|The interest paid on a loan between two periods.
+CUMPRINC|Financial|rate, nper, pv, start_period, end_period, type|The principal repaid on a loan between two periods.
+DB|Financial|cost, salvage, life, period, [month]|Fixed-declining balance depreciation for a period.
+DDB|Financial|cost, salvage, life, period, [factor]|Double-declining balance depreciation for a period.
+DISC|Financial|settlement, maturity, pr, redemption, [basis]|The discount rate of a security.
+DOLLARDE|Financial|fractional_dollar, fraction|A price written as a fraction (1.02 = 1 2/16) as a decimal number.
+DOLLARFR|Financial|decimal_dollar, fraction|A decimal price written as a fraction (1.125 = 1.02 in sixteenths).
+DURATION|Financial|settlement, maturity, coupon, yld, frequency, [basis]|The Macaulay duration of a bond, in years.
+EFFECT|Financial|nominal_rate, npery|The effective annual interest rate.
+FVSCHEDULE|Financial|principal, schedule|The future value of a principal after a series of interest rates.
+INTRATE|Financial|settlement, maturity, investment, redemption, [basis]|The interest rate of a fully invested security.
+ISPMT|Financial|rate, per, nper, pv|The interest paid in a period of a loan with even principal payments.
+MDURATION|Financial|settlement, maturity, coupon, yld, frequency, [basis]|The modified duration of a bond, in years.
+MIRR|Financial|values, finance_rate, reinvest_rate|The modified internal rate of return of cash flows.
+NOMINAL|Financial|effect_rate, npery|The nominal annual interest rate.
+ODDFPRICE|Financial|settlement, maturity, issue, first_coupon, rate, yld, redemption, frequency, [basis]|The price per 100 of a bond with an odd first period.
+ODDFYIELD|Financial|settlement, maturity, issue, first_coupon, rate, pr, redemption, frequency, [basis]|The yield of a bond with an odd first period.
+ODDLPRICE|Financial|settlement, maturity, last_interest, rate, yld, redemption, frequency, [basis]|The price per 100 of a bond with an odd last period.
+ODDLYIELD|Financial|settlement, maturity, last_interest, rate, pr, redemption, frequency, [basis]|The yield of a bond with an odd last period.
+PDURATION|Financial|rate, pv, fv|The number of periods an investment takes to reach a value.
+PRICE|Financial|settlement, maturity, rate, yld, redemption, frequency, [basis]|The price per 100 of a bond that pays periodic interest.
+PRICEDISC|Financial|settlement, maturity, discount, redemption, [basis]|The price per 100 of a discounted security.
+PRICEMAT|Financial|settlement, maturity, issue, rate, yld, [basis]|The price per 100 of a security that pays interest at maturity.
+RECEIVED|Financial|settlement, maturity, investment, discount, [basis]|The amount received at maturity of a fully invested security.
+RRI|Financial|nper, pv, fv|The equivalent interest rate for the growth of an investment.
+SYD|Financial|cost, salvage, life, per|Sum-of-years' digits depreciation for a period.
+TBILLEQ|Financial|settlement, maturity, discount|The bond-equivalent yield of a Treasury bill.
+TBILLPRICE|Financial|settlement, maturity, discount|The price per 100 of a Treasury bill.
+TBILLYIELD|Financial|settlement, maturity, pr|The yield of a Treasury bill.
+VDB|Financial|cost, salvage, life, start_period, end_period, [factor], [no_switch]|Declining balance depreciation between two periods.
+XIRR|Financial|values, dates, [guess]|The internal rate of return of cash flows on given dates.
+XNPV|Financial|rate, values, dates|The net present value of cash flows on given dates.
+YIELD|Financial|settlement, maturity, rate, pr, redemption, frequency, [basis]|The yield of a bond that pays periodic interest.
+YIELDDISC|Financial|settlement, maturity, pr, redemption, [basis]|The annual yield of a discounted security.
+YIELDMAT|Financial|settlement, maturity, issue, rate, pr, [basis]|The annual yield of a security that pays interest at maturity.
+DAVERAGE|Database|database, field, criteria|The average of a field over the records that match the criteria.
+DCOUNT|Database|database, [field], criteria|The count of numbers in a field over the matching records.
+DCOUNTA|Database|database, [field], criteria|The count of non-blank entries in a field over the matching records.
+DGET|Database|database, field, criteria|The one value of a field that matches the criteria.
+DMAX|Database|database, field, criteria|The largest number in a field over the matching records.
+DMIN|Database|database, field, criteria|The smallest number in a field over the matching records.
+DPRODUCT|Database|database, field, criteria|The product of a field over the matching records.
+DSTDEV|Database|database, field, criteria|The sample standard deviation of a field over the matching records.
+DSTDEVP|Database|database, field, criteria|The population standard deviation of a field over the matching records.
+DSUM|Database|database, field, criteria|The sum of a field over the records that match the criteria.
+DVAR|Database|database, field, criteria|The sample variance of a field over the matching records.
+DVARP|Database|database, field, criteria|The population variance of a field over the matching records.

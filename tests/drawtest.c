@@ -339,6 +339,18 @@ static void pictures_shapes(void)
     free(x);
     book_free(e);
   }
+  {
+    /* a background picture */
+    Book *e = book_new(), *f;
+    Drawing *dr = drw_of(e->sh[0]);
+    dr->bg = blob_new(png, plen); dr->bgtype = PIC_PNG;
+    x = xlsx_save(e, &len);
+    f = x ? xlsx_load(x, len, err, sizeof err) : NULL;
+    ok("background: through a file", f && f->sh[0]->drw && f->sh[0]->drw->bg && f->sh[0]->drw->bg->len == plen && f->sh[0]->drw->bgtype == PIC_PNG);
+    if (f) book_free(f);
+    free(x);
+    book_free(e);
+  }
   /* objects follow columns deleted */
   book_delete_cols(b, 0, 0, 2);
   o = drw_obj(b->sh[0], 1);

@@ -31,6 +31,7 @@ static const char *const x_types[CK_N] = {
   "Box & Whisker", "Stock", "Combo" };
 static const char *const x_spaxis[] = { "Show Axis", "Same Minimum for All", "Same Maximum for All", "Each Its Own Minimum and Maximum",
                                         "Custom Minimum...", "Custom Maximum..." };
+static const char *const x_align[] = { "Align Left", "Align Centre", "Align Right", "Align Top", "Align Middle", "Align Bottom" };
 static const char *const x_spclear[] = { "Clear Selected Sparklines", "Clear Selected Sparkline Groups" };
 /* the parts of the selected chart (charttab.c fills them in through ribbon_set_elems) */
 static const char *x_elems[40] = { "Chart Area" };
@@ -40,8 +41,10 @@ static List xlists[LX_END - LX_BASE] = {
   { x_stat, N(x_stat), PL_TEXT, NULL }, { x_more, N(x_more), PL_TEXT, NULL }, { x_addelem, N(x_addelem), PL_TEXT, NULL },
   { x_layouts, N(x_layouts), PL_TEXT, NULL }, { x_colors, N(x_colors), PL_TEXT, NULL }, { x_styles, N(x_styles), PL_TEXT, NULL },
   { x_types, CK_N, PL_TEXT, NULL }, { x_elems, 1, PL_TEXT, NULL }, { x_spaxis, N(x_spaxis), PL_TEXT, NULL }, { x_spclear, N(x_spclear), PL_TEXT, NULL },
+  { x_align, N(x_align), PL_TEXT, NULL },
 };
-#define LIST(k) ((k) >= LX_BASE && (k) < LX_END ? &xlists[(k) - LX_BASE] : &lists[(k) < (int)N(lists) ? (k) : 0])
+/* ribbon.c's list_of() made to know these lists too (inside the macro, list_of is still the function) */
+#define list_of(k) ((k) >= LX_BASE && (k) < LX_END ? (const List *)&xlists[(k) - LX_BASE] : list_of(k))
 /* (charttab.c) the Format tab's list of the selected chart's parts, and the one shown */
 static char x_elemshown[48] = "Chart Area";
 void ribbon_set_elems(const char *const *labels, int n, int shown)

@@ -31,6 +31,7 @@ ObjView *ov_new(void);
 void ov_free(ObjView *ov);
 void ov_cleanup(ObjView *ov, Object *obj);      /* (MUIM_Cleanup) pens and pictures given back */
 void ov_fonts_free(void);                       /* (at the end) the chart text fonts */
+void ov_background(ObjView *ov, GridView *gv); /* the sheet's background picture, tiled (under the cells' fills) */
 void ov_sparks(ObjView *ov, GridView *gv);      /* sparklines in their cells (after the cells) */
 void ov_draw(ObjView *ov, GridView *gv);        /* the objects over the cells, the selection's handles */
 int  ov_mouse(ObjView *ov, GridView *gv, struct IntuiMessage *im, LONG x, LONG y);   /* 1: taken */

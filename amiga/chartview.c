@@ -506,6 +506,31 @@ static void draw_picture(ObjView *ov, GridView *gv, const DObj *o, LONG x0, LONG
     for (k = 0; k < lw; k++) { Move(rp, gv->ox + x0 + k, gv->oy + y0 + k); Draw(rp, gv->ox + x1 - k, gv->oy + y0 + k); Draw(rp, gv->ox + x1 - k, gv->oy + y1 - k); Draw(rp, gv->ox + x0 + k, gv->oy + y1 - k); Draw(rp, gv->ox + x0 + k, gv->oy + y0 + k); }
   }
 }
+void ov_background(ObjView *ov, GridView *gv)
+{
+  Drawing *dr = SH(gv)->drw;
+  DObj t;
+  u32 w0, h0;
+  LONG tw, th, x0, y0, x, y, row;
+  UBYTE *px;
+  if (!dr || !dr->bg || img_info(dr->bg->data, dr->bg->len, &w0, &h0) == IMG_NONE) return;
+  tw = (LONG)w0 * gv->zoom / 100; th = (LONG)h0 * gv->zoom / 100;
+  if (tw < 4 || th < 4) return;
+  memset(&t, 0, sizeof t);
+  t.pic = dr->bg;
+  if (!(px = pic_pens(ov, gv, &t, tw, th))) return;
+  /* tiles from A1's corner, wherever the sheet is scrolled to */
+  x0 = gv->colx(gv->g, 0); y0 = gv->rowy(gv->g, 0);
+  while (x0 + tw <= gv->hw) x0 += tw;
+  while (y0 + th <= gv->hh) y0 += th;
+  for (y = y0; y < gv->h; y += th)
+    for (x = x0; x < gv->w; x += tw)
+      for (row = 0; row < th; row++) {
+        LONG yy = y + row, a = x < gv->hw ? gv->hw : x, b = x + tw - 1 >= gv->w ? gv->w - 1 : x + tw - 1;
+        if (yy < gv->hh || yy >= gv->h || b < a) continue;
+        WriteChunkyPixels(gv->rp, (ULONG)(gv->ox + a), (ULONG)(gv->oy + yy), (ULONG)(gv->ox + b), (ULONG)(gv->oy + yy), px + row * tw + (a - x), tw);
+      }
+}
 void ov_sparks(ObjView *ov, GridView *gv)
 {
   Sheet *s = SH(gv);

@@ -36,6 +36,8 @@ static int count_kind(Book *b, int si, int ex, int pics)
 }
 int xd_has_drawing(Book *b, int si) { return si >= 0 && si < b->nsh && drw_count(b->sh[si]) > 0; }
 static int has_sparks(Book *b, int si) { Sheet *s = b->sh[si]; return s->drw && s->drw->ng > 0; }
+static int has_bg(Book *b, int si) { Sheet *s = b->sh[si]; return s->drw && s->drw->bg; }
+int xd_has_rels(Book *b, int si) { return xd_has_drawing(b, si) || has_bg(b, si); }
 
 /* ------------------------------------------------------------------ saving: package bits */
 void xd_content_types(Book *b, Buf *o)
@@ -44,6 +46,7 @@ void xd_content_types(Book *b, Buf *o)
   for (i = 0; i < b->nsh; i++) {
     Sheet *s = b->sh[i];
     int nc = 0, nx = 0;
+    if (has_bg(b, i)) { if (s->drw->bgtype == PIC_JPEG) jpg = 1; else png = 1; }
     if (!xd_has_drawing(b, i)) continue;
     buf_printf(o, "<Override PartName=\"/xl/drawings/drawing%d.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/>", i + 1);
     for (k = 0; k < drw_count(s); k++) {
@@ -61,6 +64,9 @@ void xd_content_types(Book *b, Buf *o)
 void xd_sheet_drawing_ref(Book *b, int si, Buf *o) { if (xd_has_drawing(b, si)) buf_adds(o, "<drawing r:id=\"rIdD1\"/>"); }
 void xd_sheet_rels(Book *b, int si, Buf *o)
 {
+  if (has_bg(b, si))
+    buf_printf(o, "<Relationship Id=\"rIdB1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/background%d.%s\"/>",
+               si + 1, b->sh[si]->drw->bgtype == PIC_JPEG ? "jpeg" : "png");
   if (xd_has_drawing(b, si))
     buf_printf(o, "<Relationship Id=\"rIdD1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing%d.xml\"/>", si + 1);
 }
@@ -69,6 +75,7 @@ void xd_sheet_ext(Book *b, int si, Buf *o)
 {
   Sheet *s = b->sh[si];
   int i, k;
+  if (has_bg(b, si)) buf_adds(o, "<picture r:id=\"rIdB1\"/>");
   if (!has_sparks(b, si)) return;
   buf_adds(o, "<extLst><ext uri=\"{05C60535-1F16-4fd2-B633-F4F36F0B64E0}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">"
               "<x14:sparklineGroups xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\">");
@@ -507,6 +514,10 @@ void xd_write_parts(Book *b, int si, ZipWriter *w)
   Buf o, r, cbuf;
   int k, nc = count_kind(b, si, 0, 0), nx = count_kind(b, si, 1, 0), ni = count_kind(b, si, 0, 1), rid = 0;
   char path[64];
+  if (has_bg(b, si)) {
+    sprintf(path, "xl/media/background%d.%s", si + 1, s->drw->bgtype == PIC_JPEG ? "jpeg" : "png");
+    zip_add(w, path, s->drw->bg->data, s->drw->bg->len);
+  }
   if (!xd_has_drawing(b, si)) return;
   buf_init(&o); buf_init(&r); buf_init(&cbuf);
   buf_adds(&o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
@@ -1150,6 +1161,20 @@ static u32 xcolor(Xml *x)
   if ((v = xml_attr(x, "theme"))) { int t = atoi(v); if (t >= 4 && t <= 9) return FILLRGB(accents[t - 4]); return FILLRGB(t == 0 || t == 2 ? 0xFFFFFF : 0); }
   return FILLRGB(0);
 }
+static void read_background(Book *b, ZipReader *z, const char *path, int sheet, const char *rid)
+{
+  XRel *rels = NULL;
+  int n = rels_of(z, path, &rels);
+  const XRel *r = rel_by_id(rels, n, rid);
+  size_t pl;
+  u8 *pd = r ? part(z, r->target, &pl) : NULL;
+  u32 w0, h0;
+  int t = pd ? img_info(pd, (u32)pl, &w0, &h0) : IMG_NONE;
+  Drawing *d;
+  if ((t == IMG_PNG || t == IMG_JPEG) && (d = drw_of(b->sh[sheet]))) { blob_free(d->bg); d->bg = blob_new(pd, (u32)pl); d->bgtype = (u8)(t == IMG_PNG ? PIC_PNG : PIC_JPEG); }
+  free(pd);
+  free(rels);
+}
 static void read_sparks(Book *b, ZipReader *z, const char *path, int sheet)
 {
   size_t len;
@@ -1160,7 +1185,7 @@ static void read_sparks(Book *b, ZipReader *z, const char *path, int sheet)
   int ing = 0;
   char fbuf[400] = "", rbuf[64] = "";
   Sheet *s = b->sh[sheet];
-  if (!d || !strstr((const char *)d, "sparklineGroup")) { free(d); return; }
+  if (!d || (!strstr((const char *)d, "sparklineGroup") && !strstr((const char *)d, "<picture"))) { free(d); return; }
   memset(&st, 0, sizeof st);
   memset(&g, 0, sizeof g);
   xml_init(&x, (const char *)d, len);
@@ -1169,6 +1194,7 @@ static void read_sparks(Book *b, ZipReader *z, const char *path, int sheet)
       const char *n = x.name;
       stk_push(&st, n);
       if (!strcmp(n, "sheetData")) { xml_skip(&x); stk_pop(&st); continue; }
+      if (!strcmp(n, "picture") && st.sp == 2) { const char *id = xml_attr(&x, "id"); if (id) read_background(b, z, path, sheet, id); }
       if (!strcmp(n, "sparklineGroup")) {
         const char *v;
         spark_group_init(&g, SP_LINE);

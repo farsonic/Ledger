@@ -109,7 +109,7 @@ static int read_range(const char *t, Rect *a, int *sheet)
 }
 
 /* ------------------------------------------------------------------ a chart preview (the Insert Chart dialog) */
-#define MUIA_ChartPreview_Chart (QTAG + 0x700)   /* Chart *: shown (and freed by the preview) */
+#define MUIA_ChartPreview_Chart (QTAG + 0x7C0)   /* Chart *: shown (and freed by the preview) */
 struct PVData { Chart *c; struct { ULONG rgb; LONG pen; } pens[40]; int npens; struct ColorMap *cm; };
 static struct MUI_CustomClass *pvcls;
 static LONG pv_pen(void *ctx, ULONG rgb)
@@ -254,28 +254,56 @@ static void dlg_insert_chart(int recommended)
   if (pvcls) { MUI_DeleteCustomClass(pvcls); pvcls = NULL; }
 }
 static char picdir[300];
-static void insert_picture(void)
+/* a PNG or JPEG file chosen and read: its bytes (malloc'd), size and kind; NULL if none */
+static u8 *choose_picture(const char *title, size_t *lenp, int *tp, u32 *w0, u32 *h0, char *path, size_t cap)
 {
   struct FileRequester *fr;
+  u8 *data;
+  int t;
+  path[0] = 0;
+  if (!(fr = (struct FileRequester *)MUI_AllocAslRequestTags(ASL_FileRequest, ASLFR_TitleText, (ULONG)tr(title), ASLFR_InitialDrawer, (ULONG)picdir,
+        ASLFR_InitialPattern, (ULONG)"#?.(png|jpg|jpeg)", ASLFR_DoPatterns, TRUE, TAG_DONE))) return NULL;
+  if (MUI_AslRequestTags(fr, ASLFR_Window, (ULONG)_window(grid), TAG_DONE) && fr->fr_File[0]) {
+    strncpy(path, (const char *)fr->fr_Drawer, cap - 1); path[cap - 1] = 0;
+    strncpy(picdir, (const char *)fr->fr_Drawer, sizeof picdir - 1);
+    AddPart((STRPTR)path, fr->fr_File, (ULONG)cap);
+  }
+  MUI_FreeAslRequest(fr);
+  if (!path[0]) return NULL;
+  if (!(data = file_read(path, lenp)) || ((t = img_info(data, (u32)*lenp, w0, h0)) != IMG_PNG && t != IMG_JPEG)) {
+    free(data);
+    ask("OK", "%s", tr("Ledger can't read that picture: it shows PNG and JPEG pictures."));
+    return NULL;
+  }
+  *tp = t;
+  return data;
+}
+static void background(void)
+{
+  Sheet *s = cur_sheet();
+  char path[400];
+  size_t len;
+  int t;
+  u32 w0, h0;
+  u8 *data;
+  if (s->drw && s->drw->bg) {
+    if (ask(tr("Delete|Cancel"), "%s", tr("Take the sheet's background picture off?")) == 1) { begin(); blob_free(s->drw->bg); s->drw->bg = NULL; end(); }
+    return;
+  }
+  if (!(data = choose_picture("Sheet Background", &len, &t, &w0, &h0, path, sizeof path))) return;
+  begin();
+  if (drw_of(cur_sheet())) { cur_sheet()->drw->bg = blob_new(data, (u32)len); cur_sheet()->drw->bgtype = (u8)(t == IMG_PNG ? PIC_PNG : PIC_JPEG); }
+  end();
+  free(data);
+}
+static void insert_picture(void)
+{
   char path[400] = "";
   u8 *data = NULL;
   size_t len = 0;
   u32 w0, h0;
   int t;
-  if (!(fr = (struct FileRequester *)MUI_AllocAslRequestTags(ASL_FileRequest, ASLFR_TitleText, (ULONG)tr("Insert Picture"), ASLFR_InitialDrawer, (ULONG)picdir,
-        ASLFR_InitialPattern, (ULONG)"#?.(png|jpg|jpeg)", ASLFR_DoPatterns, TRUE, TAG_DONE))) return;
-  if (MUI_AslRequestTags(fr, ASLFR_Window, (ULONG)_window(grid), TAG_DONE) && fr->fr_File[0]) {
-    strncpy(path, (const char *)fr->fr_Drawer, sizeof path - 1);
-    strncpy(picdir, (const char *)fr->fr_Drawer, sizeof picdir - 1);
-    AddPart((STRPTR)path, fr->fr_File, sizeof path);
-  }
-  MUI_FreeAslRequest(fr);
-  if (!path[0]) return;
-  if (!(data = file_read(path, &len)) || ((t = img_info(data, (u32)len, &w0, &h0)) != IMG_PNG && t != IMG_JPEG)) {
-    free(data);
-    ask("OK", "%s", tr("Ledger can't read that picture: it shows PNG and JPEG pictures."));
-    return;
-  }
+  if (!(data = choose_picture("Insert Picture", &len, &t, &w0, &h0, path, sizeof path))) return;
   {
     DObj *o;
     i32 w = (i32)w0, h = (i32)h0;
@@ -784,6 +812,115 @@ static void spark_set(ULONG id)
   end();
 }
 
+/* ------------------------------------------------------------------ arranging */
+static void align_objects(int how)
+{
+  int sel[32], n = ov_selection(OV(), sel, 32), k;
+  Sheet *s = cur_sheet();
+  i32 ax0, ay0, ax1, ay1;
+  if (n < 2) { ask("OK", "%s", tr("Select two or more objects first (hold Shift and click them, or drag round them with Select Objects).")); return; }
+  dobj_box(s, drw_obj(s, sel[0]), &ax0, &ay0, &ax1, &ay1);
+  begin();
+  for (k = 1; k < n; k++) {
+    DObj *o = drw_obj(s, sel[k]);
+    i32 x0, y0, x1, y1, dx = 0, dy = 0;
+    if (!o) continue;
+    dobj_box(s, o, &x0, &y0, &x1, &y1);
+    switch (how) {
+    case 0: dx = ax0 - x0; break;
+    case 1: dx = (ax0 + ax1) / 2 - (x0 + x1) / 2; break;
+    case 2: dx = ax1 - x1; break;
+    case 3: dy = ay0 - y0; break;
+    case 4: dy = (ay0 + ay1) / 2 - (y0 + y1) / 2; break;
+    default: dy = ay1 - y1; break;
+    }
+    if (x0 + dx < 0) dx = -x0;
+    if (y0 + dy < 0) dy = -y0;
+    dobj_place(s, o, x0 + dx, y0 + dy, x1 + dx, y1 + dy);
+  }
+  end();
+}
+static void rotate_shape(void)
+{
+  DObj *o = sel_obj();
+  Sheet *s = cur_sheet();
+  i32 x0, y0, x1, y1, cx, cy, w, h;
+  if (!o || o->kind != OB_SHAPE) return;
+  dobj_box(s, o, &x0, &y0, &x1, &y1);
+  cx = (x0 + x1) / 2; cy = (y0 + y1) / 2; w = x1 - x0; h = y1 - y0;
+  begin();
+  /* a quarter turn about its middle: its width and height change places (a line turns too) */
+  if (o->shape == SK_LINE || o->shape == SK_ARROW) { u8 fx = o->flipx; o->flipx = (u8)!o->flipy; o->flipy = fx; }
+  dobj_place(s, o, cx - h / 2 > 0 ? cx - h / 2 : 0, cy - w / 2 > 0 ? cy - w / 2 : 0, (cx - h / 2 > 0 ? cx - h / 2 : 0) + h, (cy - w / 2 > 0 ? cy - w / 2 : 0) + w);
+  end();
+}
+/* the Selection Pane: the objects by name, topmost first */
+static Object *sp_list;
+static char sp_names[200][64];
+static int sp_n;
+static void sp_fill(void)
+{
+  Sheet *s = cur_sheet();
+  int i;
+  static const char *const kinds[3] = { "chart", "picture", "shape" };
+  DoMethod(sp_list, MUIM_List_Clear);
+  sp_n = drw_count(s) < 200 ? drw_count(s) : 200;
+  for (i = 0; i < sp_n; i++) {
+    DObj *o = drw_obj(s, sp_n - 1 - i);
+    char nm[48];
+    utf8_latin(o->name, nm, sizeof nm);
+    snprintf(sp_names[i], sizeof sp_names[i], "%s  (%s)", nm, tr(kinds[o->kind % 3]));
+    DoMethod(sp_list, MUIM_List_InsertSingle, (ULONG)sp_names[i], MUIV_List_Insert_Bottom);
+  }
+}
+static void sp_each(ULONG id)
+{
+  LONG a = (LONG)xget(sp_list, MUIA_List_Active);
+  Sheet *s = cur_sheet();
+  int k = a >= 0 && a < sp_n ? sp_n - 1 - (int)a : -1;
+  if (k < 0) return;
+  if (id == ID_DLG1) { ov_select(OV(), k); refresh_all(); }
+  else if (id == ID_DLG2 || id == ID_DLG3) {
+    int to = id == ID_DLG2 ? k + 1 : k - 1;
+    if (to < 0 || to >= drw_count(s)) return;
+    begin(); drw_move_z(s, k, to); ov_select(OV(), to); end();
+    sp_fill(); set(sp_list, MUIA_List_Active, sp_n - 1 - to);
+  } else if (id == ID_DLG4) {
+    char t[48], u[96];
+    DObj *o = drw_obj(s, k);
+    utf8_latin(o->name, t, sizeof t);
+    if (!ask_string("Rename", "Name:", t, sizeof t) || !t[0]) return;
+    latin1_utf8(t, u, sizeof u);
+    begin(); o = drw_obj(s, k); snprintf(o->name, sizeof o->name, "%s", u); end();
+    sp_fill(); set(sp_list, MUIA_List_Active, a);
+  } else if (id == ID_DLG5) {
+    begin(); drw_remove(s, k); ov_select(OV(), -1); end();
+    sp_fill();
+  }
+}
+static void dlg_selection_pane(void)
+{
+  static const ULONG ends[] = { ID_DLGOK, 0 };
+  Object *w, *b1, *b2, *b3, *b4, *b5;
+  w = dialog_window("Selection Pane", VGroup,
+        Child, QLabel(tr("Objects on this sheet, the front one first:"), MUIO_Label_LeftAligned),
+        Child, ListviewObject, MUIA_Listview_List, sp_list = ListObject, InputListFrame, End, MUIA_CycleChain, 1, MUIA_Listview_DoubleClick, TRUE, End,
+        Child, HGroup, Child, b1 = QButton(tr("Select")), Child, b2 = QButton(tr("Forward")), Child, b3 = QButton(tr("Backward")),
+          Child, b4 = QButton(tr("Rename")), Child, b5 = QButton(tr("Delete")), End,
+      End, "Close");
+  if (!w) return;
+  set(w, MUIA_Window_Height, MUIV_Window_Height_Visible(50));
+  DoMethod(b1, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG1);
+  DoMethod(sp_list, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG1);
+  DoMethod(b2, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG2);
+  DoMethod(b3, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG3);
+  DoMethod(b4, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG4);
+  DoMethod(b5, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG5);
+  sp_fill();
+  run_modal(w, ends, sp_each);
+  MUI_DisposeObject(w);
+}
+
 /* ------------------------------------------------------------------ the ribbon's states */
 ULONG chart_ribbon_state(void)
 {
@@ -848,6 +985,7 @@ void chart_command(ULONG id)
   if (id >= ID_X_TYPE0 && id <= ID_X_TYPEN) { change_type((int)(id - ID_X_TYPE0)); return; }
   if (id >= ID_X_LAYOUT1 && id <= ID_X_LAYOUT6) { if (c) { begin(); chart_quick_layout(c, (int)(id - ID_X_LAYOUT1 + 1)); end(); } return; }
   if (id >= ID_X_COLOR0 && id <= ID_X_COLOR7) { if (c) { begin(); chart_colors(c, (int)(id - ID_X_COLOR0)); end(); } return; }
+  if (id >= ID_X_ALIGN0 && id <= ID_X_ALIGN5) { align_objects((int)(id - ID_X_ALIGN0)); return; }
   if (id >= ID_X_STYLE1 && id <= ID_X_STYLE8) { if (c) { begin(); chart_style(c, (int)(id - ID_X_STYLE1 + 1)); end(); } return; }
   switch (id) {
   /* Insert */
@@ -922,6 +1060,10 @@ void chart_command(ULONG id)
     end();
     break; }
   case ID_X_EDITTEXT: edit_text(); break;
+  case ID_X_BACKGROUND: background(); break;
+  case ID_X_SELPANE: dlg_selection_pane(); break;
+  case ID_X_ALIGNDD: align_objects((int)v); break;
+  case ID_X_ROTATE: rotate_shape(); break;
   /* Sparkline */
   case ID_X_SPTLINE: case ID_X_SPTCOL: case ID_X_SPTWIN: case ID_X_SPHIGH: case ID_X_SPLOW: case ID_X_SPNEG: case ID_X_SPFIRST: case ID_X_SPLAST: case ID_X_SPMARK:
     spark_set(id);

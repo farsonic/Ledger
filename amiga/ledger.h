@@ -87,7 +87,7 @@ struct MUIP_Ribbon_State {
   int size;
   const char *numfmt;       /* the number format's name as the Number field shows it (Latin-1) */
   FontSet *fs;
-  ULONG ext;                /* more states, the Item.st/en values 32-63 (chartids.h's RBX_) */
+  ULONG ext;                /* more states, the Item.st/en values 96-127 (chartids.h RBX_) */
 };
 struct MUI_CustomClass *ribbon_class(void);
 /* (chartrib.h) the Format tab's list of the selected chart's parts (labels kept by the caller), the one shown */

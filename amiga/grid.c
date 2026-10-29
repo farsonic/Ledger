@@ -34,6 +34,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "layout.h"
 #include "../core/calc.h"
 #include "../core/ops.h"
 #include "../core/cond.h"
@@ -51,7 +52,7 @@
 #define EMAX 2000                /* the editor's text, bytes */
 
 /* where the mouse is dragging */
-enum { DR_NONE, DR_CELLS, DR_COLW, DR_ROWH, DR_COLS, DR_ROWS, DR_FILL, DR_POINT };
+enum { DR_NONE, DR_CELLS, DR_COLW, DR_ROWH, DR_COLS, DR_ROWS, DR_FILL, DR_POINT, DR_LAYOUT };
 
 struct Data {
   Object *obj;
@@ -322,6 +323,7 @@ static void layout(struct Data *d, LONG w, LONG h)
   for (r = s->top; r < MAXROW && d->nvr < MAXVR && y < h; r++) {
     LONG rh = rowh(d, r);
     if (!rh) continue;
+    y += lx_gap_before(d->book, SI(d), 1, r, zoom(d));
     d->vr[d->nvr] = r; d->vy[d->nvr++] = y; y += rh;
   }
   d->vy[d->nvr] = y;
@@ -336,6 +338,7 @@ static void layout(struct Data *d, LONG w, LONG h)
   for (c = s->left; c < MAXCOL && d->nvc < MAXVC && x < w; c++) {
     LONG cw = colw(d, c);
     if (!cw) continue;
+    x += lx_gap_before(d->book, SI(d), 0, c, zoom(d));
     d->vc[d->nvc] = c; d->vx[d->nvc++] = x; x += cw;
   }
   d->vx[d->nvc] = x;
@@ -455,6 +458,7 @@ static struct RastPort *back_rp(struct Data *d, Object *obj, LONG w, LONG h)
 }
 
 /* ------------------------------------------------------------------ drawing */
+static void gv_fill(struct Data *d, GridView *gv, struct RastPort *rp, LONG ox, LONG oy);
 static void fill(struct RastPort *rp, LONG x0, LONG y0, LONG x1, LONG y1, LONG pen)
 {
   if (x1 < x0 || y1 < y0) return;
@@ -480,7 +484,8 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
   int st = sheet_cell_style(s, r, c);
   const Style *sty = &b->styles[st];
   const Font *fnt = &b->fonts[sty->font];
-  Font cfnt;
+  Font cfnt, vfnt;
+  LONG vsh = 0;
   CondLook lk;
   struct TextFont *tf;
   char t[1100];
@@ -517,6 +522,12 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
     } else grid_cell_text(b, SI(d), r, c, 0, t, sizeof t, &col);
     isnum = v->t == V_NUM;
     if (v->t == V_NUM && v->n == 0 && !s->showzeros) return;
+  }
+  /* superscript and subscript: two thirds the size, raised or lowered */
+  if (fnt->vert) {
+    vfnt = *fnt; vfnt.size = (u16)(fnt->size * 2 / 3);
+    vsh = fnt->vert == 1 ? -(LONG)fnt->size * zoom(d) / 2400 : (LONG)fnt->size * zoom(d) / 6000;
+    fnt = &vfnt;
   }
   tf = cell_font(d, fnt);
   if (!tf) tf = theme_font();
@@ -573,7 +584,7 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
     else if (sty->valign == VA_CENTER) ty = y0 + (y1 - y0 + 1 - lines * lh) / 2 + li * lh;
     else ty = y1 - 1 - (lines - li) * lh;
     if (ty < y0 && lines == 1) ty = y0;
-    Move(rp, tx, ty + tf->tf_Baseline);
+    Move(rp, tx, ty + tf->tf_Baseline + vsh);
     Text(rp, (STRPTR)ls, n);
     if (fnt->strike) { Move(rp, tx, ty + tf->tf_Baseline - tf->tf_Baseline / 3); Draw(rp, tx + te.te_Width - 1, ty + tf->tf_Baseline - tf->tf_Baseline / 3); }
     if (fnt->underline == 2) { Move(rp, tx, ty + tf->tf_Baseline + 3); Draw(rp, tx + te.te_Width - 1, ty + tf->tf_Baseline + 3); }
@@ -679,6 +690,7 @@ static void draw_cells(struct Data *d, struct RastPort *rp)
   int i, j, k;
   LONG x1 = d->vx[d->nvc], y1 = d->vy[d->nvr];
   fill(rp, d->hw, d->hh, d->w - 1, d->h - 1, d->pen_cell);
+  if (d->ov && s->drw && s->drw->bg) { GridView gv; gv_fill(d, &gv, rp, 0, 0); ov_background(d->ov, &gv); }   /* (Page Layout > Background) */
   /* gridlines on each cell's right and bottom edge */
   if (s->gridlines) {
     for (j = 0; j < d->nvc; j++) vline(rp, d->vx[j + 1] - 1, d->hh, d->h - 1, d->pen_grid);
@@ -1032,8 +1044,10 @@ static void gv_fill(struct Data *d, GridView *gv, struct RastPort *rp, LONG ox, 
   gv->hw = d->hw; gv->hh = d->hh; gv->w = d->w; gv->h = d->h;
   gv->g = d; gv->colx = gv_colx; gv->rowy = gv_rowy; gv->cell_at = gv_cell; gv->pen = gv_pen; gv->notify = gv_notify; gv->redraw = gv_redraw;
 }
+static LONG pen_cb(void *pd, ULONG rgb) { return pen_for((struct Data *)pd, rgb); }
 static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
 {
+  GridGeom g;
   GridView gv;
   layout(d, w, h);
   draw_cells(d, rp);
@@ -1041,6 +1055,10 @@ static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
   if (d->ov) ov_sparks(d->ov, &gv);
   draw_headings(d, rp);
   draw_filters(d, rp);
+  /* (layout.h) page breaks, page numbers and tracer arrows over the cells */
+  g.obj = d->obj; g.book = d->book; g.sheet = SI(d); g.zoom = zoom(d); g.hw = d->hw; g.hh = d->hh; g.w = d->w; g.h = d->h;
+  g.nvr = d->nvr; g.nvc = d->nvc; g.vr = d->vr; g.vy = d->vy; g.vc = d->vc; g.vx = d->vx; g.pen = pen_cb; g.pd = d;
+  lx_grid_draw(rp, &g);
   draw_marks(d, rp);
   if (d->ov) ov_draw(d->ov, &gv);
   draw_notes(d, rp);
@@ -1406,7 +1424,8 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   case 0x41: edit_begin(d, "", 1); return 1;                    /* Backspace: the cell cleared and typed into */
   case 0x51: edit_begin(d, NULL, 2); return 1;                  /* F2 */
   case 0x45: if (d->copied) { d->copied = 0; redraw(d); } return 1;   /* Esc: the copied outline goes */
-  case 0x58: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_CALCNOW); return 1;   /* F9 */
+  case 0x58: DoMethod(_app(obj), MUIM_Application_ReturnID, shift ? ID_LX_CALCSHEET : ID_CALCNOW); return 1;   /* F9, Shift-F9 */
+  case 0x56: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_LX_SPELLING); return 1;   /* F7 */
   case 0x7A: case 0x7B: scroll_rows(d, code == 0x7A ? -3 : 3); return 1;             /* the mouse wheel */
   }
   /* Shift-F3 Insert Function, Shift-F11 a new sheet, Alt-= AutoSum, Ctrl-` show formulas */
@@ -1615,6 +1634,7 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
     if (ov_mouse(d->ov, &gv, im, x, y)) { if (im->Class == IDCMP_MOUSEBUTTONS) { set(_win(obj), MUIA_Window_ActiveObject, (ULONG)obj); key_grab = NULL; } return MUI_EventHandlerRC_Eat; }
   }
   if (im->Class == IDCMP_MOUSEMOVE || im->Class == IDCMP_INTUITICKS) {
+    if (d->drag == DR_LAYOUT) { lx_grid_mouse(obj, 1, x, y); return MUI_EventHandlerRC_Eat; }
     if (d->drag) { drag_to(d, obj, x, y); return MUI_EventHandlerRC_Eat; }
     if (im->Class == IDCMP_MOUSEMOVE) { hover_edge(d, obj, x, y, inside); return 0; }
     if (im->Class == IDCMP_INTUITICKS) {
@@ -1628,8 +1648,10 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
     return 0;
   }
   if (im->Class != IDCMP_MOUSEBUTTONS) return 0;
+  if (im->Code == SELECTUP && d->drag == DR_LAYOUT) { d->drag = DR_NONE; events_set(d, obj, EV_IDLE); lx_grid_mouse(obj, 2, x, y); return MUI_EventHandlerRC_Eat; }
   if (im->Code == SELECTUP) { if (d->drag) { drag_end(d, obj); return MUI_EventHandlerRC_Eat; } return 0; }
   if (im->Code != SELECTDOWN || !inside) return 0;
+  if (!d->editing && lx_grid_mouse(obj, 0, x, y)) { d->drag = DR_LAYOUT; events_set(d, obj, EV_DRAG); return MUI_EventHandlerRC_Eat; }
   {
     Sheet *s = SH(d);
     i32 r, c, e;

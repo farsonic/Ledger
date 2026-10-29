@@ -49,7 +49,10 @@ ULONG chart_ribbon_state(void);
   XP("Chart Style"), XS("Style 1: plain", ID_X_STYLE1), XS("Style 2: outlined", ID_X_STYLE1 + 1), XS("Style 3: bold lines", ID_X_STYLE1 + 2), \
     XS("Style 4: shaded plot area", ID_X_STYLE1 + 3), XS("Style 5: dark", ID_X_STYLE1 + 4), \
   XBAR, \
-  XI("Edit Shape Text...", ID_X_EDITTEXT), XI("Bring Forward", ID_X_FORWARD), XI("Send Backward", ID_X_BACKWARD), XI("Delete Object", ID_X_DELOBJ), \
+  XI("Edit Shape Text...", ID_X_EDITTEXT), XI("Bring Forward", ID_X_FORWARD), XI("Send Backward", ID_X_BACKWARD), XI("Selection Pane...", ID_X_SELPANE), \
+  XP("Align"), XS("Left", ID_X_ALIGN0), XS("Centre", ID_X_ALIGN0 + 1), XS("Right", ID_X_ALIGN0 + 2), XS("Top", ID_X_ALIGN0 + 3), XS("Middle", ID_X_ALIGN0 + 4), \
+    XS("Bottom", ID_X_ALIGN0 + 5), \
+  XI("Rotate", ID_X_ROTATE), XI("Delete Object", ID_X_DELOBJ), XI("Sheet Background...", ID_X_BACKGROUND), \
   XBAR, \
   XP("Sparkline"), XS("Edit Data...", ID_X_SPEDIT), XS("Line", ID_X_SPTLINE), XS("Column", ID_X_SPTCOL), XS("Win/Loss", ID_X_SPTWIN), \
     XS("High Point", ID_X_SPHIGH), XS("Low Point", ID_X_SPLOW), XS("Negative Points", ID_X_SPNEG), XS("First Point", ID_X_SPFIRST), \

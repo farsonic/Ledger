@@ -14,6 +14,7 @@
 /* saving */
 void xd_content_types(Book *b, Buf *o);          /* the parts' content types */
 int  xd_has_drawing(Book *b, int si);            /* sheet si has objects (a drawing part) */
+int  xd_has_rels(Book *b, int si);               /* it needs relationships of its own (a drawing, a background) */
 void xd_sheet_drawing_ref(Book *b, int si, Buf *o);   /* <drawing r:id="rIdD1"/>, if it has one */
 void xd_sheet_ext(Book *b, int si, Buf *o);      /* the worksheet's extLst (sparklines), if any */
 void xd_sheet_rels(Book *b, int si, Buf *o);     /* the sheet's relationship to its drawing */

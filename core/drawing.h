@@ -112,7 +112,12 @@ typedef struct {
   Spark *sp; int n;
 } SparkGroup;
 
-typedef struct Drawing { DObj *o; int n; SparkGroup *g; int ng; u32 nextid; } Drawing;
+typedef struct Drawing {
+  DObj *o; int n;                  /* the objects, bottom first */
+  SparkGroup *g; int ng;
+  u32 nextid;
+  Blob *bg; u8 bgtype;             /* Page Layout > Background: a picture tiled behind the cells (PIC_), or NULL */
+} Drawing;
 
 /* ------------------------------------------------------------------ a sheet's drawing */
 Drawing *drw_of(Sheet *s);                 /* made if the sheet had none; NULL out of memory */

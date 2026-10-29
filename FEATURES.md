@@ -25,9 +25,9 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 19 | Old Excel .xls files (values, formulas, number formats) | yes | ⬜ |
 | 20 | OpenDocument .ods import | yes | ⬜ |
 | 21 | Pictures on the sheet (PNG/JPEG) | yes | ✅ |
-| 22 | Spelling check | yes | ⬜ |
+| 22 | Spelling check | yes | ✅ |
 | 23 | Interface languages (German, French, Spanish, Italian, as Quill) | yes | ⬜ |
-| 24 | PDF export | yes | ⬜ |
+| 24 | PDF export | yes | ✅ |
 | 25 | Flash Fill | yes | ⬜ |
-| 26 | Printing, page setup, Page Break Preview | yes | ➖ (printing left out, as for Quill) |
+| 26 | Printing, page setup, Page Break Preview | yes | ✅ page setup, Page Break Preview, Page Layout view (printing itself ➖ left out, as for Quill) |
 | 27 | ARexx / scripting control channel | MCP | ➖ (left out, as for Quill) |
