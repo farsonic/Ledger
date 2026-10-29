@@ -63,7 +63,7 @@ int pivot_field_here(int *area, int *fi)
   }
   if (c < p->datacol && p->nrows) {
     if (p->layout != PL_COMPACT) { *area = PA_ROWS; *fi = (int)(c - p->c); return *fi < p->nrows; }
-    if (kind == PK_DATA || kind == PK_SUB || kind == PK_ITEM) { *area = PA_ROWS; *fi = lv > 0 ? lv - 1 : 0; return *fi < p->nrows; }
+    if (kind == PK_DATA || kind == PK_SUB || kind == PK_ITEM || kind == PK_COLL) { *area = PA_ROWS; *fi = lv > 0 ? lv - 1 : 0; return *fi < p->nrows; }
     if (kind == PK_HEAD && r == p->datarow - 1) { *area = PA_ROWS; *fi = 0; return 1; }
   }
   return 0;
@@ -318,7 +318,7 @@ int pivot_value_settings(int sheet, int pi, int vi)
 {
   static const ULONG ends[] = { ID_DLGOK, 0 };
   static const char *const funcs_en[PF_N + 1] = { "Sum", "Count", "Average", "Max", "Min", "Product", "Count Numbers", "StdDev", "StdDevp", "Var", "Varp", NULL };
-  static const char *const shows_en[PS_N + 1] = { "No Calculation", "% of Grand Total", "% of Column Total", "% of Row Total", NULL };
+  static const char *const shows_en[PS_N + 1] = { "No Calculation", "% of Grand Total", "% of Column Total", "% of Row Total", "Running Total In", "Rank Largest to Smallest", NULL };
   const char *funcs[PF_N + 1], *shows[PS_N + 1];
   LPivot *p, np;
   PivotValue *v;

@@ -2439,3 +2439,80 @@ The annual yield of a discounted security.	Die Jahresrendite eines abgezinsten W
 The annual yield of a security that pays interest at maturity.	Die Jahresrendite eines Wertpapiers, das bei Fälligkeit Zinsen zahlt.	Le rendement annuel d'un titre rapportant des intérêts à l'échéance.	El rendimiento anual de un valor bursátil que paga intereses al vencimiento.	Il rendimento annuo di un titolo che paga interessi alla scadenza.
 The one-tailed probability of a z-test.	Die einseitige Wahrscheinlichkeit eines z-Tests.	La probabilité unilatérale d'un test z.	La probabilidad de una cola de una prueba z.	La probabilità a una coda di un test z.
 The one-tailed z-test probability (Z.TEST).	Die einseitige Wahrscheinlichkeit des z-Tests (Z.TEST).	La probabilité unilatérale du test z (Z.TEST).	La probabilidad de una cola de la prueba z (Z.TEST).	La probabilità a una coda del test z (Z.TEST).
+
+## Recommended PivotTables, PivotCharts, slicers, calculated fields, grouping (pivot2.c)
+Recommended PivotTables	Empfohlene PivotTables	Tableaux croisés dynamiques recommandés	Tablas dinámicas recomendadas	Tabelle pivot consigliate
+PivotChart	PivotChart	Graphique croisé dynamique	Gráfico dinámico	Grafico pivot
+PivotChart...	PivotChart...	Graphique croisé dynamique...	Gráfico dinámico...	Grafico pivot...
+Slicer	Datenschnitt	Segment	Segmentación	Filtro dati
+Slicer...	Datenschnitt...	Segment...	Segmentación...	Filtro dati...
+Insert Slicer	Datenschnitt einfügen	Insérer un segment	Insertar segmentación	Inserisci filtro dati
+Insert Slicer...	Datenschnitt einfügen...	Insérer un segment...	Insertar segmentación...	Inserisci filtro dati...
+Insert Slicers	Datenschnitte einfügen	Insérer des segments	Insertar segmentaciones	Inserisci filtri dati
+Slicer Settings	Datenschnitteinstellungen	Paramètres des segments	Configuración de segmentación	Impostazioni filtro dati
+Slicer Settings...	Datenschnitteinstellungen...	Paramètres des segments...	Configuración de segmentación...	Impostazioni filtro dati...
+Clear Slicer Filter	Datenschnittfilter löschen	Effacer le filtre du segment	Borrar filtro de segmentación	Cancella filtro
+Recommended PivotTables...	Empfohlene PivotTables...	Tableaux croisés dynamiques recommandés...	Tablas dinámicas recomendadas...	Tabelle pivot consigliate...
+PivotTable Tools	PivotTable-Tools	Outils de tableau croisé	Herramientas de tabla dinámica	Strumenti tabella pivot
+PivotTable & Slicer	PivotTable und Datenschnitt	Tableau croisé et segment	Tabla dinámica y segmentación	Tabella pivot e filtro dati
+Calculated Field...	Berechnetes Feld...	Champ calculé...	Campo calculado...	Campo calcolato...
+Insert Calculated Field	Berechnetes Feld einfügen	Insérer un champ calculé	Insertar campo calculado	Inserisci campo calcolato
+Fields, Items & Sets	Felder, Elemente und Gruppen	Champs, éléments et jeux	Campos, elementos y conjuntos	Campi, elementi e set
+Group Field	Feld gruppieren	Grouper le champ	Agrupar campo	Raggruppa campo
+Group Field...	Feld gruppieren...	Grouper le champ...	Agrupar campo...	Raggruppa campo...
+Expand Field	Feld erweitern	Développer le champ	Expandir el campo	Espandi campo
+Collapse Field	Feld reduzieren	Réduire le champ	Contraer el campo	Comprimi campo
+Calculations	Berechnungen	Calculs	Cálculos	Calcoli
+Running Total In	Ergebnis in	Résultat cumulé par	Total en	Totale parziale in
+Rank Largest to Smallest	Rangfolge nach Größe (absteigend)	Rang du plus grand au plus petit	Clasificar de mayor a menor	Ordina dal maggiore al minore
+Grouping	Gruppierung	Grouper	Agrupar	Raggruppa
+Group Selection	Auswahl gruppieren	Grouper la sélection	Agrupar selección	Raggruppa selezione
+Starting at:	Starten:	Début :	Comenzar en:	Inizia da:
+Ending at:	Beenden:	Fin :	Terminar en:	Termina a:
+By:	Nach:	Par :	Por:	Per:
+Years	Jahre	Années	Años	Anni
+Quarters	Quartale	Trimestres	Trimestres	Trimestri
+Caption:	Beschriftung:	Légende :	Título:	Didascalia:
+Columns:	Spalten:	Colonnes :	Columnas:	Colonne:
+Sort items:	Elemente sortieren:	Trier les éléments :	Ordenar elementos:	Ordina elementi:
+Display header:	Kopfzeile anzeigen:	Afficher l'en-tête :	Mostrar encabezado:	Mostra intestazione:
+Insert Field	Feld einfügen	Insérer un champ	Insertar campo	Inserisci campo
+Group name:	Gruppenname:	Nom du groupe :	Nombre del grupo:	Nome gruppo:
+Choose a PivotTable:	PivotTable auswählen:	Choisissez un tableau croisé :	Elija una tabla dinámica:	Scegliere una tabella pivot:
+Chart type:	Diagrammtyp:	Type de graphique :	Tipo de gráfico:	Tipo di grafico:
+Insert PivotChart	PivotChart einfügen	Insérer un graphique croisé	Insertar gráfico dinámico	Inserisci grafico pivot
+Tick the fields to make a slicer for:	Felder für Datenschnitte ankreuzen:	Cochez les champs à segmenter :	Marque los campos para segmentar:	Spuntare i campi per i filtri dati:
+Data source order	Datenquellenreihenfolge	Ordre de la source	Orden del origen de datos	Ordine dell'origine dati
+## Recommended PivotTables, PivotCharts, slicers, calculated fields, grouping: messages and tips (pivot2.c, tabletabs.h)
+A chart of the PivotTable at the active cell, which follows its report	Ein Diagramm der PivotTable an der aktiven Zelle, das ihrem Bericht folgt	Un graphique du tableau croisé de la cellule active, qui suit son rapport	Un gráfico de la tabla dinámica de la celda activa, que sigue su informe	Un grafico della tabella pivot nella cella attiva, che ne segue il rapporto
+Select a cell in a range with headings, or in a table, first.	Markieren Sie zuerst eine Zelle in einem Bereich mit Überschriften oder in einer Tabelle.	Sélectionnez d'abord une cellule d'une plage avec en-têtes, ou d'un tableau.	Seleccione primero una celda de un rango con encabezados o de una tabla.	Seleziona prima una cella in un intervallo con intestazioni o in una tabella.
+Ledger has no PivotTables to recommend for this data.	Ledger hat für diese Daten keine PivotTables zu empfehlen.	Ledger n'a pas de tableau croisé à recommander pour ces données.	Ledger no tiene tablas dinámicas que recomendar para estos datos.	Ledger non ha tabelle pivot da consigliare per questi dati.
+Select a cell in a PivotTable first: the PivotChart shows its report.	Markieren Sie zuerst eine Zelle in einer PivotTable: Das PivotChart zeigt ihren Bericht.	Sélectionnez d'abord une cellule d'un tableau croisé : le graphique croisé montre son rapport.	Seleccione primero una celda de una tabla dinámica: el gráfico dinámico muestra su informe.	Seleziona prima una cella in una tabella pivot: il grafico pivot ne mostra il rapporto.
+Select a cell in a table or a PivotTable first: a slicer filters its data.	Markieren Sie zuerst eine Zelle in einer Tabelle oder PivotTable: Ein Datenschnitt filtert ihre Daten.	Sélectionnez d'abord une cellule d'un tableau ou d'un tableau croisé : un segment filtre ses données.	Seleccione primero una celda de una tabla o tabla dinámica: una segmentación filtra sus datos.	Seleziona prima una cella in una tabella o tabella pivot: un filtro dati ne filtra i dati.
+The table needs a header row for slicers.	Die Tabelle braucht für Datenschnitte eine Kopfzeile.	Le tableau a besoin d'une ligne d'en-tête pour les segments.	La tabla necesita una fila de encabezado para las segmentaciones.	La tabella ha bisogno di una riga di intestazione per i filtri dati.
+Ascending (A to Z)	Aufsteigend (A bis Z)	Croissant (A à Z)	Ascendente (A a Z)	Crescente (A-Z)
+Descending (Z to A)	Absteigend (Z bis A)	Décroissant (Z à A)	Descendente (Z a A)	Decrescente (Z-A)
+Select a slicer first: click its frame.	Markieren Sie zuerst einen Datenschnitt: Klicken Sie auf seinen Rahmen.	Sélectionnez d'abord un segment : cliquez sur son cadre.	Seleccione primero una segmentación: haga clic en su marco.	Seleziona prima un filtro dati: fai clic sulla cornice.
+Field:	Feld:	Champ :	Campo:	Campo:
+Select a cell in a PivotTable first.	Markieren Sie zuerst eine Zelle in einer PivotTable.	Sélectionnez d'abord une cellule d'un tableau croisé.	Seleccione primero una celda de una tabla dinámica.	Seleziona prima una cella in una tabella pivot.
+Fields (double-click to put one in the formula):	Felder (Doppelklick fügt eines in die Formel ein):	Champs (double-cliquez pour en mettre un dans la formule) :	Campos (doble clic para poner uno en la fórmula):	Campi (doppio clic per inserirne uno nella formula):
+The formula works on each cell's sums of the fields it names.	Die Formel rechnet mit den Summen der genannten Felder in jeder Zelle.	La formule calcule sur les sommes, dans chaque cellule, des champs qu'elle nomme.	La fórmula trabaja con las sumas de cada celda de los campos que nombra.	La formula lavora sulle somme, in ogni cella, dei campi che nomina.
+Select an item of a Rows or Columns field first.	Markieren Sie zuerst ein Element eines Zeilen- oder Spaltenfelds.	Sélectionnez d'abord un élément d'un champ Lignes ou Colonnes.	Seleccione primero un elemento de un campo de Filas o Columnas.	Seleziona prima un elemento di un campo Righe o Colonne.
+Months	Monate	Mois	Meses	Mesi
+Days	Tage	Jours	Días	Giorni
+Tick at least one of Years, Quarters, Months and Days.	Haken Sie mindestens eines von Jahre, Quartale, Monate und Tage an.	Cochez au moins une option parmi Années, Trimestres, Mois et Jours.	Marque al menos uno de Años, Trimestres, Meses y Días.	Spunta almeno uno tra Anni, Trimestri, Mesi e Giorni.
+Starting at, Ending at and By must be numbers, By more than 0.	Starten, Beenden und Nach müssen Zahlen sein, Nach größer als 0.	Début, Fin et Par doivent être des nombres, Par supérieur à 0.	Comenzar en, Terminar en y Por deben ser números, Por mayor que 0.	Inizia da, Termina a e Per devono essere numeri, Per maggiore di 0.
+Tick the items to group:	Haken Sie die zu gruppierenden Elemente an:	Cochez les éléments à grouper :	Marque los elementos que agrupar:	Spunta gli elementi da raggruppare:
+Tick at least one item and give the group a name.	Haken Sie mindestens ein Element an und geben Sie der Gruppe einen Namen.	Cochez au moins un élément et donnez un nom au groupe.	Marque al menos un elemento y dé un nombre al grupo.	Spunta almeno un elemento e dai un nome al gruppo.
+The innermost field has no detail to show or hide.	Das innerste Feld hat keine Details zum Ein- oder Ausblenden.	Le champ le plus interne n'a pas de détail à afficher ou masquer.	El campo más interno no tiene detalle que mostrar u ocultar.	Il campo più interno non ha dettagli da mostrare o nascondere.
+PivotTables that suit the data round the active cell, each with a preview	Zu den Daten um die aktive Zelle passende PivotTables, jeweils mit Vorschau	Les tableaux croisés adaptés aux données autour de la cellule active, chacun avec un aperçu	Tablas dinámicas adecuadas a los datos que rodean la celda activa, cada una con una vista previa	Tabelle pivot adatte ai dati intorno alla cella attiva, ognuna con un'anteprima
+Buttons over the sheet that filter a table or PivotTable by a field's items	Schaltflächen über dem Blatt, die eine Tabelle oder PivotTable nach den Elementen eines Felds filtern	Des boutons sur la feuille qui filtrent un tableau ou un tableau croisé selon les éléments d'un champ	Botones sobre la hoja que filtran una tabla o tabla dinámica por los elementos de un campo	Pulsanti sul foglio che filtrano una tabella o tabella pivot in base agli elementi di un campo
+Slicers that filter the table by a column's items	Datenschnitte, die die Tabelle nach den Elementen einer Spalte filtern	Des segments qui filtrent le tableau selon les éléments d'une colonne	Segmentaciones que filtran la tabla por los elementos de una columna	Filtri dati che filtrano la tabella in base agli elementi di una colonna
+Show the detail of every item of the active field	Die Details aller Elemente des aktiven Felds anzeigen	Afficher le détail de chaque élément du champ actif	Mostrar el detalle de cada elemento del campo activo	Mostra i dettagli di ogni elemento del campo attivo
+Hide the detail of every item of the active field	Die Details aller Elemente des aktiven Felds ausblenden	Masquer le détail de chaque élément du champ actif	Ocultar el detalle de cada elemento del campo activo	Nascondi i dettagli di ogni elemento del campo attivo
+Group the active field: dates by years, quarters, months or days; numbers by intervals; items by hand	Das aktive Feld gruppieren: Datumswerte nach Jahren, Quartalen, Monaten oder Tagen; Zahlen nach Intervallen; Elemente von Hand	Grouper le champ actif : dates par années, trimestres, mois ou jours ; nombres par intervalles ; éléments à la main	Agrupar el campo activo: fechas por años, trimestres, meses o días; números por intervalos; elementos a mano	Raggruppa il campo attivo: date per anni, trimestri, mesi o giorni; numeri per intervalli; elementi a mano
+Take the active field's grouping away	Die Gruppierung des aktiven Felds aufheben	Supprimer le groupement du champ actif	Quitar la agrupación del campo activo	Rimuovi il raggruppamento del campo attivo
+Slicers that filter the PivotTable by a field's items	Datenschnitte, die die PivotTable nach den Elementen eines Felds filtern	Des segments qui filtrent le tableau croisé selon les éléments d'un champ	Segmentaciones que filtran la tabla dinámica por los elementos de un campo	Filtri dati che filtrano la tabella pivot in base agli elementi di un campo
+Calculated Field: a formula over the other fields' sums	Berechnetes Feld: eine Formel über die Summen der anderen Felder	Champ calculé : une formule sur les sommes des autres champs	Campo calculado: una fórmula sobre las sumas de los demás campos	Campo calcolato: una formula sulle somme degli altri campi
+A chart of the PivotTable's report, which follows it	Ein Diagramm des PivotTable-Berichts, das ihm folgt	Un graphique du rapport du tableau croisé, qui le suit	Un gráfico del informe de la tabla dinámica, que lo sigue	Un grafico del rapporto della tabella pivot, che lo segue
+PivotTables that suit the source data	Zu den Quelldaten passende PivotTables	Les tableaux croisés adaptés aux données source	Tablas dinámicas adecuadas a los datos de origen	Tabelle pivot adatte ai dati di origine

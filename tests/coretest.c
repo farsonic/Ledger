@@ -11,6 +11,8 @@
 #include "../core/cond.h"
 #include "../core/table.h"
 #include "../core/pivot.h"
+#include "../core/slicer.h"
+#include "../core/drawing.h"
 #include "../core/data.h"
 #include "../core/xls.h"
 #include <stdio.h>
@@ -1617,6 +1619,180 @@ static void pivots(void)
   pivot_free1(&np);
   book_free(b);
 }
+
+/* ------------------------------------------------------------------ pivot tables: grouping, calculated fields, collapse, charts, slicers */
+static void dated_sales(Book *b)
+{
+  static const char *const rows[][5] = {
+    { "Date", "Region", "Product", "Sales", "Units" }, { "2023-01-15", "East", "Apples", "100", "10" }, { "2023-02-20", "West", "Pears", "250", "20" },
+    { "2023-04-05", "East", "Pears", "50", "5" }, { "2023-07-10", "North", "Apples", "75", "7" }, { "2024-01-03", "West", "Apples", "120", "12" },
+    { "2024-05-22", "East", "Apples", "30", "3" } };
+  int r, c;
+  for (r = 0; r < 7; r++) for (c = 0; c < 5; c++) book_input(b, 0, r, c, rows[r][c], NULL);
+}
+static int npv(Book *b, int sh, LPivot *np) { int ok = book_pivot_set(b, sh, 0, np); pivot_free1(np); pivot_copy1(np, &b->sh[sh]->pivots[0]); return ok; }
+static void pivots2(void)
+{
+  Book *b = book_new(), *c;
+  LPivot np;
+  int sh, i, n, k;
+  const char *why;
+  char cap[64];
+  u8 *x;
+  size_t xn;
+  char err[200];
+  dated_sales(b);
+  sh = book_add_sheet(b, "P", -1);
+  book_pivot_add(b, sh, "Sheet1!$A$1:$E$7", 2, 0);
+  pivot_copy1(&np, &b->sh[sh]->pivots[0]);
+  ok("pivot2: dates read as dates", pivot_field_type(b, &np, "Date", &(double){0}, &(double){0}) == 2 && pivot_field_type(b, &np, "Sales", &(double){0}, &(double){0}) == 1);
+  /* dates by years, then years and quarters */
+  pivot_def_add(&np, PA_ROWS, "Date", 0);
+  pivot_def_add(&np, PA_VALUES, "Sales", PF_SUM);
+  ok("pivot2: group by years", pivot_group_dates(&np, PA_ROWS, 0, 1u << PG_YEARS) && npv(b, sh, &np)
+     && text_at(b, "P!A4", "2023") && num_at(b, "P!B4") == 475 && text_at(b, "P!A5", "2024") && num_at(b, "P!B5") == 150 && num_at(b, "P!B6") == 625);
+  ok("pivot2: years and quarters", pivot_group_dates(&np, PA_ROWS, 0, (1u << PG_YEARS) | (1u << PG_QUARTERS)) && np.nrows == 2 && npv(b, sh, &np)
+     && text_at(b, "P!A5", "Qtr1") && num_at(b, "P!B5") == 350 && text_at(b, "P!A7", "Qtr3") && text_at(b, "P!A8", "2024") && num_at(b, "P!B9") == 120);
+  pivot_field_caption(&np, PA_ROWS, 0, cap, sizeof cap);
+  ok("pivot2: a coarser level's caption", !strcmp(cap, "Years") && (pivot_field_caption(&np, PA_ROWS, 1, cap, sizeof cap), !strcmp(cap, "Date")));
+  ok("pivot2: months", pivot_group_dates(&np, PA_ROWS, 1, 1u << PG_MONTHS) && np.nrows == 1 && npv(b, sh, &np) && text_at(b, "P!A4", "Jan") && num_at(b, "P!B4") == 220 && text_at(b, "P!A5", "Feb"));
+  ok("pivot2: ungroup", pivot_ungroup(&np, PA_ROWS, 0) && npv(b, sh, &np) && num_at(b, "P!B4") == 100);
+  /* numbers by intervals */
+  pivot_def_remove(&np, PA_ROWS, 0); pivot_def_remove(&np, PA_VALUES, 0);
+  pivot_def_add(&np, PA_ROWS, "Sales", 0); pivot_def_add(&np, PA_VALUES, "Units", PF_SUM);
+  ok("pivot2: numbers by 100", pivot_group_range(&np, PA_ROWS, 0, 0, 299, 100) && npv(b, sh, &np)
+     && text_at(b, "P!A4", "0-99") && num_at(b, "P!B4") == 15 && text_at(b, "P!A5", "100-199") && num_at(b, "P!B5") == 22 && text_at(b, "P!A6", "200-299"));
+  /* items grouped by hand */
+  pivot_ungroup(&np, PA_ROWS, 0); pivot_def_remove(&np, PA_ROWS, 0); pivot_def_remove(&np, PA_VALUES, 0);
+  pivot_def_add(&np, PA_ROWS, "Region", 0); pivot_def_add(&np, PA_VALUES, "Sales", PF_SUM);
+  {
+    char *its[2] = { "East", "West" };
+    pivot_group_name(&np.rows[0], cap, sizeof cap);
+    ok("pivot2: group by hand", !strcmp(cap, "Group1") && pivot_group_items(&np, PA_ROWS, 0, "Coast", its, 2) && npv(b, sh, &np)
+       && text_at(b, "P!A4", "Coast") && num_at(b, "P!B4") == 550 && text_at(b, "P!A5", "North") && num_at(b, "P!B5") == 75);
+  }
+  pivot_ungroup(&np, PA_ROWS, 0);
+  /* calculated field */
+  ok("pivot2: calculated field refused when it names nothing", !pivot_calc_set(b, &np, "Bad", "=Nope*2", &why));
+  ok("pivot2: calculated field", pivot_calc_set(b, &np, "Price", "=Sales/Units", &why) && pivot_def_add(&np, PA_VALUES, "Price", PF_SUM) && npv(b, sh, &np)
+     && text_at(b, "P!C3", "Sum of Price") && near(num_at(b, "P!C4"), 10) && near(num_at(b, "P!C5"), 75.0 / 7) && near(num_at(b, "P!C7"), 625.0 / 57));
+  ok("pivot2: calculated field of a calculated field, quoted", pivot_calc_set(b, &np, "Dbl", "='Price'*2", &why) && pivot_def_add(&np, PA_VALUES, "Dbl", PF_SUM) && npv(b, sh, &np) && near(num_at(b, "P!D4"), 20));
+  pivot_calc_remove(&np, "Dbl"); pivot_calc_remove(&np, "Price");
+  ok("pivot2: calculated field removed", np.nvals == 1 && np.ncalcs == 0);
+  /* running total, rank */
+  pivot_def_add(&np, PA_VALUES, "Sales", PF_SUM); pivot_def_add(&np, PA_VALUES, "Sales", PF_SUM);
+  np.vals[1].showas = PS_RUNTOTAL; np.vals[2].showas = PS_RANK;
+  ok("pivot2: running total", npv(b, sh, &np) && num_at(b, "P!C4") == 180 && num_at(b, "P!C5") == 255 && num_at(b, "P!C6") == 625);
+  ok("pivot2: rank", num_at(b, "P!D4") == 2 && num_at(b, "P!D5") == 3 && num_at(b, "P!D6") == 1);
+  pivot_def_remove(&np, PA_VALUES, 2); pivot_def_remove(&np, PA_VALUES, 1);
+  /* collapse and expand */
+  pivot_def_add(&np, PA_ROWS, "Product", 0);
+  npv(b, sh, &np);
+  ok("pivot2: +/- buttons on outer items", b->sh[sh]->pivots[0].nbtns == 3 && pivot_button_at(b, sh, 3, 0, NULL) && !pivot_button_at(b, sh, 4, 0, NULL));
+  ok("pivot2: collapse an item", book_pivot_toggle(b, sh, 3, 0) && text_at(b, "P!A4", "East") && num_at(b, "P!B4") == 180 && text_at(b, "P!A5", "North")
+     && b->sh[sh]->pivots[0].kind[1] == PK_COLL && pivot_button_at(b, sh, 3, 0, NULL)->collapsed);
+  ok("pivot2: expand it again", book_pivot_toggle(b, sh, 3, 0) && text_at(b, "P!A5", "Apples"));
+  pivot_free1(&np); pivot_copy1(&np, &b->sh[sh]->pivots[0]);
+  ok("pivot2: collapse the field", pivot_collapse_field(b, &np, PA_ROWS, 0, 1) && np.rows[0].ncollapsed == 3 && npv(b, sh, &np) && text_at(b, "P!A5", "North") && text_at(b, "P!A7", "Grand Total"));
+  pivot_collapse_field(b, &np, PA_ROWS, 0, 0); npv(b, sh, &np);
+  /* a PivotChart follows its pivot table */
+  {
+    int ci = book_pivot_chart_add(b, sh, 0, CK_COL, &why);
+    DObj *o = ci >= 0 ? drw_obj(b->sh[sh], ci) : NULL;
+    CData d;
+    ok("pivot2: PivotChart made", o && o->chart && o->chart->pivot && !strcmp(o->chart->pivot, "P!PivotTable1") && o->chart->ns == 1);
+    if (o && o->chart && o->chart->ns) {
+      chart_resolve(b, sh, o->chart, &d);
+      ok("pivot2: PivotChart's points are the inner items", d.ns == 1 && d.s[0].n == 5 && d.s[0].v[0] == 130 && d.ncat >= 5 && !strcmp(d.cat[0], "Apples"));
+      cdata_free(&d);
+      book_pivot_toggle(b, sh, 3, 0);
+      o = drw_obj(b->sh[sh], ci);
+      chart_resolve(b, sh, o->chart, &d);
+      ok("pivot2: PivotChart follows a collapse", d.s[0].n == 4 && d.s[0].v[0] == 180 && !strcmp(d.cat[0], "East"));
+      cdata_free(&d);
+      book_pivot_toggle(b, sh, 3, 0);
+    }
+    pivot_free1(&np); pivot_copy1(&np, &b->sh[sh]->pivots[0]);
+    strcpy(np.name, "Sales Pivot");
+    npv(b, sh, &np);
+    o = ci >= 0 ? drw_obj(b->sh[sh], ci) : NULL;
+    ok("pivot2: PivotChart follows a rename", o && o->chart && !strcmp(o->chart->pivot, "P!Sales Pivot") && o->chart->ns == 1);
+  }
+  /* recommended */
+  {
+    PivotSuggest sg[8];
+    char **cells;
+    int rows, cols;
+    n = pivot_recommend(b, 0, "Sheet1!$A$1:$E$7", sg, 8);
+    ok("pivot2: recommended", n >= 5 && !strcmp(sg[0].title, "Sum of Sales by Region") && !strcmp(sg[1].title, "Sum of Sales by Region and Product")
+       && !strcmp(sg[2].title, "Sum of Sales by Date (quarters)") && sg[2].def.rows[0].group == PG_QUARTERS);
+    ok("pivot2: preview", pivot_preview(b, &sg[2].def, 10, &cells, &rows, &cols) && rows == 5 && cols == 2 && !strcmp(cells[0], "Row Labels") && !strcmp(cells[2], "Qtr1") && !strcmp(cells[3], "470"));
+    if (cells) { for (i = 0; i < rows * cols; i++) free(cells[i]); free(cells); }
+    for (i = 0; i < n; i++) pivot_free1(&sg[i].def);
+  }
+  pivot_free1(&np);
+  /* slicers: a table's, a pivot table's */
+  book_table_add(b, 0, rc4(0, 0, 6, 4), 1, "");
+  k = book_slicer_add(b, 0, 0, "Table1", "Region", 1, 7);
+  {
+    DObj *o = drw_obj(b->sh[0], k);
+    char **items;
+    u8 *on;
+    PrimList pl;
+    i32 x0, y0, x1, y1;
+    ok("slicer: made", k >= 0 && o && o->kind == OB_SLICER && !strcmp(o->slicer->name, "Region") && !strcmp(o->name, "Region"));
+    n = slicer_items(b, o->slicer, &items, &on);
+    ok("slicer: items", n == 3 && !strcmp(items[0], "East") && !strcmp(items[2], "West") && on[0] && on[2]);
+    pivot_strings_free(items, n); free(on);
+    ok("slicer: a click filters the table", book_slicer_click(b, 0, k, 0, 0) && b->sh[0]->rows[2]->filtered && !b->sh[0]->rows[1]->filtered && b->sh[0]->rows[4]->filtered);
+    ok("slicer: a multi click adds", book_slicer_click(b, 0, k, 2, 1) && !b->sh[0]->rows[2]->filtered && b->sh[0]->rows[4]->filtered);
+    ok("slicer: clear filter", book_slicer_clear(b, 0, k) && !b->sh[0]->rows[2]->filtered && !b->sh[0]->rows[4]->filtered && drw_obj(b->sh[0], k)->slicer->all);
+    ok("slicer: undo", book_undo(b, NULL, NULL) && b->sh[0]->rows[4]->filtered && !drw_obj(b->sh[0], k)->slicer->all);
+    book_slicer_clear(b, 0, k);
+    o = drw_obj(b->sh[0], k);
+    dobj_box(b->sh[0], o, &x0, &y0, &x1, &y1);
+    prims_init(&pl);
+    ok("slicer: drawn", slicer_render(b, o->slicer, x1 - x0, y1 - y0, 100, NULL, NULL, &pl) && pl.n > 8);
+    prims_free(&pl);
+    ok("slicer: hit test", slicer_hit(b, o->slicer, x1 - x0, y1 - y0, 100, 20, 36) == 0 && slicer_hit(b, o->slicer, x1 - x0, y1 - y0, 100, 20, 60) == 1
+       && slicer_hit(b, o->slicer, x1 - x0, y1 - y0, 100, x1 - x0 - 12, 10) == SH_CLEAR);
+  }
+  k = book_slicer_add(b, sh, 1, "Sales Pivot", "Product", 1, 8);
+  ok("slicer: on a pivot table", k >= 0 && book_slicer_click(b, sh, k, 0, 0) && num_at(b, "P!B4") == 130 && b->sh[sh]->pivots[0].nsfilters == 1);
+  /* saved and read back */
+  {
+    LPivot *q = &b->sh[sh]->pivots[0];
+    pivot_copy1(&np, q);
+    pivot_calc_set(b, &np, "Price", "Sales/Units", &why);
+    pivot_def_add(&np, PA_VALUES, "Price", PF_SUM);
+    pivot_def_add(&np, PA_VALUES, "Sales", PF_SUM); np.vals[2].showas = PS_RANK;
+    pivot_set_collapsed(&np.rows[0], "West", 1);
+    pivot_def_add(&np, PA_COLS, "Date", 0); pivot_group_dates(&np, PA_COLS, 0, 1u << PG_YEARS);
+    npv(b, sh, &np);
+    pivot_free1(&np);
+  }
+  x = xlsx_save(b, &xn);
+  c = x ? xlsx_load(x, xn, err, sizeof err) : NULL;
+  ok("pivot2 xlsx: read back", c && c->nsh == 2 && c->sh[1]->npivots == 1);
+  if (c && c->sh[1]->npivots) {
+    LPivot *q = &c->sh[1]->pivots[0];
+    int nsl = 0, nch = 0;
+    ok("pivot2 xlsx: calculated field", q->ncalcs == 1 && !strcmp(q->calcs[0].name, "Price") && !strcmp(q->calcs[0].formula, "Sales/Units") && q->nvals == 3 && !strcmp(q->vals[1].name, "Price"));
+    ok("pivot2 xlsx: rank, collapsed, date group", q->nvals == 3 && q->vals[2].showas == PS_RANK && q->nrows == 2 && pivot_is_collapsed(&q->rows[0], "West") && q->ncols == 1 && q->cols[0].group == PG_YEARS);
+    ok("pivot2 xlsx: slicer filter", q->nsfilters == 1 && q->sfilters[0].nhidden == 1);
+    for (i = 0; i < drw_count(c->sh[1]); i++) {
+      DObj *o = drw_obj(c->sh[1], i);
+      if (o->kind == OB_SLICER && o->slicer && o->slicer->onpivot && !strcmp(o->slicer->source, "Sales Pivot") && !o->slicer->all && o->slicer->nsel == 1) nsl++;
+      if (o->kind == OB_CHART && o->chart && o->chart->pivot && !strcmp(o->chart->pivot, "P!Sales Pivot") && o->chart->ns >= 1) nch++;
+    }
+    ok("pivot2 xlsx: pivot slicer and PivotChart", nsl == 1 && nch == 1);
+    for (i = nsl = 0; i < drw_count(c->sh[0]); i++) { DObj *o = drw_obj(c->sh[0], i); if (o->kind == OB_SLICER && o->slicer && !o->slicer->onpivot && !strcmp(o->slicer->field, "Region")) nsl++; }
+    ok("pivot2 xlsx: table slicer", nsl == 1);
+  }
+  if (c) book_free(c);
+  free(x);
+  book_free(b);
+}
 /* the statistical functions of func_stat.c: the special functions far into the tails, and arrays */
 static void stat_functions(void)
 {
@@ -1655,6 +1831,7 @@ int main(void)
   links();
   tables();
   pivots();
+  pivots2();
   drawings();
   validation();
   outline();

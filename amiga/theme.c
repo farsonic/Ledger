@@ -19,6 +19,7 @@
 #include "../core/ttraster.h"
 #include "lang.h"
 #include "chartids.h"
+#include "pivot2.h"
 
 extern struct Library *DiskfontBase;
 #include <stdio.h>
@@ -1091,7 +1092,7 @@ void theme_icon(struct RastPort *rp, int icon, LONG x, LONG y, LONG size, int di
   const char *p;
   LONG pen = mono >= 0 ? mono : tpen(dim ? T_DISABLED : T_ICON);
 #define SC(v) ((v) * size / 16)
-  const char *desc = icon >= ICX_BASE ? chart_icon_desc(icon) : icon > IC_NONE && icon < IC_N ? icons[icon] : NULL;   /* (chart tools' icons: charticons.c) */
+  const char *desc = icon >= ICP_BASE ? pivot2_icon_desc(icon) : icon >= ICX_BASE ? chart_icon_desc(icon) : icon > IC_NONE && icon < IC_N ? icons[icon] : NULL;   /* (chart tools' icons: charticons.c) */
   if (!desc) return;
   SetDrMd(rp, JAM1);
   SetAPen(rp, pen);

@@ -12,12 +12,15 @@
 #include "xml.h"
 #include "image.h"
 #include "ops.h"
+#include "tablexml.h"
+#include "slicer.h"
 
 #define EMU 9525L                /* EMUs to a pixel at 96 dpi */
 #define FILLRGB(c) (FILL_ON | ((c) & 0xFFFFFF))
 static const u32 accents[6] = { 0x4472C4, 0xED7D31, 0xA5A5A5, 0xFFC000, 0x5B9BD5, 0x70AD47 };
 
 static void xesc(Buf *o, const char *s) { xml_escape(o, s ? s : "", s ? strlen(s) : 0); }
+char xd_book_name[128] = "";
 static int is_ex(int k) { return k == CK_HISTOGRAM || k == CK_WATERFALL || k == CK_FUNNEL || k == CK_TREEMAP || k == CK_SUNBURST || k == CK_BOXWHISKER; }
 static int count_kind(Book *b, int si, int ex, int pics)
 {
@@ -77,7 +80,10 @@ void xd_sheet_ext(Book *b, int si, Buf *o)
 {
   Sheet *s = b->sh[si];
   int i, k;
-  if (!has_sparks(b, si)) return;
+  if (!has_sparks(b, si)) {
+    if (tablexml_has_sheet_ext(b, si)) { buf_adds(o, "<extLst>"); tablexml_sheet_ext(b, si, o); buf_adds(o, "</extLst>"); }
+    return;
+  }
   buf_adds(o, "<extLst><ext uri=\"{05C60535-1F16-4fd2-B633-F4F36F0B64E0}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">"
               "<x14:sparklineGroups xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\">");
   for (i = 0; i < s->drw->ng; i++) {
@@ -115,7 +121,9 @@ void xd_sheet_ext(Book *b, int si, Buf *o)
     }
     buf_adds(o, "</x14:sparklines></x14:sparklineGroup>");
   }
-  buf_adds(o, "</x14:sparklineGroups></ext></extLst>");
+  buf_adds(o, "</x14:sparklineGroups></ext>");
+  tablexml_sheet_ext(b, si, o);    /* slicers */
+  buf_adds(o, "</extLst>");
 }
 
 /* ------------------------------------------------------------------ saving: charts */
@@ -268,7 +276,14 @@ static void w_chart(Book *b, int si, const Chart *c, Buf *o)
   buf_adds(o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
               "<c:chartSpace xmlns:c=\"http://schemas.openxmlformats.org/drawingml/2006/chart\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
               "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><c:roundedCorners val=\"0\"/>");
-  buf_printf(o, "<c:style val=\"%d\"/><c:chart>", c->style >= 1 && c->style <= 48 ? c->style + 1 : 2);
+  buf_printf(o, "<c:style val=\"%d\"/>", c->style >= 1 && c->style <= 48 ? c->style + 1 : 2);
+  if (c->pivot) {
+    /* a PivotChart: Excel binds it to the pivot table when the link names the workbook */
+    buf_printf(o, "<c:pivotSource><c:name>[%s]", xd_book_name[0] ? xd_book_name : "Book1.xlsx");
+    xesc(o, c->pivot);
+    buf_adds(o, "</c:name><c:fmtId val=\"0\"/></c:pivotSource>");
+  }
+  buf_adds(o, "<c:chart>");
   if (c->has_title) {
     buf_adds(o, "<c:title>");
     if (c->title && *c->title) rich(o, c->title, 1400, 0);
@@ -547,6 +562,18 @@ static void w_obj(Book *b, int si, DObj *ob, Buf *o, Buf *r, Buf *cbuf, ZipWrite
       sprintf(path, "xl/charts/chart%d.xml", *nc);
     }
     zip_add(w, path, cbuf->data, cbuf->len);
+  } else if (ob->kind == OB_SLICER) {
+    /* Excel 2010's pivot table slicers, Excel 2013's table ones; others see the fallback */
+    if (ob->slicer->onpivot) buf_adds(o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:Choice xmlns:a14=\"http://schemas.microsoft.com/office/drawing/2010/main\" Requires=\"a14\">");
+    else buf_adds(o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:Choice xmlns:sle15=\"http://schemas.microsoft.com/office/drawing/2012/slicer\" Requires=\"sle15\">");
+    buf_adds(o, "<xdr:graphicFrame macro=\"\"><xdr:nvGraphicFramePr>"); cnvpr(o, ob); buf_adds(o, "<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>");
+    buf_adds(o, "<xdr:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></xdr:xfrm><a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/drawing/2010/slicer\">"
+                "<sle:slicer xmlns:sle=\"http://schemas.microsoft.com/office/drawing/2010/slicer\" name=\"");
+    xesc(o, ob->slicer->name);
+    buf_adds(o, "\"/></a:graphicData></a:graphic></xdr:graphicFrame></mc:Choice><mc:Fallback><xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>"); cnvpr(o, ob);
+    buf_adds(o, "<xdr:cNvSpPr><a:spLocks noTextEdit=\"1\"/></xdr:cNvSpPr></xdr:nvSpPr><xdr:spPr>"); xfrm(o, "a", s, ob);
+    buf_adds(o, "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:solidFill><a:prstClr val=\"white\"/></a:solidFill><a:ln w=\"1\"><a:solidFill><a:prstClr val=\"green\"/></a:solidFill></a:ln></xdr:spPr>"
+                "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\"/><a:lstStyle/><a:p><a:r><a:rPr lang=\"en-GB\" sz=\"1100\"/><a:t>This shape represents a slicer. Slicers need Excel 2010 or later.</a:t></a:r></a:p></xdr:txBody></xdr:sp></mc:Fallback></mc:AlternateContent>");
   } else if (ob->kind == OB_PICTURE) {
     (*rid)++; (*ni)++;
     buf_printf(r, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image%d.%s\"/>", *rid, *ni, ob->pictype == PIC_JPEG ? "jpeg" : "png");
@@ -596,7 +623,7 @@ static void w_group_open(Buf *o, Sheet *s, u32 gid)
              "<a:chOff x=\"%ld\" y=\"%ld\"/><a:chExt cx=\"%ld\" cy=\"%ld\"/></a:xfrm></xdr:grpSpPr>",
              (long)x0 * EMU, (long)y0 * EMU, (long)(x1 - x0) * EMU, (long)(y1 - y0) * EMU, (long)x0 * EMU, (long)y0 * EMU, (long)(x1 - x0) * EMU, (long)(y1 - y0) * EMU);
 }
-static int writable(const DObj *ob) { return !((ob->kind == OB_CHART && !ob->chart) || (ob->kind == OB_PICTURE && !ob->pic)); }
+static int writable(const DObj *ob) { return !((ob->kind == OB_CHART && !ob->chart) || (ob->kind == OB_PICTURE && !ob->pic) || (ob->kind == OB_SLICER && !ob->slicer)); }
 void xd_write_parts(Book *b, int si, ZipWriter *w)
 {
   Sheet *s = b->sh[si];
@@ -853,6 +880,11 @@ static Chart *read_chart(Book *b, int sheet, const char *data, size_t len)
     if (x.type == XT_TEXT) {
       const char *n = up(&st, 0);
       if (titledepth >= 0 && (!strcmp(n, "t") || (!strcmp(n, "v") && within(&st, "strCache")))) buf_add(&tb, x.text.data, x.text.len);
+      else if (!strcmp(n, "name") && !strcmp(up(&st, 1), "pivotSource") && x.text.data) {
+        const char *t = x.text.data, *e;
+        if (*t == '[' && (e = strchr(t, ']'))) t = e + 1;
+        free(c->pivot); c->pivot = str_dup(t);
+      }
       else if (ser >= 0 && !strcmp(n, "f")) {
         const char *part2 = up(&st, 2);
         Formula *f = parse_f(b, sheet, x.text.data ? x.text.data : "");
@@ -1017,6 +1049,7 @@ typedef struct {
   long gw, gh;                     /* custGeom path's size */
   char name[48]; char *descr;
   char rid[32];
+  char slname[48];                 /* a slicer's name */
   u32 fill, line; u16 linew;
   int flipx, flipy;
   Buf text, ink;
@@ -1056,7 +1089,8 @@ static DObj *finish_obj(Book *b, ZipReader *z, const XRel *rels, int nrels, int 
       free(pd);
     }
   }
-  if ((o->kind == OB_CHART && ch) || (o->kind == OB_PICTURE && pic) || o->kind == OB_SHAPE) ob = drw_new(s, o->kind);
+  struct Slicer *sl = o->kind == OB_SLICER ? tablexml_slicer_take(sheet, o->slname) : NULL;
+  if ((o->kind == OB_CHART && ch) || (o->kind == OB_PICTURE && pic) || o->kind == OB_SHAPE || sl) ob = drw_new(s, o->kind);
   if (ob) {
     ob->anchor = (u8)o->anchor;
     ob->from = o->from;
@@ -1072,6 +1106,7 @@ static DObj *finish_obj(Book *b, ZipReader *z, const XRel *rels, int nrels, int 
     ob->descr = o->descr; o->descr = NULL;
     ob->flipx = (u8)o->flipx; ob->flipy = (u8)o->flipy;
     ob->chart = ch; ob->pic = pic; ob->pictype = (u8)ptype;
+    ob->slicer = sl; sl = NULL;
     ob->line = o->noline ? 0 : o->line; ob->linew = o->linew;
     if (o->kind == OB_SHAPE) {
       if (o->shape == SK_LINE && o->arrow) o->shape = SK_ARROW;
@@ -1109,6 +1144,7 @@ static DObj *finish_obj(Book *b, ZipReader *z, const XRel *rels, int nrels, int 
       ob->fsize = o->fsize; ob->bold = o->bold; ob->italic = o->italic; ob->halign = o->halign; ob->valign = o->valign; ob->tcolor = o->tcolor;
     }
   } else { chart_free(ch); blob_free(pic); }
+  slicer_free(sl);
   return ob;
 }
 static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
@@ -1172,6 +1208,7 @@ static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
       else if (!strcmp(n, "graphicFrame")) o.kind = OB_CHART;
       else if (!strcmp(n, "pic")) o.kind = OB_PICTURE;
       else if (!strcmp(n, "sp") || !strcmp(n, "cxnSp")) { o.kind = OB_SHAPE; o.shape = n[0] == 'c' ? SK_LINE : SK_RECT; }
+      else if (!strcmp(n, "slicer") && o.kind == OB_CHART) { const char *nm = xml_attr(&x, "name"); o.kind = OB_SLICER; snprintf(o.slname, sizeof o.slname, "%s", nm ? nm : ""); }
       else if (!strcmp(n, "chart") && o.kind == OB_CHART) { const char *id = xml_attr(&x, "id"); snprintf(o.rid, sizeof o.rid, "%s", id ? id : ""); }
       else if (!strcmp(n, "blip")) { const char *id = xml_attr(&x, "embed"); snprintf(o.rid, sizeof o.rid, "%s", id ? id : ""); }
       else if (!strcmp(n, "cNvPr")) {

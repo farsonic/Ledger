@@ -13,7 +13,7 @@
 #     log lines ...);
 #   - plainly not words (see not_words below: icon drawings, numbers, format specifiers alone,
 #     ALL-CAPS names such as function names, file and device names, the arguments of printf, strcmp
-#     and other calls that never show their text).
+#     and other calls that never show their text, gadget sizing samples (MUIA_FixWidthTxt ...)).
 # It also checks each row's translations keep the English's printf conversions (%s %d ...) in order,
 # its '|' requester buttons, its leading MUI escape (\33c) and its '_' shortcut marker, and it
 # flags a literal handed straight to a gadget (Label1("..."), QButton("..."), MUIA_ShortHelp ...)
@@ -151,6 +151,7 @@ def main():
             if t in rows: used.add(t); continue
             if t in ign or not_words(t): continue
             if enclosing_call(src, pos) in QUIET_CALLS: continue
+            if re.search(r'MUIA_(?:FixWidthTxt|FixHeightTxt|String_Accept|String_Reject|List_Format)\s*,\s*(?:\(ULONG\)\s*)?$', src[max(0, pos - 60):pos]): continue
             missing.setdefault(t, []).append('%s:%d' % (rel, line))
         for m in SHOWN.finditer(src):
             t = mklang.unescape(m.group(1))

@@ -7,7 +7,9 @@ export PATH=$VBCC/bin:$PATH
 NDK=${NDK:-/opt/amiga/ndk/Include_H}
 MUI=${MUI:-/opt/amiga/mui/include}
 cd "$(dirname "$0")"
-CORE="core/util.c core/zip.c core/xml.c core/book.c core/formula.c core/calc.c core/func.c core/func_stat.c core/func_eng.c core/func_fin.c core/func_misc.c core/func_array.c core/funcdesc.c core/numfmt.c core/xlsx.c core/splitpane.c core/ops.c core/cond.c core/template.c core/fonts.c core/ttraster.c core/pagesetup.c core/pdfout.c core/spell.c core/audit.c core/htmlout.c core/comments.c core/table.c core/pivot.c core/tablexml.c core/drawing.c core/drwgroup.c core/chart.c core/spark.c core/image.c core/xlsx_draw.c core/valid.c core/outline.c core/protect.c core/flash.c core/datatools.c core/whatif.c core/xls.c core/ods.c"
+CORE="core/util.c core/zip.c core/xml.c core/book.c core/formula.c core/calc.c core/func.c core/func_stat.c core/func_eng.c core/func_fin.c core/func_misc.c core/func_array.c core/funcdesc.c core/numfmt.c core/xlsx.c core/splitpane.c core/ops.c core/cond.c core/template.c core/fonts.c core/ttraster.c core/pagesetup.c core/pdfout.c core/spell.c core/audit.c core/htmlout.c core/comments.c core/table.c core/pivot.c core/slicer.c core/tablexml.c core/drawing.c core/drwgroup.c core/chart.c core/spark.c core/image.c core/xlsx_draw.c core/valid.c core/outline.c core/protect.c core/flash.c core/datatools.c core/whatif.c core/xls.c core/ods.c"
 cc -std=c99 -O1 -g -Wall -Wextra -Wno-unused-parameter -fsanitize=address,undefined $CORE tests/coretest.c -o /tmp/ledger_coretest -lm
 /tmp/ledger_coretest | tail -3
+# the interface strings: every one translated (lang/strings.txt) and the table made from them
+python3 tools/mklang.py --check && python3 tools/langcheck.py | tail -1 || echo "build.sh: interface strings need translating: run python3 tools/langcheck.py"
 vc +tools/vbcc-aos68k-fpu -c99 -O2 -cpu=68040 -fpu=68040 -I. -I"$MUI" -I"$NDK" amiga/*.c $CORE -o Ledger -lamiga -lm040

@@ -42,6 +42,7 @@
 #include "chartview.h"
 #include "../core/data.h"
 #include "datatab.h"
+#include "pivot2.h"
 #include "../core/splitpane.h"
 
 #ifndef MUIM_GoActive
@@ -1182,6 +1183,7 @@ static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
   lx_grid_draw(rp, &lg);
   draw_marks(d, rp);
   gx_draw_marks(rp, &g);
+  pivot2_draw_buttons(rp, &g);     /* (pivot2.c) pivot items' +/- */
   if (d->ov) ov_draw(d->ov, &gv);
   draw_notes(d, rp);
   draw_editor(d, rp, 0, 0);
@@ -1859,6 +1861,7 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
       int k = (geo(d, &g), gx_click(&g, x, y));
       if (k == 1) { changed(d); redraw(d); update_props(d); moved(d); return MUI_EventHandlerRC_Eat; }
       if (k == 2) { DoMethod(_app(obj), MUIM_Application_ReturnID, ID_DVPICK); return MUI_EventHandlerRC_Eat; }
+      if (pivot2_click(&g, x, y)) { changed(d); redraw(d); update_props(d); moved(d); return MUI_EventHandlerRC_Eat; }   /* (pivot2.c) */
     }
     /* while typing a formula, a click points at a cell for it */
     if (region == 0 && d->editing && pointable(d)) {

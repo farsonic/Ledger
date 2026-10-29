@@ -120,3 +120,4 @@ Icon: %s %lu
 # ---- (more drawing object names)
 Straight Connector
 Pivot
+Field%d

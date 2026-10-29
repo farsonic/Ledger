@@ -65,7 +65,7 @@ void chart_free(Chart *c)
   int i;
   if (!c) return;
   for (i = 0; i < c->ns; i++) series_clear(&c->s[i]);
-  free(c->s); free(c->title); free(c->xtitle); free(c->ytitle);
+  free(c->s); free(c->title); free(c->xtitle); free(c->ytitle); free(c->pivot);
   free(c);
 }
 static Formula *fcopy(const Formula *f) { return f ? formula_copy(f) : NULL; }
@@ -78,6 +78,7 @@ Chart *chart_copy(const Chart *c)
   n->title = c->title ? str_dup(c->title) : NULL;
   n->xtitle = c->xtitle ? str_dup(c->xtitle) : NULL;
   n->ytitle = c->ytitle ? str_dup(c->ytitle) : NULL;
+  n->pivot = c->pivot ? str_dup(c->pivot) : NULL;
   n->s = NULL; n->ns = 0;
   if (c->ns && !(n->s = (CSeries *)calloc((size_t)c->ns, sizeof(CSeries)))) { chart_free(n); return NULL; }
   for (i = 0; i < c->ns; i++) {
