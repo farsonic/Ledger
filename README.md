@@ -1,6 +1,6 @@
 # Ledger: a spreadsheet for the Amiga
 
-Ledger 0.2.2 is a native spreadsheet for AmigaOS with a MUI interface. It reads and writes Excel workbooks (.xlsx) and CSV files and works out formulas as Excel does, with over 200 functions. It is written in C for a 68040 or better (it uses the 68040's floating-point unit). Its design and look follow GridCraft, an open-source spreadsheet in Rust, the way Quill, Ledger's word-processing sibling, follows WordCraft (see "Why C, not a port"). It shares Quill's ribbon, File page, dialogs, icons and screen fonts, so the two look and work alike.
+Ledger 0.3 is a native spreadsheet for AmigaOS with a MUI interface. It reads and writes Excel workbooks (.xlsx) and CSV files, opens old Excel (.xls) and OpenDocument (.ods) files, exports PDF, and works out formulas as Excel does, with 514 functions (every one GridCraft has), dynamic arrays and LAMBDA. It is written in C for a 68040 or better (it uses the 68040's floating-point unit). Its design and look follow GridCraft, an open-source spreadsheet in Rust, the way Quill, Ledger's word-processing sibling, follows WordCraft (see "Why C, not a port"). It shares Quill's ribbon, File page, dialogs, icons and screen fonts, so the two look and work alike.
 
 ![Ledger with its example workbook](docs/ledger-example.png)
 
@@ -74,7 +74,7 @@ As in GridCraft, from the top:
 
 ## Setting up
 
-1. Unpack the archive (`lha x Ledger-0.2.2.lha`). You get a **Ledger** drawer with its own icon. Open it and either:
+1. Unpack the archive (`lha x Ledger-0.3.lha`). You get a **Ledger** drawer with its own icon. Open it and either:
    - **double-click Install-Ledger** (it needs Installer, which comes with Workbench 3.x and AROS). It asks where to put Ledger, makes a Ledger drawer there and copies everything with its icons. The example workbook and the source code are optional. Installing over an older Ledger updates it and keeps your settings. It can also remove an installed Ledger. If Workbench can't find Installer, select the Install-Ledger icon, choose **Icons > Information...** and set its Default Tool to where Installer is (`C:Installer`, `SYS:Utilities/Installer` or `SYS:System/Installer`). On AROS, start it from a Shell in the Ledger drawer instead: `Installer SCRIPT Install-Ledger APPNAME Ledger`;
    - or just use the drawer where it is, or drag it anywhere. Ledger needs `Ledger`, `Fonts` and `TrueType` kept together.
 
@@ -115,6 +115,25 @@ As in GridCraft, from the top:
 | Amiga-+, - | zoom in, out |
 | Amiga-` | the next workbook window |
 
+## What's new in 0.3
+
+Ledger 0.3 closes the gap with GridCraft: every function it has, every ribbon command but its scripting tools (left out, as in Quill), and its big features. In more detail:
+
+- **Functions: 514, up from 187.** Every one of GridCraft's: all of Excel's statistical (distributions and their inverses, regression with LINEST/LOGEST/TREND/GROWTH, FORECAST.ETS, tests), engineering (bases, bits, CONVERT, Bessel, complex numbers), financial (bonds, coupons, depreciation, XIRR/XNPV), database (DSUM and the rest), text (TEXTSPLIT, TEXTBEFORE/AFTER, REGEX functions), date, information, web, cube and compatibility functions. Insert Function searches them and describes every one; Formulas > More Functions lists them by category.
+- **Dynamic arrays:** formulas whose result is an array spill into the cells below and to the right (#SPILL! when something is in the way), with `A1#`, `@` and trim references; FILTER, SORT, SORTBY, UNIQUE, SEQUENCE, RANDARRAY, XMATCH, TAKE, DROP, VSTACK, HSTACK, TOCOL, WRAPROWS, EXPAND, GROUPBY, PIVOTBY and more. Arithmetic on ranges works element by element. Saved as Excel saves them; old {=...} array formulas too.
+- **LET and LAMBDA** (named lambdas in the Name Manager, recursion), MAP, REDUCE, SCAN, BYROW, BYCOL, MAKEARRAY; IF, IFS, IFERROR, CHOOSE and SWITCH only work out what they need.
+- **Charts:** every kind GridCraft draws (26: column, bar, line, area, pie, doughnut, scatter, bubble, radar, stock, combo, histogram, waterfall, funnel, treemap, sunburst, box & whisker...), with Recommended Charts, the Chart Design and Format tabs, titles, legends, axes, data labels and colours; saved and read as Excel's charts. **Sparklines**, **pictures**, **shapes**, **text boxes**, **icons** and **ink** (the Draw tab), with grouping, arranging and a sheet background.
+- **Tables** (Format as Table): styles, header and total rows, banded rows, calculated columns, structured references (`Table1[Sales]`, `[@Price]`). **Pivot tables** with a fields pane, value settings, subtotals and layouts, grouping by dates and numbers, calculated fields, **slicers**, **PivotCharts** and Recommended PivotTables.
+- **The Data tab:** data validation (drop-down lists, rules, messages, circling invalid data), Text to Columns, Flash Fill, Remove Duplicates, Advanced Filter, Consolidate, group and outline with Subtotal, Goal Seek, Data Tables, Scenarios, **Solver** (Simplex LP, GRG Nonlinear, Evolutionary), the **Analysis ToolPak** (all 19 tools) and **Forecast Sheet**.
+- **Protection:** protect sheet (with Excel's options) and workbook, locked and hidden cells, Allow Edit Ranges; checkboxes in cells.
+- **Page Layout and PDF:** page setup (margins, paper, orientation, scaling, print area and titles, breaks, headers and footers), Page Break Preview and Page Layout view, **PDF export** and web page export (printing itself is left out, as in Quill).
+- **Formulas and Review:** trace precedents and dependents, Evaluate Formula, Error Checking, Watch Window, Go To Special, spelling and thesaurus, threaded comments as well as notes.
+- **View:** split panes, new windows on the same workbook, arrange, side by side, custom views.
+- **Files:** opens old Excel .xls (BIFF8) and OpenDocument .ods workbooks.
+- **Languages:** the interface in English, German, French, Spanish and Italian.
+- **FunctionTests.xlsx** now has 3,503 tests of all 514 functions (including spills and lambdas). Ledger passes every one, natively and on a 68040; LibreOffice passes all but the 791 rows whose notes say why (Excel's documented answer where LibreOffice differs, or a function LibreOffice hasn't got).
+- **On the 68040:** vbcc's floor and ceil went wrong past 2,147,483,647 (they go through a 32-bit number); Ledger now has its own, so big numbers convert, round and spell out (BAHTTEXT) right.
+
 ## What's new in 0.2.2
 
 - **Resizing rows and columns is easy to find.** Point at the line between two column letters (or two row numbers): the line lights up and the pointer turns into a double arrow. Drag to change the size, or double-click to fit the contents. The spot to grab is wider than before. Format > Row Height, Column Width and the AutoFit items do the same from the menus.
@@ -131,7 +150,7 @@ AutoFilter, conditional formatting (highlight rules, data bars and colour scales
 
 ## What it doesn't do yet
 
-Not there yet: charts, Format as Table, pivot tables, data validation, spill (dynamic array) formulas, grouping and outlines, sheet protection, pictures and other languages for the interface (FEATURES.md in the Source drawer lists what's left, and ticks off what's done). Printing is left out, as in Quill, but the page setup is there (margins, paper, scaling, print area and titles, page breaks, headers and footers), for PDF export, Page Break Preview and the Page Layout view, and is saved for Excel. Old .xls files can't be read: save them as .xlsx first.
+Printing (as in Quill; the page setup, PDF export and Page Break Preview are there) and GridCraft's scripting tools (Automate tab; there is no ARexx port either). FEATURES.md and docs/gridcraft-gap.md in the Source drawer list GridCraft's features and ribbon commands one by one, with what Ledger has.
 
 ## Why C, not a port
 
@@ -144,7 +163,7 @@ GridCraft is about 180,000 lines of Rust with an interface drawn by egui on the 
 
 Ledger takes GridCraft's ideas instead (its ribbon, its File page, the way the sheet looks and works) and is written in C from scratch:
 
-- **The core** (`core/`) is portable C99: workbooks, formulas, the function library, number formats, .xlsx and CSV. It is tested natively (220 tests, with the address and undefined-behaviour sanitizers) and by round trips through LibreOffice and openpyxl.
+- **The core** (`core/`) is portable C99: workbooks, formulas, the function library, number formats, .xlsx and CSV. It is tested natively (893 tests, with the address and undefined-behaviour sanitizers), by the function suite against LibreOffice (3,525 results) and by round trips through LibreOffice and openpyxl.
 - **Workbooks are sparse:** each row keeps only its filled cells, so a sheet costs what is in it, wherever that is in Excel's 1,048,576 by 16,384 grid.
 - **Formulas** are compiled once into a small stack machine; results are kept and worked out again only when needed.
 - **Numbers** are doubles on the 68040's FPU, as in Excel.

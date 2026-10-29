@@ -1,4 +1,4 @@
-; $VER: Install-Ledger 0.2.2 (28.10.2026)
+; $VER: Install-Ledger 0.3 (29.10.2026)
 ;
 ; Installer script for Ledger, the spreadsheet (Commodore's Installer 43 or later, or AROS's).
 ; Started from its icon (default tool Installer). It installs or updates Ledger in a drawer of your
@@ -16,7 +16,7 @@
 ; in lower case (AROS's Installer doesn't know "IN", only "in").
 
 (set @app-name "Ledger")
-(set #version "0.2.2")
+(set #version "0.3")
 
 ; ------------------------------------------------------------------ install or remove
 

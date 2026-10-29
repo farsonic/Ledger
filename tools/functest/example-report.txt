@@ -1,3 +1,4 @@
-FunctionTests.xlsx: 715 tests of 187 functions (376 cases, each with arguments typed in and in cells where it takes any)
-Ledger's core: 715 PASS, 0 FAIL
-LibreOffice: 673 PASS, 42 FAIL (42 of them the rows noted as Excel's answer, 0 others)
+FunctionTests.xlsx: 3503 tests of 542 functions (1837 cases, each with arguments typed in and in cells where it takes any)
+Ledger's core: 3503 PASS, 0 FAIL
+LibreOffice: 2712 PASS, 791 FAIL (791 of them the rows noted as Excel's answer, 0 others)
+68040 build (vbcc, in FS-UAE): 3503 PASS, 0 FAIL
