@@ -39,6 +39,8 @@
 #include "splash.h"
 #include "sysfonts.h"
 #include "tabletab.h"
+#include "pivot2.h"
+#include "../core/xlsx_draw.h"
 #include "../core/calc.h"
 #include "../core/xlsx.h"
 #include "../core/template.h"
@@ -104,7 +106,7 @@ static struct NewMenu menus[] = {
   I("Rows", 0, ID_INSROWS), I("Columns", 0, ID_INSCOLS), I("Cells...", 0, ID_INSCELLS), I("Sheet", 0, ID_INSSHEET), BAR,
   I("Function...", 0, ID_FUNCTION), I("AutoSum", "=", ID_AUTOSUM), I("Today's Date", ";", ID_DATE), I("Time Now", ":", ID_TIME), BAR,
   I("Link...", 0, ID_LINK), I("Note...", 0, ID_NOTENEW), BAR,
-  I("Define Name...", 0, ID_DEFNAME), I("Name Manager...", 0, ID_NAMES),
+  I("Define Name...", 0, ID_DEFNAME), I("Name Manager...", 0, ID_NAMES), PIVOT2_INSERT_MENU,
   CHART_MENUS,                     /* charts, pictures, shapes, ink, sparklines (charttab.h) */
   M("Format"),
   I("Cells...", "1", ID_FORMATCELLS), I("Bold", "B", ID_BOLD), I("Italic", "I", ID_ITALIC), I("Underline", "U", ID_UNDERLINE), BAR,
@@ -134,7 +136,7 @@ static struct NewMenu menus[] = {
   I("Freeze Panes", 0, ID_FREEZE), I("Unfreeze Panes", 0, ID_UNFREEZE), BAR, T("Dark Mode", 0, ID_DARKUI),
   LX_WINDOW_ITEMS
   LX_MENUS
-  TABLE_MENUS,
+  TABLE_MENUS, PIVOT2_TABLE_MENU,
   { NM_END, 0, 0, 0, 0, 0 }
 };
 
@@ -730,6 +732,7 @@ static int save_to(const char *path)
     size_t len;
     u8 *data;
     if (username[0] && !book->author[0]) latin1_utf8(username, book->author, sizeof book->author);
+    strncpy(xd_book_name, (const char *)FilePart((STRPTR)path), sizeof xd_book_name - 1);   /* (a PivotChart's link names the file) */
     data = xlsx_save(book, &len);
     ok = data && file_write(path, data, len);
     free(data);
@@ -1936,6 +1939,7 @@ int main(int argc, char **argv)
     else if ((id >= ID_FONTDD && id <= ID_FN_MORE)) ribbon_choice(id);
     else if (id >= ID_TBL_FIRST && id < ID_TBL_LAST) tabletab_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value));
     else if (id >= ID_X_FIRST && id < ID_X_LAST) chart_command(id);     /* charttab.c */
+    else if (id >= ID_P2_FIRST && id < ID_P2_LAST) pivot2_command(id);  /* pivot2.c */
     else if (id >= ID_LX_FIRST && id < ID_LX_LAST) { if (back_shown && id != ID_LX_REFRESH && id != ID_LX_SCROLLED) backstage_show(0, 0); lx_command(id); }
     else if (id) {
       if (back_shown && (id == ID_OPEN || id == ID_SAVE || id == ID_SAVEAS || id == ID_SAVECSV || id == ID_NEW)) backstage_show(0, 0);

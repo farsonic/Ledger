@@ -299,7 +299,7 @@ static const Item i_textx[] = {
   { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
 };
 static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Illustrations", G_COLS, ix_illus, N(ix_illus) },
-                                { "Charts", G_COLS, ix_charts, N(ix_charts) }, { "Sparklines", G_COLS, ix_spark, N(ix_spark) },
+                                { "Charts", G_COLS, ix_charts, N(ix_charts) }, { "Sparklines", G_COLS, ix_spark, N(ix_spark) }, { "Filters", G_COLS, i_filters, N(i_filters) },
                                 { "Functions", G_COLS, i_fn, N(i_fn) }, { "Links", G_COLS, i_links, N(i_links) }, { "Text", G_COLS, i_textx, N(i_textx) },
                                 { "Names", G_COLS, i_names, N(i_names) } };
 /* Page Layout: themes, the page setup (Ledger doesn't print, but PDF export, Page Break Preview and

@@ -76,6 +76,7 @@ static const Item ix_charts[] = {
   { K_DROP, S_ICON, ICX_HISTOGRAM, LX_STAT, NULL, ID_X_STATDD, 0, 0, 0, 0, "Statistic chart: histogram, box and whisker" },
   { K_DROP, S_ICON, ICX_TREEMAP, LX_MORE, NULL, ID_X_MOREDD, 0, 0, 0, 0, "Treemap, sunburst, waterfall, funnel, radar, stock or combo chart" },
   { K_BUTTON, S_LARGE, ICX_ALLCHARTS, 0, "All Charts", ID_X_ALLCHARTS, 0, 0, 0, 0, "Every kind of chart, with a preview of the selected data" },
+  { K_BUTTON, S_LARGE, ICP_PIVOTCHART, 0, "PivotChart", ID_P2_PIVOTCHART, 0, 0, 0, 0, "A chart of the PivotTable at the active cell, which follows its report (pivot2.c)" },
 };
 static const Item ix_spark[] = {
   { K_BUTTON, S_SMALL, ICX_SPARKLINE, 0, "Line", ID_X_SPARKLINE, 0, 0, 0, 0, "A line sparkline: a small chart inside a cell" },

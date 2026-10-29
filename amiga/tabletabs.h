@@ -3,6 +3,7 @@
  * with TT_LISTS for the lists' entries, then with TT_TOOLS for the tools and the contextual tabs'
  * groups). Kept apart so ribbon.c only gains a few lines.
  */
+#include "pivot2.h"                /* Recommended PivotTables, PivotCharts, slicers, grouping (pivot2.c) */
 #ifdef TT_LISTS
 /* the table style gallery: 21 Light, 28 Medium, 11 Dark (tabletab_preview draws each) */
 static const char *const tstyles[] = {
@@ -26,7 +27,12 @@ static const char *const pvmoves[] = { "Move Up", "Move Down", "Move to Report F
 /* Insert > Tables and Home > Styles' Format as Table */
 static const Item i_tables[] = {
   { K_BUTTON, S_LARGE, IC_PIVOT, 0, "PivotTable", ID_PIVOTNEW, 0, 0, 0, 0, "Summarize the data in a PivotTable" },
+  { K_BUTTON, S_LARGE, ICP_RECPIVOT, 0, "Recommended PivotTables", ID_P2_RECPIVOT, 0, 0, 0, 0, "PivotTables that suit the data round the active cell, each with a preview" },
   { K_BUTTON, S_LARGE, IC_TABLE, 0, "Table", ID_TBLNEW, 0, 0, 0, 0, "Make the data a table, to sort, filter and total it (Amiga-T)" },
+};
+/* Insert > Filters */
+static const Item i_filters[] = {
+  { K_BUTTON, S_LARGE, ICP_SLICER, 0, "Slicer", ID_P2_SLICER, 0, 0, 0, 0, "Buttons over the sheet that filter a table or PivotTable by a field's items" },
 };
 /* Table Design */
 static const Item td_props[] = {
@@ -38,6 +44,7 @@ static const Item td_tools[] = {
   { K_BUTTON, S_SMALL, IC_PIVOT, 0, "Summarize with PivotTable", ID_TBLPIVOT, 0, CB_INTABLE, 0, 0, "A PivotTable of this table's data" },
   { K_BUTTON, S_SMALL, IC_REMOVEDUP, 0, "Remove Duplicates", ID_TBLDEDUPE, 0, CB_INTABLE, 0, 0, "Delete rows of the table that repeat an earlier one" },
   { K_BUTTON, S_SMALL, IC_TBLCONVERT, 0, "Convert to Range", ID_TBLCONVERT, 0, CB_INTABLE, 0, 0, "Make the table ordinary cells again, keeping its look" },
+  { K_BUTTON, S_SMALL, ICP_SLICER, 0, "Insert Slicer", ID_P2_SLICER, 0, CB_INTABLE, 0, 0, "Slicers that filter the table by a column's items" },
 };
 static const Item td_opts[] = {
   { K_BUTTON, S_SMALL, 0, 0, "Header Row", ID_TBLHEADER, CB_HEADER, CB_INTABLE, F_CHECK, 0, "Show the table's header row" },
@@ -64,6 +71,22 @@ static const Item pa_field[] = {
   { K_BUTTON, S_SMALL, IC_FIELDADD, 0, "Add Field", ID_PVADDFIELD, 0, CB_INPIVOT, 0, 0, "Add a field to the PivotTable" },
   { K_BUTTON, S_SMALL, IC_FIELDREMOVE, 0, "Remove Field", ID_PVREMOVEFIELD, 0, CB_PVFIELD, 0, 0, "Take the active cell's field out" },
   { K_DROP, S_SMALL, IC_FIELDMOVE, L_PVMOVE, "Move Field", ID_PVMOVEDD, 0, CB_PVFIELD, 0, 0, "Move the active cell's field to another area" },
+  { K_BUTTON, S_SMALL, ICP_EXPAND, 0, "Expand Field", ID_P2_EXPAND, 0, CB_PVFIELD, F_NEWCOL, 0, "Show the detail of every item of the active field" },
+  { K_BUTTON, S_SMALL, ICP_COLLAPSE, 0, "Collapse Field", ID_P2_COLLAPSE, 0, CB_PVFIELD, 0, 0, "Hide the detail of every item of the active field" },
+};
+static const Item pa_group[] = {
+  { K_BUTTON, S_SMALL, ICP_GROUPFIELD, 0, "Group Field", ID_P2_GROUP, 0, CB_PVFIELD, 0, 0, "Group the active field: dates by years, quarters, months or days; numbers by intervals; items by hand" },
+  { K_BUTTON, S_SMALL, ICP_UNGROUPFIELD, 0, "Ungroup", ID_P2_UNGROUP, 0, CB_PVFIELD, 0, 0, "Take the active field's grouping away" },
+};
+static const Item pa_filter[] = {
+  { K_BUTTON, S_LARGE, ICP_SLICER, 0, "Insert Slicer", ID_P2_SLICER, 0, CB_INPIVOT, 0, 0, "Slicers that filter the PivotTable by a field's items" },
+};
+static const Item pa_calc[] = {
+  { K_BUTTON, S_LARGE, ICP_CALCFIELD, 0, "Fields, Items & Sets", ID_P2_CALCFIELD, 0, CB_INPIVOT, 0, 0, "Calculated Field: a formula over the other fields' sums" },
+};
+static const Item pa_tools[] = {
+  { K_BUTTON, S_LARGE, ICP_PIVOTCHART, 0, "PivotChart", ID_P2_PIVOTCHART, 0, CB_INPIVOT, 0, 0, "A chart of the PivotTable's report, which follows it" },
+  { K_BUTTON, S_SMALL, ICP_RECPIVOT, 0, "Recommended PivotTables", ID_P2_RECPIVOT, 0, 0, 0, 0, "PivotTables that suit the source data" },
 };
 static const Item pa_sort[] = {
   { K_BUTTON, S_SMALL, IC_SORTAZ, 0, "Sort A to Z", ID_PVSORTAZ, 0, CB_PVFIELD, 0, 0, "The active field's items smallest first" },
@@ -78,7 +101,9 @@ static const Item pa_show[] = {
   { K_BUTTON, S_LARGE, IC_PIVOTFIELDS, 0, "Field List", ID_PVFIELDS, 0, CB_INPIVOT, 0, 0, "The PivotTable Fields pane: put fields in Filters, Columns, Rows and Values" },
 };
 static const Group panalyze[] = { { "PivotTable", G_COLS, pa_pivot, N(pa_pivot) }, { "Active Field", G_COLS, pa_field, N(pa_field) },
-                                  { "Sort & Filter", G_COLS, pa_sort, N(pa_sort) }, { "Data", G_COLS, pa_data, N(pa_data) },
+                                  { "Group", G_COLS, pa_group, N(pa_group) }, { "Sort & Filter", G_COLS, pa_sort, N(pa_sort) },
+                                  { "Filter", G_COLS, pa_filter, N(pa_filter) }, { "Data", G_COLS, pa_data, N(pa_data) },
+                                  { "Calculations", G_COLS, pa_calc, N(pa_calc) }, { "Tools", G_COLS, pa_tools, N(pa_tools) },
                                   { "Show", G_COLS, pa_show, N(pa_show) } };
 /* PivotTable Design */
 static const Item pd_layout[] = {
