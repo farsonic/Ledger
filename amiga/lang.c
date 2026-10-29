@@ -10,7 +10,7 @@ static const char *const codes[UI_NLANG] = { "en", "de", "fr", "es", "it" };
 static const char *const names[UI_NLANG] = { "english", "deutsch", "fran\347ais", "espa\361ol", "italiano" };   /* Locale's */
 
 /* the table: English, then each other language in order (NULL: as English); generated from
-   lang/strings.txt by lang/mktable.py */
+   lang/strings.txt by tools/mklang.py */
 typedef struct { const char *s[UI_NLANG]; } Words;
 static const Words table[] = {
 #include "lang_table.h"
@@ -45,9 +45,9 @@ const char *tr(const char *english)
   w = (const Words *const *)bsearch(english, byen, (size_t)nby, sizeof byen[0], cmp_key);
   return w && (*w)->s[cur] ? (*w)->s[cur] : english;
 }
-/* the two-letter code Quill.prefs keeps (language=de); English's for a number out of range */
+/* the two-letter code Ledger.prefs keeps (language=de); English's for a number out of range */
 const char *lang_code(int lang) { return codes[lang >= 0 && lang < UI_NLANG ? lang : 0]; }
-/* the LANG_ for a code from lang_code (as read back from Quill.prefs), -1 if it isn't one */
+/* the LANG_ for a code from lang_code (as read back from Ledger.prefs), -1 if it isn't one */
 int lang_by_code(const char *code)
 {
   int i;
@@ -56,7 +56,7 @@ int lang_by_code(const char *code)
 }
 /* locale.library, open only while lang_system looks (the proto/ calls go through this global) */
 struct Library *LocaleBase;
-/* the first of the user's preferred languages in Locale prefs that Quill speaks, else English.
+/* the first of the user's preferred languages in Locale prefs that Ledger speaks, else English.
    Locale names them in their own words, lower case ("deutsch"), so they are matched by their
    start against names[]. The library is opened just for this and closed again */
 int lang_system(void)

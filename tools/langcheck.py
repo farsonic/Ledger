@@ -17,7 +17,7 @@
 # It also checks each row's translations keep the English's printf conversions (%s %d ...) in order,
 # its '|' requester buttons, its leading MUI escape (\33c) and its '_' shortcut marker, and it
 # flags a literal handed straight to a gadget (Label1("..."), QButton("..."), MUIA_ShortHelp ...)
-# without tr(). After adding strings, run this, translate, then tools/mklang.py.
+# without tr() (unless its line says "lang: as is"). After adding strings, run this, translate, then tools/mklang.py.
 import glob, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mklang
@@ -154,6 +154,7 @@ def main():
             missing.setdefault(t, []).append('%s:%d' % (rel, line))
         for m in SHOWN.finditer(src):
             t = mklang.unescape(m.group(1))
+            if 'lang: as is' in src[m.start():src.find('\n', m.start())]: continue
             if t in rows or (t not in ign and not not_words(t)):
                 unwrapped.append('%s:%d: "%s" is shown without tr()' % (rel, src.count('\n', 0, m.start()) + 1, m.group(1)))
     for rel, line, t in funcdesc_strings():

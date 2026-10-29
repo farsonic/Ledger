@@ -69,6 +69,7 @@ char bookpath[512];
 FontSet fonts;
 char username[64];
 int pref_dark, pref_large, pref_fxbar = 1;
+static int pref_lang = -1;          /* the interface's language (LANG_), -1: the one Locale prefs prefer */
 static char title[600];
 static int back_shown;
 static LONG win_box[4];
@@ -138,6 +139,20 @@ static struct NewMenu menus[] = {
   TABLE_MENUS,
   { NM_END, 0, 0, 0, 0, 0 }
 };
+
+/* the menus' labels in the language chosen (lang_set), for the menu strips made after: the English
+   kept from the first call, so a new language can be put in later */
+static void menus_translate(void)
+{
+  static CONST_STRPTR en[sizeof menus / sizeof menus[0]];
+  static int kept;
+  int i;
+  for (i = 0; menus[i].nm_Type != NM_END; i++) {
+    if (!kept) en[i] = menus[i].nm_Label;
+    if (en[i] && en[i] != NM_BARLABEL) menus[i].nm_Label = (STRPTR)tr((const char *)en[i]);
+  }
+  kept = 1;
+}
 
 /* ------------------------------------------------------------------ small helpers */
 Sheet *cur_sheet(void) { return book->sh[book->active]; }
@@ -642,6 +657,7 @@ static void load_prefs(void)
     line[strcspn(line, "\r\n")] = 0;
     if (!strncmp(line, "theme=", 6)) pref_dark = !strcmp(line + 6, "dark");
     else if (!strncmp(line, "textsize=", 9)) pref_large = !strcmp(line + 9, "large");
+    else if (!strncmp(line, "language=", 9)) pref_lang = lang_by_code(line + 9);
     else if (!strncmp(line, "dates=", 6)) ledger_date_order = !strcmp(line + 6, "mdy");
     else if (!strncmp(line, "formulabar=", 11)) pref_fxbar = atoi(line + 11);
     else if (!strncmp(line, "name=", 5)) { strncpy(username, line + 5, sizeof username - 1); username[sizeof username - 1] = 0; }
@@ -663,6 +679,7 @@ static void save_prefs(void)
   if (!f) return;
   fprintf(f, "theme=%s\ntextsize=%s\ndates=%s\nformulabar=%d\n", pref_dark ? "dark" : "light", pref_large ? "large" : "normal",
           ledger_date_order ? "mdy" : "dmy", pref_fxbar);
+  if (pref_lang >= 0) fprintf(f, "language=%s\n", lang_code(pref_lang));
   if (username[0]) fprintf(f, "name=%s\n", username);
   if (pub_screen[0]) fprintf(f, "screen=%s\n", pub_screen);
   if (win_box[2] > 0) fprintf(f, "windowbox=%ld,%ld,%ld,%ld\n", (long)win_box[0], (long)win_box[1], (long)win_box[2], (long)win_box[3]);
@@ -1185,14 +1202,15 @@ static void backstage_show(int on, int page)
     if (bookpath[0]) *((char *)PathPart((STRPTR)loc)) = 0;
     utf8_to_latin1(book->title, (u32)strlen(book->title), ttl, sizeof ttl);
     utf8_to_latin1(book->author, (u32)strlen(book->author), auth, sizeof auth);
-    sprintf(info, "Name\t%.100s\nLocation\t%.250s\nSheets\t%d\nCells\t%ld\nFormulas\t%ld\nNames\t%d\nCalculation\t%s\nTitle\t%.100s\nAuthor\t%.60s",
-            name, loc[0] ? loc : tr("(current drawer)"), book->nsh, cells, formulas, book->nnames, tr(book->manualcalc ? "Manual" : "Automatic"),
-            ttl[0] ? ttl : "-", auth[0] ? auth : "-");
+    sprintf(info, "%s\t%.100s\n%s\t%.250s\n%s\t%d\n%s\t%ld\n%s\t%ld\n%s\t%d\n%s\t%s\n%s\t%.100s\n%s\t%.60s",
+            tr("Name"), name, tr("Location"), loc[0] ? loc : tr("(current drawer)"), tr("Sheets"), book->nsh, tr("Cells"), cells,
+            tr("Formulas"), formulas, tr("Names"), book->nnames, tr("Calculation"), tr(book->manualcalc ? "Manual" : "Automatic"),
+            tr("Title"), ttl[0] ? ttl : "-", tr("Author"), auth[0] ? auth : "-");
     for (i = 0; i < nrecent; i++) recentp[i] = recent[i];
     memset(&bs, 0, sizeof bs);
     bs.MethodID = MUIM_Back_Set;
     bs.recent = recentp; bs.nrecent = nrecent; bs.info = info; bs.username = username;
-    bs.metric = !ledger_date_order; bs.dark = pref_dark; bs.lang = 0; bs.large = pref_large;
+    bs.metric = !ledger_date_order; bs.dark = pref_dark; bs.lang = lang_current(); bs.large = pref_large;
     DoMethodA(backstage, (Msg)&bs);
     set(backstage, MUIA_Back_Page, page);
   }
@@ -1218,14 +1236,16 @@ static void backstage_command(ULONG id)
     if (v >= 0 && v < nrecent) { char path[256]; strcpy(path, recent[v]); open_path(path); }
     break;
   case ID_OPTIONS: {
-    ULONG m = 1, dk = 0, lgt = 0;
+    ULONG m = 1, dk = 0, lgt = 0, lg = 0;
     char *n = NULL;
     get(backstage, MUIA_Back_Metric, &m); get(backstage, MUIA_Back_UserName, &n);
     ledger_date_order = m ? 0 : 1;
     if (n) { strncpy(username, n, sizeof username - 1); username[sizeof username - 1] = 0; }
-    get(backstage, MUIA_Back_Dark, &dk); get(backstage, MUIA_Back_Large, &lgt);
-    if ((int)dk != pref_dark || (int)lgt != pref_large) {
+    get(backstage, MUIA_Back_Dark, &dk); get(backstage, MUIA_Back_Large, &lgt); get(backstage, MUIA_Back_Language, &lg);
+    if ((int)dk != pref_dark || (int)lgt != pref_large || (int)lg != lang_current()) {
+      /* a new look or language: every window again, its parts set up with the new pens and words */
       pref_dark = (int)dk; pref_large = (int)lgt;
+      if ((int)lg != lang_current()) { pref_lang = (int)lg; lang_set(pref_lang); menus_translate(); }
       win_reopen_all();
     }
     save_prefs();
@@ -1599,7 +1619,7 @@ static int win_new(Book *b, const char *path)
         Child, namebox = StringObject, StringFrame, MUIA_String_MaxLen, 60, MUIA_HorizWeight, 0, MUIA_FixWidthTxt, (ULONG)"WWWWWWWWW",
                          MUIA_ShortHelp, (ULONG)tr("Name Box: the active cell's address. Type an address or a name and press Return to go there; type a new name to name the selection."), End,
         Child, fxno = QButton("\327"),
-        Child, fxok = QButton("OK"),
+        Child, fxok = QButton("OK"),                                      /* (lang: as is, the tick's place) */
         Child, fxb = QButton("fx"),
         Child, VGroup, InnerSpacing(0, 0), MUIA_Group_PageMode, TRUE,      /* (uitab.c: page 1 a spilled cell's formula, greyed) */
           Child, fxbar = StringObject, StringFrame, MUIA_String_MaxLen, 2000, MUIA_ShortHelp, (ULONG)tr("Formula bar: the active cell's entry. Click here to change it; Return puts it in the cell."), End,
@@ -1884,7 +1904,8 @@ int main(int argc, char **argv)
     struct Screen *sc = LockPubScreen((STRPTR)pub_screen);
     if (sc) UnlockPubScreen(NULL, sc); else { strcpy(missing_screen, pub_screen); pub_screen[0] = 0; }
   }
-  lang_set(LANG_EN);
+  lang_set(pref_lang >= 0 ? pref_lang : lang_system());
+  menus_translate();
   theme_set_dark(pref_dark);
   theme_set_large(pref_large);
   splash_open(pub_screen, "Ledger 0.2.2");

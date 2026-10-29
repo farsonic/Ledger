@@ -326,7 +326,7 @@ static int fn_matches(const char *name, const char *find)
   if (!*find) return 1;
   if (strstr_nocase(name, find)) return 1;
   fd = func_desc(name);
-  return fd && strstr_nocase(fd->what, find);
+  return fd && (strstr_nocase(fd->what, find) || strstr_nocase(tr(fd->what), find));
 }
 static void fn_fill(void)
 {
@@ -357,8 +357,8 @@ static void fn_each(ULONG id)
       snprintf(u, sizeof u, "%s(%s)", fd->name, fd->args);
       utf8_to_latin1(u, (u32)strlen(u), l1, sizeof l1);
       snprintf(t, sizeof t, "%s\n", l1);           /* (the first line shows bold) */
-      utf8_to_latin1(tr(fd->what), (u32)strlen(tr(fd->what)), l1, sizeof l1);
-      strncat(t, l1, sizeof t - strlen(t) - 1);
+      utf8_to_latin1(fd->what, (u32)strlen(fd->what), l1, sizeof l1);
+      strncat(t, tr(l1), sizeof t - strlen(t) - 1);    /* (the table's English is Latin-1, as l1 is) */
       fn_wrap(t, 58);
     } else snprintf(t, sizeof t, "%s", fn_shown[a]);
     fn_show(t);
