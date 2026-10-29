@@ -138,32 +138,32 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ⬜ Go To Special (Editing) `edit.goToSpecial`
 - ⬜ Add-ins (Add-ins) `home.addIns`
 
-### Insert (2 of 17 by name)
+### Insert (9 of 17 by name)
 
 - ⬜ PivotTable (Tables) `insert.pivotTable`
 - ⬜ Recommended PivotTables (Tables) `insert.recommendedPivotTables`
 - ⬜ Table (Tables) `insert.table`
-- ⬜ Pictures (Illustrations) `insert.picture`
-- ⬜ Shapes (Illustrations) `insert.shape`
-- ⬜ Icons (Illustrations) `insert.icons`
-- ⬜ Recommended Charts (Charts) `insert.recommendedCharts`
-- ⬜ Charts (Charts) `insert.chart`
+- ✅ Pictures (Illustrations) `insert.picture`
+- ✅ Shapes (Illustrations) `insert.shape`
+- ✅ Icons (Illustrations) `insert.icons`
+- ✅ Recommended Charts (Charts) `insert.recommendedCharts`
+- ✅ Charts (Charts) `insert.chart`
 - ⬜ PivotChart (Charts) `insert.pivotChart`
-- ⬜ Sparklines (Sparklines) `insert.sparkline`
+- ✅ Sparklines (Sparklines) `insert.sparkline`
 - ⬜ Slicer (Filters) `insert.slicer`
 - ✅ Link (Links) `insert.link`
 - ⬜ Comment (Comments) `review.newComment`
-- ⬜ Text Box (Text) `insert.textBox`
+- ✅ Text Box (Text) `insert.textBox`
 - ⬜ Header & Footer (Text) `pageLayout.headerFooter`
 - ✅ Symbol (Symbols) `insert.symbol`
 - ⬜ Checkbox (Cell Controls) `insert.checkbox`
 
-### Draw (0 of 4 by name)
+### Draw (4 of 4 by name)
 
-- ⬜ Pen (Tools) `draw.pen`
-- ⬜ Eraser (Tools) `draw.eraser`
-- ⬜ Lasso Select (Tools) `draw.lasso`
-- ⬜ Ink to Shape (Convert) `draw.inkToShape`
+- ✅ Pen (Tools) `draw.pen`
+- ✅ Eraser (Tools) `draw.eraser`
+- ✅ Lasso Select (Tools) `draw.lasso`
+- ✅ Ink to Shape (Convert) `draw.inkToShape`
 
 ### Page Layout (1 of 23 by name)
 
@@ -307,22 +307,22 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ⬜ Banded Columns (Table Style Options) `table.bandedColumns`
 - ⬜ Table Styles (Table Styles) `table.style`
 
-### Chart Design (0 of 8 by name)
+### Chart Design (8 of 8 by name)
 
-- ⬜ Add Chart Element (Chart Layouts) `chart.addElement`
-- ⬜ Quick Layout (Chart Layouts) `chart.quickLayout`
-- ⬜ Change Colors (Chart Styles) `chart.changeColors`
-- ⬜ Chart Styles (Chart Styles) `chart.set`
-- ⬜ Switch Row/Column (Data) `chart.switchRowColumn`
-- ⬜ Select Data (Data) `chart.selectData`
-- ⬜ Change Chart Type (Type) `chart.changeType`
-- ⬜ Move Chart (Location) `chart.move`
+- ✅ Add Chart Element (Chart Layouts) `chart.addElement`
+- ✅ Quick Layout (Chart Layouts) `chart.quickLayout`
+- ✅ Change Colors (Chart Styles) `chart.changeColors`
+- ✅ Chart Styles (Chart Styles) `chart.set`
+- ✅ Switch Row/Column (Data) `chart.switchRowColumn`
+- ✅ Select Data (Data) `chart.selectData`
+- ✅ Change Chart Type (Type) `chart.changeType`
+- ✅ Move Chart (Location) `chart.move`
 
-### Format (0 of 3 by name)
+### Format (3 of 3 by name)
 
-- ⬜ Format Selection (Current Selection) `chart.formatSelection`
-- ⬜ Shape Fill (Shape Styles) `chart.shapeFill`
-- ⬜ Shape Outline (Shape Styles) `chart.shapeOutline`
+- ✅ Format Selection (Current Selection) `chart.formatSelection`
+- ✅ Shape Fill (Shape Styles) `chart.shapeFill`
+- ✅ Shape Outline (Shape Styles) `chart.shapeOutline`
 
 ### PivotTable Analyze (3 of 13 by name)
 

@@ -187,6 +187,29 @@ static void charts(void)
     dobj_place(b->sh[0], o, 100, 30, 300, 230);
     ok("chart: placed by pixels", o->from.c == 1 && o->from.dx == 36 && o->from.r == 1 && o->from.dy == 10 && o->to.c == 4 && o->to.dx == 44);
   }
+  {
+    /* the data deleted under it: the chart still draws (its references are #REF!) */
+    Book *e = sales_book();
+    DObj *eo = add_chart(e, 0, CK_COL, R4(0, 0, 6, 3));
+    int k2, okall = 1;
+    book_delete_cols(e, 0, 0, 5);
+    for (k2 = 0; k2 < CK_N && eo; k2++) {
+      eo = drw_obj(e->sh[0], 0);
+      eo->chart->kind = (u8)k2;
+      prims_init(&pl);
+      if (!chart_render(e, 0, eo->chart, 300, 200, 100, NULL, NULL, &pl)) okall = 0;
+      prims_free(&pl);
+    }
+    {
+      Chart *empty = chart_new(CK_PIE);
+      prims_init(&pl);
+      if (!chart_render(e, 0, empty, 50, 30, 100, NULL, NULL, &pl)) okall = 0;
+      prims_free(&pl);
+      chart_free(empty);
+    }
+    ok("chart: draws with its data gone", eo && okall);
+    book_free(e);
+  }
   book_duplicate_sheet(b, 0);
   ok("chart: copied with its sheet", b->nsh == 2 && drw_count(b->sh[1]) == 1 && drw_obj(b->sh[1], 0)->chart != drw_obj(b->sh[0], 0)->chart);
   book_delete_sheet(b, 1);
