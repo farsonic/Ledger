@@ -1,0 +1,111 @@
+BETA.DIST|Statistical|x, alpha, beta, cumulative, [A], [B]|The beta distribution (cumulative or density) between A and B.
+BETA.INV|Statistical|probability, alpha, beta, [A], [B]|The inverse of the cumulative beta distribution.
+BINOM.DIST|Statistical|number_s, trials, probability_s, cumulative|The binomial distribution probability.
+BINOM.DIST.RANGE|Statistical|trials, probability_s, number_s, [number_s2]|The probability of between number_s and number_s2 successes.
+BINOM.INV|Statistical|trials, probability_s, alpha|The smallest number of successes whose cumulative probability reaches alpha.
+CHISQ.DIST|Statistical|x, deg_freedom, cumulative|The chi-squared distribution (left tail or density).
+CHISQ.DIST.RT|Statistical|x, deg_freedom|The right-tailed probability of the chi-squared distribution.
+CHISQ.INV|Statistical|probability, deg_freedom|The inverse of the left-tailed chi-squared distribution.
+CHISQ.INV.RT|Statistical|probability, deg_freedom|The inverse of the right-tailed chi-squared distribution.
+CHISQ.TEST|Statistical|actual_range, expected_range|The chi-squared test of independence: its probability.
+CONFIDENCE.NORM|Statistical|alpha, standard_dev, size|The half-width of a confidence interval for a mean (normal).
+CONFIDENCE.T|Statistical|alpha, standard_dev, size|The half-width of a confidence interval for a mean (Student's t).
+COVARIANCE.P|Statistical|array1, array2|The population covariance of pairs of values.
+COVARIANCE.S|Statistical|array1, array2|The sample covariance of pairs of values.
+DEVSQ|Statistical|number1, ...|The sum of squared deviations from the mean.
+EXPON.DIST|Statistical|x, lambda, cumulative|The exponential distribution.
+F.DIST|Statistical|x, deg_freedom1, deg_freedom2, cumulative|The F distribution (left tail or density).
+F.DIST.RT|Statistical|x, deg_freedom1, deg_freedom2|The right-tailed F distribution.
+F.INV|Statistical|probability, deg_freedom1, deg_freedom2|The inverse of the left-tailed F distribution.
+F.INV.RT|Statistical|probability, deg_freedom1, deg_freedom2|The inverse of the right-tailed F distribution.
+F.TEST|Statistical|array1, array2|The F-test: the two-tailed probability that two variances are equal.
+FISHER|Statistical|x|The Fisher transformation.
+FISHERINV|Statistical|y|The inverse of the Fisher transformation.
+FORECAST.ETS|Statistical|target_date, values, timeline, [seasonality], [data_completion], [aggregation]|A future value by exponential triple smoothing (AAA).
+FORECAST.ETS.CONFINT|Statistical|target_date, values, timeline, [confidence_level], [seasonality], [data_completion], [aggregation]|The half-width of the confidence interval of an ETS forecast.
+FORECAST.ETS.SEASONALITY|Statistical|values, timeline, [data_completion], [aggregation]|The length of the repeating pattern ETS finds.
+FORECAST.ETS.STAT|Statistical|values, timeline, statistic_type, [seasonality], [data_completion], [aggregation]|A statistic of the ETS fit (1 alpha, 2 beta, 3 gamma, 4 MASE, 5 SMAPE, 6 MAE, 7 RMSE, 8 step).
+FORECAST.LINEAR|Statistical|x, known_y's, known_x's|A value on the straight line fitted to known points.
+FREQUENCY|Statistical|data_array, bins_array|How many values fall in each bin (an array, one more than the bins).
+GAMMA|Statistical|x|The gamma function.
+GAMMA.DIST|Statistical|x, alpha, beta, cumulative|The gamma distribution.
+GAMMA.INV|Statistical|probability, alpha, beta|The inverse of the cumulative gamma distribution.
+GAMMALN|Statistical|x|The natural logarithm of the gamma function.
+GAMMALN.PRECISE|Statistical|x|The natural logarithm of the gamma function.
+GAUSS|Statistical|z|The probability of a standard normal value between the mean and z.
+GEOMEAN|Statistical|number1, ...|The geometric mean.
+GROWTH|Statistical|known_y's, [known_x's], [new_x's], [const]|Values on the exponential curve fitted to known points (an array).
+HARMEAN|Statistical|number1, ...|The harmonic mean.
+HYPGEOM.DIST|Statistical|sample_s, number_sample, population_s, number_pop, cumulative|The hypergeometric distribution.
+INTERCEPT|Statistical|known_y's, known_x's|Where the fitted straight line crosses the y axis.
+KURT|Statistical|number1, ...|The kurtosis (peakedness) of the values.
+LINEST|Statistical|known_y's, [known_x's], [const], [stats]|The least-squares straight line (and its statistics) as an array.
+LOGEST|Statistical|known_y's, [known_x's], [const], [stats]|The fitted exponential curve (and its statistics) as an array.
+LOGNORM.DIST|Statistical|x, mean, standard_dev, cumulative|The lognormal distribution.
+LOGNORM.INV|Statistical|probability, mean, standard_dev|The inverse of the cumulative lognormal distribution.
+MODE.MULT|Statistical|number1, ...|Every most frequent value, as a vertical array.
+NEGBINOM.DIST|Statistical|number_f, number_s, probability_s, cumulative|The negative binomial distribution.
+NORM.DIST|Statistical|x, mean, standard_dev, cumulative|The normal distribution.
+NORM.INV|Statistical|probability, mean, standard_dev|The inverse of the cumulative normal distribution.
+NORM.S.DIST|Statistical|z, cumulative|The standard normal distribution.
+NORM.S.INV|Statistical|probability|The inverse of the standard normal distribution.
+PEARSON|Statistical|array1, array2|The Pearson correlation coefficient.
+PERCENTRANK.EXC|Statistical|array, x, [significance]|The rank of x as a percentage of the values (0 and 1 excluded).
+PERCENTRANK.INC|Statistical|array, x, [significance]|The rank of x as a percentage of the values (0 and 1 included).
+PERMUTATIONA|Statistical|number, number_chosen|Permutations with repetition: number to the power number_chosen.
+PHI|Statistical|x|The density of the standard normal distribution.
+POISSON.DIST|Statistical|x, mean, cumulative|The Poisson distribution.
+PROB|Statistical|x_range, prob_range, lower_limit, [upper_limit]|The probability that a value lies between two limits.
+QUARTILE.EXC|Statistical|array, quart|A quartile of the values (0 and 1 excluded).
+RANK.AVG|Statistical|number, ref, [order]|The rank of a number; ties share their average rank.
+RSQ|Statistical|known_y's, known_x's|The square of the Pearson correlation (R squared).
+SKEW|Statistical|number1, ...|The skewness of a sample.
+SKEW.P|Statistical|number1, ...|The skewness of a population.
+SLOPE|Statistical|known_y's, known_x's|The slope of the fitted straight line.
+STANDARDIZE|Statistical|x, mean, standard_dev|The value normalised: (x - mean) / standard_dev.
+STDEVPA|Statistical|value1, ...|Standard deviation of a population, counting text as 0 and TRUE as 1.
+STEYX|Statistical|known_y's, known_x's|The standard error of the predicted y values.
+T.DIST|Statistical|x, deg_freedom, cumulative|Student's t distribution (left tail or density).
+T.DIST.2T|Statistical|x, deg_freedom|The two-tailed Student's t distribution.
+T.DIST.RT|Statistical|x, deg_freedom|The right-tailed Student's t distribution.
+T.INV|Statistical|probability, deg_freedom|The left-tailed inverse of Student's t distribution.
+T.INV.2T|Statistical|probability, deg_freedom|The two-tailed inverse of Student's t distribution.
+T.TEST|Statistical|array1, array2, tails, type|Student's t-test: the probability (1 paired, 2 equal variance, 3 unequal).
+TREND|Statistical|known_y's, [known_x's], [new_x's], [const]|Values on the straight line fitted to known points (an array).
+TRIMMEAN|Statistical|array, percent|The mean without the given share of the highest and lowest values.
+VARA|Statistical|value1, ...|Variance of a sample, counting text as 0 and TRUE as 1.
+VARPA|Statistical|value1, ...|Variance of a population, counting text as 0 and TRUE as 1.
+WEIBULL.DIST|Statistical|x, alpha, beta, cumulative|The Weibull distribution.
+Z.TEST|Statistical|array, x, [sigma]|The one-tailed probability of a z-test.
+BETADIST|Compatibility|x, alpha, beta, [A], [B]|The cumulative beta distribution (BETA.DIST).
+BETAINV|Compatibility|probability, alpha, beta, [A], [B]|The inverse of the cumulative beta distribution (BETA.INV).
+BINOMDIST|Compatibility|number_s, trials, probability_s, cumulative|The binomial distribution (BINOM.DIST).
+CHIDIST|Compatibility|x, deg_freedom|The right-tailed chi-squared distribution (CHISQ.DIST.RT).
+CHIINV|Compatibility|probability, deg_freedom|The inverse of the right-tailed chi-squared distribution (CHISQ.INV.RT).
+CHITEST|Compatibility|actual_range, expected_range|The chi-squared test (CHISQ.TEST).
+CONFIDENCE|Compatibility|alpha, standard_dev, size|A confidence interval's half-width, normal (CONFIDENCE.NORM).
+COVAR|Compatibility|array1, array2|The population covariance (COVARIANCE.P).
+CRITBINOM|Compatibility|trials, probability_s, alpha|The smallest k with cumulative binomial >= alpha (BINOM.INV).
+EXPONDIST|Compatibility|x, lambda, cumulative|The exponential distribution (EXPON.DIST).
+FDIST|Compatibility|x, deg_freedom1, deg_freedom2|The right-tailed F distribution (F.DIST.RT).
+FINV|Compatibility|probability, deg_freedom1, deg_freedom2|The inverse of the right-tailed F distribution (F.INV.RT).
+FORECAST|Compatibility|x, known_y's, known_x's|A value on the fitted straight line (FORECAST.LINEAR).
+FTEST|Compatibility|array1, array2|The F-test (F.TEST).
+GAMMADIST|Compatibility|x, alpha, beta, cumulative|The gamma distribution (GAMMA.DIST).
+GAMMAINV|Compatibility|probability, alpha, beta|The inverse of the gamma distribution (GAMMA.INV).
+HYPGEOMDIST|Compatibility|sample_s, number_sample, population_s, number_pop|The hypergeometric probability (HYPGEOM.DIST).
+LOGINV|Compatibility|probability, mean, standard_dev|The inverse of the lognormal distribution (LOGNORM.INV).
+LOGNORMDIST|Compatibility|x, mean, standard_dev|The cumulative lognormal distribution (LOGNORM.DIST).
+NEGBINOMDIST|Compatibility|number_f, number_s, probability_s|The negative binomial probability (NEGBINOM.DIST).
+NORMDIST|Compatibility|x, mean, standard_dev, cumulative|The normal distribution (NORM.DIST).
+NORMINV|Compatibility|probability, mean, standard_dev|The inverse of the normal distribution (NORM.INV).
+NORMSDIST|Compatibility|z|The cumulative standard normal distribution (NORM.S.DIST).
+NORMSINV|Compatibility|probability|The inverse of the standard normal distribution (NORM.S.INV).
+PERCENTRANK|Compatibility|array, x, [significance]|The percentage rank of x (PERCENTRANK.INC).
+POISSON|Compatibility|x, mean, cumulative|The Poisson distribution (POISSON.DIST).
+TDIST|Compatibility|x, deg_freedom, tails|The one- or two-tailed Student's t distribution.
+TINV|Compatibility|probability, deg_freedom|The two-tailed inverse of Student's t (T.INV.2T).
+TTEST|Compatibility|array1, array2, tails, type|Student's t-test (T.TEST).
+USDOLLAR|Compatibility|number, [decimals]|A number as currency text (DOLLAR).
+WEIBULL|Compatibility|x, alpha, beta, cumulative|The Weibull distribution (WEIBULL.DIST).
+ZTEST|Compatibility|array, x, [sigma]|The one-tailed z-test probability (Z.TEST).

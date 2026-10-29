@@ -43,3 +43,132 @@ LIT:COUNT	typed-in text numbers and logicals count; in cells they don't
 LIT:COUNTA	"" typed in is a value; an empty cell isn't
 LIT:ISBLANK	"" typed in isn't blank; an empty cell is
 LIT:SUM	as COUNT
+# statistical functions (cases_stat.py)
+=_xlfn.NORM.DIST(1,0,0,TRUE)	Excel: #NUM! when standard_dev <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.NORM.DIST(E379,F379,G379,H379)	the same, from cells
+=_xlfn.NORM.INV(0,40,1.5)	Excel: #NUM! when probability <= 0 or >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.NORM.INV(E385,F385,G385)	the same, from cells
+=_xlfn.NORM.S.INV(1)	Excel: #NUM! when probability >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.NORM.S.INV(E400)	the same, from cells
+=STANDARDIZE(1,2,0)	Excel: #NUM! when standard_dev <= 0; LibreOffice gives #DIV/0!
+=STANDARDIZE(E410,F410,G410)	the same, from cells
+=_xlfn.LOGNORM.DIST(0,3.5,1.2,TRUE)	Excel: #NUM! when x <= 0; LibreOffice gives 0
+=_xlfn.LOGNORM.DIST(E413,F413,G413,H413)	the same, from cells
+=_xlfn.LOGNORM.INV(1,3.5,1.2)	Excel: #NUM! when probability >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.LOGNORM.INV(E417,F417,G417)	the same, from cells
+=_xlfn.CONFIDENCE.NORM(1,2.5,50)	Excel: #NUM! when alpha >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.CONFIDENCE.NORM(E420,F420,G420)	the same, from cells
+=FISHER(1)	Excel: #NUM! when x >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=FISHER(E427)	the same, from cells
+=_xlfn.T.DIST(1,0,TRUE)	Excel: #NUM! when deg_freedom < 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.T.DIST(E434,F434,G434)	the same, from cells
+=_xlfn.T.DIST.2T(-1,60)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.T.DIST.2T(E437,F437)	the same, from cells
+=TDIST(1,60,3)	Excel: #NUM! when tails is not 1 or 2; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=TDIST(E442,F442,G442)	the same, from cells
+=TDIST(-1,60,1)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=TDIST(E443,F443,G443)	the same, from cells
+=_xlfn.T.INV(0,3)	Excel: #NUM! when probability <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.T.INV(E448,F448)	the same, from cells
+=_xlfn.CHISQ.DIST(-1,2,TRUE)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.CHISQ.DIST(E456,F456,G456)	the same, from cells
+=CHIDIST(3,0)	Excel: #NUM! when deg_freedom < 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=CHIDIST(E460,F460)	the same, from cells
+=CHIINV(1.5,10)	Excel: #NUM! when probability > 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=CHIINV(E468,F468)	the same, from cells
+=_xlfn.F.DIST(2,0,5,TRUE)	Excel: #NUM! when deg_freedom1 < 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.F.DIST(E473,F473,G473,H473)	the same, from cells
+=_xlfn.GAMMA(0)	Excel: #NUM! for 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.GAMMA(E484)	the same, from cells
+=_xlfn.GAMMA(-2)	Excel: #NUM! for a negative integer; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.GAMMA(E485)	the same, from cells
+=GAMMALN(0)	Excel: #NUM! when x <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=GAMMALN(E494)	the same, from cells
+=_xlfn.BETA.DIST(4,8,10,TRUE,1,3)	Excel: #NUM! when x > B; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.BETA.DIST(E511,F511,G511,H511,I511,J511)	the same, from cells
+=_xlfn.BETA.INV(0,4,5)	Excel: #NUM! when probability <= 0; LibreOffice gives 0
+=_xlfn.BETA.INV(E518,F518,G518)	the same, from cells
+=_xlfn.EXPON.DIST(-1,10,TRUE)	Excel: #NUM! when x < 0; LibreOffice gives 0
+=_xlfn.EXPON.DIST(E522,F522,G522)	the same, from cells
+=WEIBULL(-1,20,100,TRUE)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=WEIBULL(E529,F529,G529,H529)	the same, from cells
+=_xlfn.BINOM.DIST(11,10,0.5,TRUE)	Excel: #NUM! when number_s > trials; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.BINOM.DIST(E533,F533,G533,H533)	the same, from cells
+=_xlfn.BINOM.DIST.RANGE(60,0.75,48)	LibreOffice has no BINOM.DIST.RANGE; Excel's documented example gives 0.0839749674
+=_xlfn.BINOM.DIST.RANGE(E539,F539,G539)	the same, from cells
+=_xlfn.BINOM.DIST.RANGE(60,0.75,45,50)	LibreOffice has no BINOM.DIST.RANGE; Excel's documented example gives 0.523629793
+=_xlfn.BINOM.DIST.RANGE(E540,F540,G540,H540)	the same, from cells
+=_xlfn.BINOM.DIST.RANGE(60,0.75,50,45)	LibreOffice has no BINOM.DIST.RANGE; Excel: #NUM! when number_s2 < number_s
+=_xlfn.BINOM.DIST.RANGE(E541,F541,G541,H541)	the same, from cells
+=CRITBINOM(6,1.5,0.75)	Excel: #NUM! when probability_s > 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=CRITBINOM(E547,F547,G547)	the same, from cells
+=NEGBINOMDIST(10,0,0.25)	Excel: #NUM! when number_s < 1; LibreOffice gives 0
+=NEGBINOMDIST(E552,F552,G552)	the same, from cells
+=_xlfn.POISSON.DIST(0,0,FALSE)	Excel allows mean = 0 (only mean < 0 is #NUM!): P(X=0) = 1; LibreOffice raises Err:502
+=_xlfn.POISSON.DIST(E555,F555,G555)	the same, from cells
+=POISSON(-1,5,TRUE)	Excel: #NUM! when x < 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=POISSON(E558,F558,G558)	the same, from cells
+=_xlfn.HYPGEOM.DIST(5,4,8,20,TRUE)	Excel: #NUM! when sample_s > number_sample; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.HYPGEOM.DIST(E561,F561,G561,H561,I561)	the same, from cells
+=DEVSQ({1;"x";3;TRUE;"";7})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
+=DEVSQ(Data!A620:A625)	the same, from cells
+=SKEW({1;"x";3;TRUE;"";7})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
+=SKEW(Data!A636:A641)	the same, from cells
+=GEOMEAN(4,0)	Excel: #NUM! when a value is <= 0; LibreOffice gives 0
+=GEOMEAN(E579,F579)	the same, from cells
+=HARMEAN(-1,2)	Excel: #NUM! when a value is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=HARMEAN(E582,F582)	the same, from cells
+=TRIMMEAN({3;1;4;1;5;9;2;6},1)	Excel: #NUM! when percent >= 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=TRIMMEAN(Data!A709:A716,E586)	the same, from cells
+=_xlfn.PERMUTATIONA(-1,2)	Excel: #NUM! for a negative number; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.PERMUTATIONA(E595,F595)	the same, from cells
+=_xlfn.PERCENTRANK.INC({3;1;4;1;5;9;2;6},8.3,2)	Excel truncates to significance digits (0.9666 -> 0.96); LibreOffice rounds
+=_xlfn.PERCENTRANK.INC(Data!A802:A809,E602,F602)	the same, from cells
+=_xlfn.PERCENTRANK.INC({3;1;4;1;5;9;2;6},10)	Excel: #N/A when x is outside the values; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.PERCENTRANK.INC(Data!A811:A818,E603)	the same, from cells
+=_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},4)	Excel truncates to significance digits (0.5555 -> 0.555); LibreOffice rounds
+=_xlfn.PERCENTRANK.EXC(Data!A856:A863,E608)	the same, from cells
+=_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},2.5)	Excel truncates to significance digits (0.3888 -> 0.388); LibreOffice rounds
+=_xlfn.PERCENTRANK.EXC(Data!A865:A872,E609)	the same, from cells
+=_xlfn.PERCENTRANK.EXC({3;1;4;1;5;9;2;6},0)	Excel: #N/A when x is outside the values; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.PERCENTRANK.EXC(Data!A883:A890,E611)	the same, from cells
+=_xlfn.QUARTILE.EXC({3;1;4;1;5;9;2;6},0)	Excel: #NUM! when quart <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.QUARTILE.EXC(Data!A919:A926,E615)	the same, from cells
+=_xlfn.QUARTILE.EXC({1;2},1)	Excel: #NUM! when the quartile falls outside the data; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.QUARTILE.EXC(Data!A928:A929,E616)	the same, from cells
+=_xlfn.MODE.MULT({1;2;3})	Excel: #N/A when no value repeats; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.MODE.MULT(Data!A983:A985)	the same, from cells
+=PROB({0;1;2;3},{0.2;0.3;0.1;0.3},1,3)	Excel: #NUM! when the probabilities do not add up to 1; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=PROB(Data!A1085:A1088,Data!A1090:A1093,E630,F630)	the same, from cells
+=PEARSON({1;2;3},{1;2})	Excel: #N/A when the arrays have different numbers of points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=PEARSON(Data!A1139:A1141,Data!A1143:A1144)	the same, from cells
+=SLOPE({1;"x";3;TRUE;"";7},{1;2;3;4;5;6})	Excel ignores TRUE in an array or range; LibreOffice keeps logicals in cells as numbers
+=SLOPE(Data!A1222:A1227,Data!A1229:A1234)	the same, from cells
+=STEYX({1;2},{3;4})	Excel: #DIV/0! for fewer than three points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=STEYX(Data!A1318:A1319,Data!A1321:A1322)	the same, from cells
+=_xlfn.COVARIANCE.S({1},{2})	Excel: #DIV/0! for fewer than two points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.COVARIANCE.S(Data!A1398:A1398,Data!A1400:A1400)	the same, from cells
+=_xlfn.T.TEST({3;4;5;8;9;1;2;4;5},{6;19;3;2;14;4;5;17;1},3,1)	Excel: #NUM! when tails is not 1 or 2; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.T.TEST(Data!A1538:A1546,Data!A1548:A1556,E658,F658)	the same, from cells
+=_xlfn.T.TEST({3;4;5;8;9;1;2;4;5},{6;19;3;2;14;4;5;17},2,1)	Excel: #N/A for a paired test of arrays of different sizes; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.T.TEST(Data!A1558:A1566,Data!A1568:A1575,E659,F659)	the same, from cells
+=_xlfn.F.TEST({1},{6;19;3;2;14;4;5;17;1})	Excel: #DIV/0! for fewer than two points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.F.TEST(Data!A1668:A1668,Data!A1670:A1678)	the same, from cells
+=_xlfn.CHISQ.TEST({58,35;11,25;10,23},{45.35,47.65;17.56,18.44})	Excel: #N/A when the ranges have different numbers of points; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.CHISQ.TEST(Data!A1748:B1750,Data!A1752:B1753)	the same, from cells
+=LOGEST({1;-2},{1;2})	Excel: #NUM! when a known_y is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=LOGEST(Data!A2308:A2309,Data!A2311:A2312)	the same, from cells
+=GROWTH({1;0},{1;2},3)	Excel: #NUM! when a known_y is <= 0; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=GROWTH(Data!A2525:A2526,Data!A2528:A2529,E720)	the same, from cells
+=_xlfn.FORECAST.ETS(10,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12})	Excel: #NUM! when target_date is before the end of the timeline; LibreOffice gives the fitted value
+=_xlfn.FORECAST.ETS(E725,Data!A2651:A2662,Data!A2664:A2675)	the same, from cells
+=_xlfn.FORECAST.ETS(13,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11})	Excel: #N/A when values and timeline differ in size; LibreOffice raises its own Err:502 (saved as #VALUE!)
+=_xlfn.FORECAST.ETS(E726,Data!A2677:A2688,Data!A2690:A2700)	the same, from cells
+=_xlfn.FORECAST.ETS.STAT({10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12},9)	Excel: #NUM! when statistic_type is not 1 to 8; LibreOffice gives 1
+=_xlfn.FORECAST.ETS.STAT(Data!A2814:A2825,Data!A2827:A2838,E731)	the same, from cells
+=_xlfn.FORECAST.ETS.CONFINT(13,{10;13;16;19;22;25;28;31;34;37;40;43},{1;2;3;4;5;6;7;8;9;10;11;12},1)	Excel: #NUM! when confidence_level is not between 0 and 1; LibreOffice gives 0
+=_xlfn.FORECAST.ETS.CONFINT(E732,Data!A2840:A2851,Data!A2853:A2864,F732)	the same, from cells
+=USDOLLAR(1234.567)	LibreOffice has no USDOLLAR; Excel gives what DOLLAR gives
+=USDOLLAR(E733)	the same, from cells
+=USDOLLAR(1234.567,-2)	LibreOffice has no USDOLLAR; Excel gives what DOLLAR gives
+=USDOLLAR(E734,F734)	the same, from cells

@@ -789,11 +789,31 @@ static void templates(void)
   book_free(b);
 }
 
+/* the statistical functions of func_stat.c: the special functions far into the tails, and arrays */
+static void stat_functions(void)
+{
+  Book *b = book_new();
+  put(b, "A1", "2"); put(b, "A2", "4"); put(b, "A3", "5"); put(b, "A4", "4"); put(b, "A5", "5");
+  put(b, "B1", "1"); put(b, "B2", "2"); put(b, "B3", "3"); put(b, "B4", "4"); put(b, "B5", "5");
+  ok("NORM.S.INV", near(evn(b, "NORM.S.INV(0.975)"), 1.959963984540054) && near(evn(b, "NORM.S.INV(1E-20)") / -9.262340089798153, 1));
+  ok("NORM.S.DIST tail", near(evn(b, "NORM.S.DIST(-10,TRUE)") / 7.619853024160527e-24, 1));
+  ok("T.DIST.2T", near(evn(b, "T.DIST.2T(2,10)"), 0.07338803477074038));
+  ok("CHISQ.DIST.RT tail", near(evn(b, "CHISQ.DIST.RT(100,3)") / 1.554159431389605e-21, 1));
+  ok("GAMMALN BETA.DIST", near(evn(b, "GAMMALN(0.1)"), 2.252712651734206) && near(evn(b, "BETA.DIST(0.2,2,3,TRUE)"), 0.1808));
+  ok("BETA.INV inverts", near(evn(b, "BETA.INV(0.1808,2,3)"), 0.2));
+  ok("domain errors", evn(b, "NORM.S.INV(0)") == -1000 - E_NUM && evn(b, "GAMMA(-1)") == -1000 - E_NUM);
+  ok("SLOPE INTERCEPT", near(evn(b, "SLOPE(A1:A5,B1:B5)"), 0.6) && near(evn(b, "INTERCEPT(A1:A5,B1:B5)"), 2.2));
+  ok("LINEST array", near(evn(b, "INDEX(LINEST(A1:A5,B1:B5),1,1)"), 0.6) && near(evn(b, "INDEX(LINEST(A1:A5,B1:B5,TRUE,TRUE),3,1)"), 0.6));
+  ok("TREND FREQUENCY", near(evn(b, "INDEX(TREND(A1:A5,B1:B5,{6;7}),2)"), 6.4) && evn(b, "INDEX(FREQUENCY(A1:A5,{3;4}),2)") == 2);
+  book_free(b);
+}
+
 int main(void)
 {
   values_dates();
   formulas();
   functions();
+  stat_functions();
   editing();
   formats();
   files();
