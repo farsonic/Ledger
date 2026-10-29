@@ -6,6 +6,7 @@
  * newer files carry, which is checked but never made.
  */
 #include "data.h"
+#include "analysis.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -138,12 +139,14 @@ static int password_ok(u16 hash, const char *key, const char *pw)
   if (hash) return prot_hash(pw) == hash;
   return key_ok(key, pw);
 }
+int prot_password_ok(u16 hash, const char *key, const char *pw) { return password_ok(hash, key, pw); }
 
 /* ------------------------------------------------------------------ cells */
 int prot_locked(Book *b, int sheet, i32 r, i32 c)
 {
   Sheet *s;
   if (sheet < 0 || sheet >= b->nsh || !(s = b->sh[sheet])->protect) return 0;
+  if (s->neranges) { Rect a; a.r1 = a.r2 = r; a.c1 = a.c2 = c; if (edit_ranges_open(s, a)) return 0; }   /* (Allow Edit Ranges) */
   return b->styles[sheet_cell_style(s, r, c)].locked != 0;
 }
 int prot_hidden(Book *b, int sheet, i32 r, i32 c)
@@ -158,6 +161,7 @@ int prot_area_locked(Book *b, int sheet, Rect a)
   i32 r, c, last;
   int i;
   if (sheet < 0 || sheet >= b->nsh || !(s = b->sh[sheet])->protect) return 0;
+  if (s->neranges && edit_ranges_open(s, a)) return 0;       /* (Allow Edit Ranges) */
   /* the cells there are; then the rows' and columns' own styles cover the empty ones */
   last = a.r2 < s->nrows - 1 ? a.r2 : s->nrows - 1;
   for (r = a.r1; r <= last; r++) {

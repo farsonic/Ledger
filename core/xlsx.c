@@ -18,6 +18,7 @@
 #include "pagesetup.h"
 #include "splitpane.h"
 #include "comments.h"
+#include "analysis.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -83,6 +84,7 @@ typedef struct {
   struct { u8 st[4]; u32 col[4]; } *borders; int nborders;
   int *fmtmap; int *fmtids; int nfmtmap;   /* custom numFmtId -> book format id */
   struct Dxf { u32 fill, color; u8 bold, italic, underline, strike; } *dxfs; int ndxfs;   /* conditional formats' looks */
+  u8 cbx[64]; int ncbx;             /* (analysis.h) which xfComplement indexes are checkboxes */
 } Rd;
 
 static u8 *part(ZipReader *z, const char *name, size_t *len)
@@ -348,6 +350,10 @@ static void read_styles(Rd *rd, ZipReader *z)
         if ((v = xml_attr(&x, "shrinkToFit"))) cs->shrink = !strcmp(v, "1") || !strcmp(v, "true");
         if ((v = xml_attr(&x, "indent"))) { int k = atoi(v); cs->indent = (u8)(k < 0 ? 0 : k > 250 ? 250 : k); }
         if ((v = xml_attr(&x, "textRotation"))) { int k = atoi(v); cs->rotation = (i16)(k > 90 && k <= 180 ? 90 - k : k > 180 ? 0 : k); }
+      } else if (!strcmp(n, "xfComplement") && cs) {
+        const char *v = xml_attr(&x, "i");
+        int k = v ? atoi(v) : -1;
+        if (k >= 0 && k < rd->ncbx && rd->cbx[k]) cs->numfmt = (u16)book_fmt(rd->b, CHECKBOX_FMT);   /* a checkbox cell (analysis.h) */
       } else if (!strcmp(n, "protection") && cs) {
         const char *v;
         if ((v = xml_attr(&x, "locked"))) cs->locked = strcmp(v, "0") && strcmp(v, "false");
@@ -672,6 +678,8 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
       outline_xlsx_read_pr(s, &x);
     } else if (!strcmp(n, "sheetProtection")) {
       prot_xlsx_read_sheet(s, &x);
+    } else if (!strcmp(n, "protectedRange")) {
+      edit_ranges_xlsx_read(s, &x);
     } else if (!strcmp(n, "dataValidation")) {
       dv_xlsx_read(rd->b, sheet, &x);
     } else if (!strcmp(n, "scenarios")) {
@@ -900,6 +908,7 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
   read_theme(&z);
   { size_t tl; u8 *t = part(&z, "xl/theme/theme1.xml", &tl); if (t) { page_read_theme(b, (const char *)t, tl); free(t); } }
   read_shared_strings(&rd, &z);
+  { size_t fl; u8 *fp = part(&z, CHECKBOX_PART, &fl); if (fp) { rd.ncbx = checkbox_complements((const char *)fp, fl, rd.cbx, 64); free(fp); } }
   read_styles(&rd, &z);
   nrels = read_rels(&z, "xl/_rels/workbook.xml.rels", "xl/", &rels);
   /* make the sheets first, so formulas can refer to any of them */
@@ -1161,9 +1170,13 @@ static void write_styles(Book *b, Buf *o, int **fillmap_out, int **bordermap_out
   buf_adds(o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
               "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">");
   if (b->nfmts) {
-    buf_printf(o, "<numFmts count=\"%d\">", b->nfmts);
-    for (i = 0; i < b->nfmts; i++) { buf_printf(o, "<numFmt numFmtId=\"%d\" formatCode=\"", 164 + i); xesc(o, b->fmts[i]); buf_adds(o, "\"/>"); }
-    buf_adds(o, "</numFmts>");
+    int nf = 0;
+    for (i = 0; i < b->nfmts; i++) nf += strcmp(b->fmts[i], CHECKBOX_FMT) != 0;    /* (a checkbox is General and an extension, below) */
+    if (nf) {
+      buf_printf(o, "<numFmts count=\"%d\">", nf);
+      for (i = 0; i < b->nfmts; i++) if (strcmp(b->fmts[i], CHECKBOX_FMT)) { buf_printf(o, "<numFmt numFmtId=\"%d\" formatCode=\"", 164 + i); xesc(o, b->fmts[i]); buf_adds(o, "\"/>"); }
+      buf_adds(o, "</numFmts>");
+    }
   }
   buf_printf(o, "<fonts count=\"%d\">", b->nfonts);
   for (i = 0; i < b->nfonts; i++) {
@@ -1232,15 +1245,16 @@ static void write_styles(Book *b, Buf *o, int **fillmap_out, int **bordermap_out
     static const char *const va[] = { NULL, "center", "top" };
     int align = s->halign || s->valign || s->wrap || s->indent || s->shrink || s->rotation;
     int prot = !s->locked || s->hidden;
-    buf_printf(o, "<xf numFmtId=\"%d\" fontId=\"%d\" fillId=\"%d\" borderId=\"%d\" xfId=\"0\"", s->numfmt, s->font < b->nfonts ? s->font : 0,
+    int cbx = s->numfmt >= 164 && !strcmp(book_fmt_code(b, s->numfmt), CHECKBOX_FMT);
+    buf_printf(o, "<xf numFmtId=\"%d\" fontId=\"%d\" fillId=\"%d\" borderId=\"%d\" xfId=\"0\"", cbx ? 0 : s->numfmt, s->font < b->nfonts ? s->font : 0,
                fillmap ? fillmap[i] : 0, bordermap ? bordermap[i] : 0);
-    if (s->numfmt) buf_adds(o, " applyNumberFormat=\"1\"");
+    if (s->numfmt && !cbx) buf_adds(o, " applyNumberFormat=\"1\"");
     if (s->font) buf_adds(o, " applyFont=\"1\"");
     if (s->fill) buf_adds(o, " applyFill=\"1\"");
     if (bordermap && bordermap[i]) buf_adds(o, " applyBorder=\"1\"");
     if (align) buf_adds(o, " applyAlignment=\"1\"");
     if (prot) buf_adds(o, " applyProtection=\"1\"");
-    if (!align && !prot) { buf_adds(o, "/>"); continue; }
+    if (!align && !prot && !cbx) { buf_adds(o, "/>"); continue; }
     buf_adds(o, ">");
     if (align) {
       buf_adds(o, "<alignment");
@@ -1253,6 +1267,7 @@ static void write_styles(Book *b, Buf *o, int **fillmap_out, int **bordermap_out
       buf_adds(o, "/>");
     }
     if (prot) buf_printf(o, "<protection locked=\"%d\" hidden=\"%d\"/>", s->locked ? 1 : 0, s->hidden ? 1 : 0);
+    if (cbx) checkbox_xf_ext(o);
     buf_adds(o, "</xf>");
   }
   buf_adds(o, "</cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles>");
@@ -1412,6 +1427,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   }
   buf_adds(o, "</sheetData>");
   prot_xlsx_write_sheet(s, o);
+  edit_ranges_xlsx_write(s, o);
   scen_xlsx_write(s, o);
   if (s->filter.r1 >= 0 && !tablexml_filter_in_table(s)) {
     /* the AutoFilter: its range and the values each filtered column lets through */
@@ -1578,6 +1594,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   xd_content_types(b, &o);
   cm_types(b, &o);
   if (dynamic) buf_adds(&o, "<Override PartName=\"/xl/metadata.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml\"/>");
+  if (checkbox_used(b)) buf_adds(&o, "<Override PartName=\"/" CHECKBOX_PART "\" ContentType=\"application/vnd.ms-excel.featurepropertybag+xml\"/>");
   buf_adds(&o, "</Types>");
   zip_add(&w, "[Content_Types].xml", o.data, o.len);
   o.len = 0;
@@ -1627,6 +1644,7 @@ u8 *xlsx_save(Book *b, size_t *len)
       Buf ft;
       buf_adds(&o, "<definedName name=\""); xesc(&o, n->name); buf_adds(&o, "\"");
       if (n->sheet != SHEET_SELF) buf_printf(&o, " localSheetId=\"%d\"", n->sheet);
+      if (!str_ncasecmp(n->name, "solver_", 7)) buf_adds(&o, " hidden=\"1\"");     /* (Solver's model, analysis.h) */
       buf_adds(&o, ">");
       buf_init(&ft);
       if (n->f) file_formula(b, n->sheet == SHEET_SELF ? -1 : n->sheet, n->f, &ft);
@@ -1655,6 +1673,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\"/>", b->nsh + 3);
   cm_book_rels(b, &o, b->nsh + 4);
   if (dynamic) buf_adds(&o, "<Relationship Id=\"rIdMeta1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata\" Target=\"metadata.xml\"/>");
+  if (checkbox_used(b)) buf_adds(&o, "<Relationship Id=\"rIdFpb1\" Type=\"http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag\" Target=\"featurePropertyBag/featurePropertyBag.xml\"/>");
   buf_adds(&o, "</Relationships>");
   zip_add(&w, "xl/_rels/workbook.xml.rels", o.data, o.len);
   /* sheets (they fill the string table) */
@@ -1678,6 +1697,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   o.len = 0;
   page_write_theme(b, &o);
   zip_add(&w, "xl/theme/theme1.xml", o.data, o.len);
+  if (checkbox_used(b)) { o.len = 0; checkbox_part(&o); zip_add(&w, CHECKBOX_PART, o.data, o.len); }
   o.len = 0;
   write_styles(b, &o, &fillmap, &bordermap);
   zip_add(&w, "xl/styles.xml", o.data, o.len);

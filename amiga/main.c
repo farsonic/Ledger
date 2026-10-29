@@ -47,6 +47,7 @@
 #include "../core/xls.h"
 #include "uitab.h"
 #include "datatab.h"
+#include "anatab.h"
 
 #ifndef MUIA_Window_DisableKeys
 #define MUIA_Window_DisableKeys 0x80424c36UL   /* in MUI 3.8, undocumented: MUIKEYF_ keys the window ignores */
@@ -108,7 +109,7 @@ static struct NewMenu menus[] = {
   I("Rows", 0, ID_INSROWS), I("Columns", 0, ID_INSCOLS), I("Cells...", 0, ID_INSCELLS), I("Sheet", 0, ID_INSSHEET), BAR,
   I("Function...", 0, ID_FUNCTION), I("AutoSum", "=", ID_AUTOSUM), I("Today's Date", ";", ID_DATE), I("Time Now", ":", ID_TIME), BAR,
   I("Link...", 0, ID_LINK), I("Note...", 0, ID_NOTENEW), BAR,
-  I("Define Name...", 0, ID_DEFNAME), I("Name Manager...", 0, ID_NAMES), PIVOT2_INSERT_MENU,
+  I("Define Name...", 0, ID_DEFNAME), I("Name Manager...", 0, ID_NAMES), PIVOT2_INSERT_MENU, AN_INSERT_ITEMS
   CHART_MENUS,                     /* charts, pictures, shapes, ink, sparklines (charttab.h) */
   M("Format"),
   I("Cells...", "1", ID_FORMATCELLS), I("Bold", "B", ID_BOLD), I("Italic", "I", ID_ITALIC), I("Underline", "U", ID_UNDERLINE), BAR,
@@ -119,7 +120,7 @@ static struct NewMenu menus[] = {
   I("Row Height...", 0, ID_ROWHEIGHT), I("AutoFit Row Height", 0, ID_AUTOFITROW), I("Column Width...", 0, ID_COLWIDTH), I("AutoFit Column Width", 0, ID_AUTOFITCOL),
   I("Hide Rows", 0, ID_HIDEROWS), I("Hide Columns", 0, ID_HIDECOLS), I("Unhide Rows", 0, ID_UNHIDEROWS), I("Unhide Columns", 0, ID_UNHIDECOLS), BAR,
   I("Rename Sheet...", 0, ID_RENAMESHEET), I("Duplicate Sheet", 0, ID_DUPSHEET), I("Delete Sheet", 0, ID_DELSHEET),
-  LX_FORMAT_ITEMS
+  LX_FORMAT_ITEMS AN_FORMAT_ITEMS
   M("Data"),
   I("Sort A to Z", 0, ID_SORTAZ), I("Sort Z to A", 0, ID_SORTZA), I("Sort...", 0, ID_CUSTOMSORT), BAR,
   T("Filter", 0, ID_FILTER), I("Clear Filter", 0, ID_CLEARFILTER), I("Reapply Filter", 0, ID_REAPPLY), I("Advanced Filter...", 0, ID_ADVFILTER), BAR,
@@ -131,13 +132,13 @@ static struct NewMenu menus[] = {
   I("Scenario Manager...", 0, ID_SCENARIOS), I("Goal Seek...", 0, ID_GOALSEEK), I("Data Table...", 0, ID_DATATABLE), BAR,
   I("Group...", 0, ID_GROUP), I("Ungroup...", 0, ID_UNGROUP), I("Clear Outline", 0, ID_CLEAROUTLINE), I("Subtotal...", 0, ID_SUBTOTAL),
   I("Show Detail", 0, ID_SHOWDETAIL), I("Hide Detail", 0, ID_HIDEDETAIL), I("Outline Settings...", 0, ID_OUTLINESET), BAR,
-  T("Protect Sheet...", 0, ID_PROTECTSHEET), T("Protect Workbook...", 0, ID_PROTECTBOOK),
+  T("Protect Sheet...", 0, ID_PROTECTSHEET), T("Protect Workbook...", 0, ID_PROTECTBOOK), AN_DATA_ITEMS
   M("View"),
   T("Show All Notes", 0, ID_NOTESHOW), T("Formula Bar", 0, ID_FORMULABAR), T("Gridlines", 0, ID_GRIDLINES), T("Headings", 0, ID_HEADINGS), T("Show Formulas", 0, ID_SHOWFORMULAS), BAR,
   I("Zoom In", "+", ID_ZOOMIN), I("Zoom Out", "-", ID_ZOOMOUT), I("Zoom 100%", 0, ID_ZOOM100), I("Zoom to Selection", 0, ID_ZOOMSEL), BAR,
   I("Freeze Panes", 0, ID_FREEZE), I("Unfreeze Panes", 0, ID_UNFREEZE), BAR, T("Dark Mode", 0, ID_DARKUI),
   LX_WINDOW_ITEMS
-  LX_MENUS
+  LX_MENUS AN_REVIEW_ITEMS
   TABLE_MENUS, PIVOT2_TABLE_MENU,
   { NM_END, 0, 0, 0, 0, 0 }
 };
@@ -1312,6 +1313,7 @@ static void ribbon_choice(ULONG id)
     case 10: { LONG c = ask_color(cur_sheet()->tabcolor & 0xFFFFFF); if (c >= 0) { cur_sheet()->tabcolor = FILL_ON | (ULONG)c; book->dirty = 1; refresh_all(); } break; }
     case 11: dlg_format_cells(0); break;
     case 15: datatab_command(ID_PROTECTSHEET, 0); break;     /* (datatab) */
+    case 16: anatab_command(ID_AN_LOCK); break;               /* (anatab) Lock Cell */
     }
     break;
   case ID_AUTOSUMDD: {
@@ -1987,6 +1989,7 @@ int main(int argc, char **argv)
     else if (id >= ID_TBL_FIRST && id < ID_TBL_LAST) tabletab_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value));
     else if (id >= ID_UI_FIRST && id < ID_UI_LAST) { if (id <= ID_FN_SUBLAST) insert_function(ribbon_entry(id, (LONG)xget(ribbon, MUIA_Ribbon_Value))); else ui_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value)); }
     else if (id >= ID_X_FIRST && id < ID_X_LAST) chart_command(id);     /* charttab.c */
+    else if (id >= ID_AN_FIRST && id < ID_AN_LAST) { if (back_shown) backstage_show(0, 0); anatab_command(id); }   /* anatab.c */
     else if (id >= ID_P2_FIRST && id < ID_P2_LAST) pivot2_command(id);  /* pivot2.c */
     else if (id >= ID_LX_FIRST && id < ID_LX_LAST) { if (back_shown && id != ID_LX_REFRESH && id != ID_LX_SCROLLED) backstage_show(0, 0); lx_command(id); }
     else if (id) {

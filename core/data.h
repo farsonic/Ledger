@@ -103,6 +103,8 @@ enum { PA_SELLOCKED = 1, PA_SELUNLOCKED = 2, PA_FMTCELLS = 4, PA_FMTCOLS = 8, PA
 #define PA_DEFAULT (PA_SELLOCKED | PA_SELUNLOCKED)
 /* Excel's legacy password hash (what sheetProtection's password attribute holds); 0 for "" */
 u16  prot_hash(const char *pw);
+/* a password against a legacy hash or a newer file's key (both empty: any) */
+int  prot_password_ok(u16 hash, const char *key, const char *pw);
 /* whether cell r, c can't be changed: the sheet protected and the cell's style locked */
 int  prot_locked(Book *b, int sheet, i32 r, i32 c);
 /* whether any cell of the area is locked on a protected sheet */

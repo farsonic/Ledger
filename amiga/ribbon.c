@@ -24,6 +24,7 @@
 #include "ids.h"
 #include "tabletab.h"
 #include "datatab.h"
+#include "anatab.h"
 #include "layout.h"
 #include "uitab.h"
 #include "../core/funcdesc.h"
@@ -81,7 +82,7 @@ static const char *const inserts[] = { "Insert Cells...", "Insert Sheet Rows", "
 static const char *const deletes[] = { "Delete Cells...", "Delete Sheet Rows", "Delete Sheet Columns", "Delete Sheet" };
 static const char *const formats[] = { "Row Height...", "AutoFit Row Height", "Column Width...", "AutoFit Column Width", "Default Width...",
                                        "Hide Rows", "Hide Columns", "Unhide Rows", "Unhide Columns", "Rename Sheet", "Tab Colour...", "Format Cells...",
-                                       "Hide Sheet", "Unhide Sheet...", "Move or Copy Sheet...", "Protect Sheet..." };
+                                       "Hide Sheet", "Unhide Sheet...", "Move or Copy Sheet...", "Protect Sheet...", "Lock Cell" };
 static const char *const autosums[] = { "Sum", "Average", "Count Numbers", "Max", "Min", "More Functions..." };
 static const char *const fills[] = { "Down", "Right", "Up", "Left", "Series...", "Justify" };
 static const char *const clears[] = { "Clear All", "Clear Formats", "Clear Contents", "Clear Notes", "Clear Hyperlinks" };
@@ -292,6 +293,7 @@ static const Item i_fn[] = {
   { K_BUTTON, S_SMALL, IC_DATE, 0, "Date", ID_DATE, 0, 0, F_NEWCOL, 0, "Today's date (Amiga-;)" },
   { K_BUTTON, S_SMALL, IC_TIME, 0, "Time", ID_TIME, 0, 0, 0, 0, "The time now (Amiga-:)" },
   { K_DROP, S_SMALL, IC_SYMBOL, L_SYMBOLS, "Symbol", ID_SYMBOLDD, 0, 0, 0, 0, "A symbol" },
+  { K_BUTTON, S_SMALL, IC_CHECKBOX, 0, "Checkbox", ID_AN_CHECKBOX, 0, 0, F_NEWCOL, 0, "Cell controls: checkboxes in the selected cells (TRUE ticked, FALSE not; click or Space to tick)" },
 };
 static const Item i_names[] = {
   { K_BUTTON, S_LARGE, IC_DEFNAME, 0, "Name", ID_DEFNAME, 0, 0, 0, 0, "Give the selection a name to use in formulas" },
@@ -422,6 +424,11 @@ static const Item d_tools[] = {
 };
 static const Item d_forecast[] = {
   { K_DROP, S_LARGE, IC_WHATIF, L_WHATIFS, "What-If Analysis", ID_WHATIFDD, 0, 0, 0, 0, "Scenarios, Goal Seek and Data Tables" },
+  { K_BUTTON, S_LARGE, IC_FORECAST, 0, "Forecast Sheet", ID_AN_FORECAST, 0, 0, 0, 0, "A new sheet forecasting the selected timeline's values, with a chart" },
+};
+static const Item d_analysis[] = {
+  { K_BUTTON, S_SMALL, IC_SOLVER, 0, "Solver", ID_AN_SOLVER, 0, 0, 0, 0, "Find the variable cells' values that make a formula largest, smallest or a value" },
+  { K_BUTTON, S_SMALL, IC_TOOLPAK, 0, "Data Analysis", ID_AN_TOOLPAK, 0, 0, 0, 0, "The Analysis ToolPak: regression, Anova, t-tests, histograms and more" },
 };
 static const Item d_outline[] = {
   { K_DROP, S_SMALL, IC_GROUPROWS, L_GROUPS, "Group", ID_GROUPDD, 0, 0, F_SPLIT, 0, "Group the selected rows or columns (Alt-Shift-Right)" },
@@ -433,7 +440,7 @@ static const Item d_outline[] = {
 };
 static const Group data[] = { { "Get Data", G_COLS, d_get, N(d_get) }, { "Sort & Filter", G_COLS, d_sort, N(d_sort) },
                               { "Data Tools", G_COLS, d_tools, N(d_tools) }, { "Forecast", G_COLS, d_forecast, N(d_forecast) },
-                              { "Outline", G_COLS, d_outline, N(d_outline) } };
+                              { "Outline", G_COLS, d_outline, N(d_outline) }, { "Analysis", G_COLS, d_analysis, N(d_analysis) } };
 /* Review */
 static const Item r_proof[] = {
   { K_BUTTON, S_LARGE, IC_SPELLING, 0, "Spelling", ID_LX_SPELLING, 0, 0, 0, 0, "Check the spelling of the text in the cells (F7)" },
@@ -460,6 +467,7 @@ static const Item r_notes[] = {
 static const Item r_protect[] = {
   { K_BUTTON, S_LARGE, IC_PROTECT, 0, "Protect Sheet", ID_PROTECTSHEET, RB_PROTECTED, 0, 0, 0, "Stop changes to the sheet's locked cells (press again to unprotect)" },
   { K_BUTTON, S_LARGE, IC_PROTECTBOOK, 0, "Protect Workbook", ID_PROTECTBOOK, RB_BOOKLOCK, 0, 0, 0, "Stop sheets being added, moved, renamed, hidden or deleted" },
+  { K_BUTTON, S_SMALL, IC_EDITRANGES, 0, "Allow Edit Ranges", ID_AN_EDITRANGES, 0, 0, 0, 0, "Ranges that stay editable on a protected sheet, with or without a password" },
 };
 static const Item r_comments[] = {
   { K_BUTTON, S_LARGE, IC_COMMENT, 0, "New Comment", ID_LX_COMMENTNEW, 0, 0, 0, 0, "Start a conversation on the active cell, or reply to its comment" },
@@ -553,6 +561,11 @@ static const struct { UWORD id; const char *tip; } tips[] = {
   { ID_FLASHFILL, "Type an example or two of what you want beside your data (say the first names out of full names), then Flash Fill finishes the column the same way." },
   { ID_DVDD, "Rules for what the selected cells may hold: whole numbers or decimals within limits, dates, times, text of a length, or a choice from a list shown as a drop-down on the cell. Circle Invalid Data rings the cells that break their rules." },
   { ID_CONSOLIDATE, "Adds up (or averages, counts...) ranges from several sheets into one table, matching them by their position or by the labels in their top row and left column." },
+  { ID_AN_FORECAST, "Makes a new sheet from a timeline and its values: the history, a forecast by exponential smoothing (FORECAST.ETS) with its confidence bounds, and a chart." },
+  { ID_AN_SOLVER, "Solver changes the variable cells to make the objective cell as large or small as it can be, or a set value, keeping to the constraints. Simplex LP for linear models, GRG Nonlinear for smooth ones, Evolutionary for others." },
+  { ID_AN_TOOLPAK, "The Analysis ToolPak's tools: Anova, correlation, covariance, descriptive statistics, smoothing, F, t and z tests, Fourier analysis, histograms, random numbers, rank and percentile, regression and sampling." },
+  { ID_AN_EDITRANGES, "Ranges of cells that can still be changed when the sheet is protected, each with a password or none." },
+  { ID_AN_CHECKBOX, "Makes the selected cells checkboxes: a ticked box is TRUE, an empty one FALSE, so formulas can use them. Click a box or press Space to tick it." },
   { ID_WHATIFDD, "Goal Seek finds the input that gives a formula the result you want. Data Table works a formula out for a range of inputs. Scenarios keep sets of input values to switch between." },
   { ID_GROUPDD, "Groups the selected rows or columns: a bracket with a minus button appears beside the headings, and the level buttons show or hide whole levels at a time." },
   { ID_SUBTOTAL, "Inserts a total row at each change in a column of a sorted list (SUBTOTAL formulas), a grand total, and an outline to show just the totals." },

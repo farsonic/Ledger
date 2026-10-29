@@ -31,3 +31,7 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 25 | Flash Fill | yes | ✅ |
 | 26 | Printing, page setup, Page Break Preview | yes | ✅ page setup, Page Break Preview, Page Layout view (printing itself ➖ left out, as for Quill) |
 | 27 | ARexx / scripting control channel | MCP | ➖ (left out, as for Quill) |
+| 28 | Solver (Simplex LP with branch and bound, GRG Nonlinear with Multistart, Evolutionary; reports; model saved in hidden names) | yes | ✅ |
+| 29 | Analysis ToolPak (Data Analysis: Anova, regression, t/F/z tests, histogram, descriptive statistics and the rest of Excel's 19 tools) | yes | ✅ |
+| 30 | Forecast Sheet (FORECAST.ETS with confidence bounds, table and chart on a new sheet) | yes | ✅ |
+| 31 | Checkbox cells, Lock Cell, Allow Edit Ranges (saved in .xlsx as Excel saves them) | yes | ✅ |
