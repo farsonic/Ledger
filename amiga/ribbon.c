@@ -68,7 +68,8 @@ static const char *const fillnames[] = { "No Fill", "Yellow", "Light Yellow", "L
 static const ULONG fillvals[] = { 0xFF000000, 0xFFFF00, 0xFFF2CC, 0xE2EFDA, 0x70AD47, 0xDDEBF7, 0x4472C4, 0xFCE4D6, 0xF4B084,
                                   0xF2F2F2, 0xBFBFBF, 0xE4DFEC, 0x203764, 0x000000, COLOR_MORE };
 static const char *const borders[] = { "Bottom Border", "Top Border", "Left Border", "Right Border", "No Border", "All Borders", "Outside Borders",
-                                       "Thick Outside Borders", "Bottom Double Border", "Thick Bottom Border", "Top and Bottom Border" };
+                                       "Thick Outside Borders", "Bottom Double Border", "Thick Bottom Border", "Top and Bottom Border",
+                                       "Draw Border", "Draw Border Grid", "Erase Border" };
 static const char *const merges[] = { "Merge & Centre", "Merge Across", "Merge Cells", "Unmerge Cells" };
 static const char *const numfmts[] = { "General", "Number", "Currency", "Accounting", "Short Date", "Long Date", "Time", "Percentage",
                                        "Fraction", "Scientific", "Text", "More Number Formats..." };

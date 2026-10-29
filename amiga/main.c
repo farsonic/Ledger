@@ -789,6 +789,7 @@ static Style brush_st; static Font brush_font; static int brush_pending;
 /* the grid has let go of the mouse after a selection with the painter armed */
 static void brush_done(void)
 {
+  if (lx_brush_done()) return;                /* (Draw Border's stroke) */
   if (!brush_pending || xget(grid, MUIA_Grid_Brush)) return;
   brush_pending = 0;
   apply_style(&brush_st, &brush_font, SM_NUMFMT | SM_HALIGN | SM_VALIGN | SM_WRAP | SM_INDENT | SM_FONT | SM_BORDER | SM_FILL);

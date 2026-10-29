@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "pdfout.h"
 #include "pagesetup.h"
 #include "calc.h"
@@ -287,6 +288,21 @@ static void cell_text(Pdf *p, Buf *b, Sheet *s, int si, i32 r, i32 c, double x0,
     }
   } else { starts[0] = 0; lens[0] = strlen(t); nl = 1; }
   buf_adds(b, "q "); num(b, cx0); num(b, y0); num(b, cx1 - cx0); num(b, y1 - y0); buf_adds(b, "re W n\n");
+  if (st->rotation && nl == 1 && !isnum) {
+    /* text at an angle (Orientation): its baseline through the cell's middle */
+    double ang = st->rotation * 3.14159265358979 / 180, c = cos(ang), sn = sin(ang), w = text_w(&f, t, strlen(t));
+    double mx = (x0 + x1) / 2, my = (y0 + y1) / 2, tx = mx - c * w / 2 + sn * f.pt / 3, ty = my + sn * w / 2 + c * f.pt / 3;
+    char enc[1100];
+    size_t k = to_1252(t, strlen(t), enc, sizeof enc);
+    buf_adds(b, "q "); num(b, x0); num(b, y0); num(b, x1 - x0); num(b, y1 - y0); buf_adds(b, "re W n\n");
+    colour(b, col, "rg");
+    buf_printf(b, "BT /F%d ", f.fi); num(b, f.pt); buf_adds(b, "Tf ");
+    num(b, c); num(b, -sn); num(b, -sn); num(b, -c); num(b, tx); num(b, ty); buf_adds(b, "Tm ");
+    pdf_bytes(b, enc, k);
+    buf_adds(b, " Tj ET Q\n");
+    buf_adds(b, "Q\n");
+    return;
+  }
   for (i = 0; i < nl; i++) {
     const char *ls = t + starts[i];
     size_t ll = lens[i];

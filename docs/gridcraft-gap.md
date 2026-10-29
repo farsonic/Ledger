@@ -25,7 +25,7 @@ GridCraft has 513 worksheet functions (509 in its registry and special forms, pl
 
 ## Ribbon commands
 
-GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Below, each of GridCraft's commands, tab by tab, with a first guess (by name) whether Ledger has it: ✅ probably has, ⬜ probably missing. Each is to be checked and the missing ones built.
+GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Below, each of GridCraft's commands, tab by tab, with a first guess (by name) whether Ledger has it: ✅ probably has, ⬜ probably missing. Each is to be checked and the missing ones built. The File, Home (but for the commands other parts of the work own: Format as Table, Flash Fill, protection), Page Layout, Formulas, Review and View tabs have been checked one by one and their marks are real: ✅ done, ⬜ not done (see the note under the tab), ➖ left out on purpose.
 
 ### File (7 of 11 by name)
 
@@ -34,17 +34,17 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Save (File) `file.save`
 - ✅ Save As (File) `file.saveAs`
 - ✅ Close (File) `file.close`
-- ⬜ Print (File) `file.print`
-- ⬜ Export to PDF (Export) `file.exportPdf`
-- ⬜ CSV (Export) `file.exportCsv`
-- ⬜ Web Page (Export) `file.exportHtml`
+- ➖ Print (File) `file.print`
+- ✅ Export to PDF (Export) `file.exportPdf`
+- ✅ CSV (Export) `file.exportCsv`
+- ✅ Web Page (Export) `file.exportHtml`
 - ✅ Properties (Info) `file.properties`
 - ✅ Options (Options) `file.options`
 
 ### Home (67 of 94 by name)
 
 - ✅ Paste (Clipboard) `edit.paste`
-- ⬜ Paste Special (Clipboard) `edit.pasteSpecial`
+- ✅ Paste Special (Clipboard) `edit.pasteSpecial`
 - ✅ Cut (Clipboard) `edit.cut`
 - ✅ Copy (Clipboard) `edit.copy`
 - ✅ Format Painter (Clipboard) `edit.formatPainter`
@@ -55,32 +55,32 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Bold (Font) `home.bold`
 - ✅ Italic (Font) `home.italic`
 - ✅ Underline (Font) `home.underline`
-- ⬜ Double Underline (Font) `home.doubleUnderline`
+- ✅ Double Underline (Font) `home.doubleUnderline`
 - ✅ Strikethrough (Font) `home.strikethrough`
-- ⬜ Superscript (Font) `home.superscript`
-- ⬜ Subscript (Font) `home.subscript`
+- ✅ Superscript (Font) `home.superscript`
+- ✅ Subscript (Font) `home.subscript`
 - ✅ Borders (Font) `home.borders`
-- ⬜ Draw Border (Font) `home.drawBorder`
-- ⬜ Fill Color (Font) `home.fillColor`
-- ⬜ Font Color (Font) `home.fontColor`
+- ✅ Draw Border (Font) `home.drawBorder`
+- ✅ Fill Color (Font) `home.fillColor`
+- ✅ Font Color (Font) `home.fontColor`
 - ✅ Top Align (Alignment) `home.alignTop`
 - ✅ Middle Align (Alignment) `home.alignMiddle`
 - ✅ Bottom Align (Alignment) `home.alignBottom`
-- ⬜ Orientation (Alignment) `home.orientation`
+- ✅ Orientation (Alignment) `home.orientation`
 - ✅ Align Left (Alignment) `home.alignLeft`
-- ⬜ Center (Alignment) `home.alignCenter`
+- ✅ Center (Alignment) `home.alignCenter`
 - ✅ Align Right (Alignment) `home.alignRight`
 - ✅ Decrease Indent (Alignment) `home.decreaseIndent`
 - ✅ Increase Indent (Alignment) `home.increaseIndent`
 - ✅ Wrap Text (Alignment) `home.wrapText`
-- ⬜ Merge & Center (Alignment) `home.mergeCenter`
+- ✅ Merge & Center (Alignment) `home.mergeCenter`
 - ✅ Merge Across (Alignment) `home.mergeAcross`
 - ✅ Merge Cells (Alignment) `home.mergeCells`
 - ✅ Unmerge Cells (Alignment) `home.unmergeCells`
 - ✅ Number Format (Number) `home.numberFormat`
-- ⬜ Accounting Number Format (Number) `home.accounting`
+- ✅ Accounting Number Format (Number) `home.accounting`
 - ✅ Percent Style (Number) `home.percent`
-- ⬜ Comma Style (Number) `home.comma`
+- ✅ Comma Style (Number) `home.comma`
 - ✅ Increase Decimal (Number) `home.increaseDecimal`
 - ✅ Decrease Decimal (Number) `home.decreaseDecimal`
 - ✅ Conditional Formatting (Styles) `home.conditionalFormat`
@@ -106,26 +106,26 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Hide Columns (Cells) `home.hideColumns`
 - ✅ Unhide Rows (Cells) `home.unhideRows`
 - ✅ Unhide Columns (Cells) `home.unhideColumns`
-- ⬜ Hide Sheet (Cells) `sheet.hide`
-- ⬜ Unhide Sheet (Cells) `sheet.unhide`
+- ✅ Hide Sheet (Cells) `sheet.hide`
+- ✅ Unhide Sheet (Cells) `sheet.unhide`
 - ✅ Rename Sheet (Cells) `sheet.rename`
-- ⬜ Move or Copy Sheet (Cells) `sheet.move`
-- ⬜ Tab Color (Cells) `sheet.tabColor`
+- ✅ Move or Copy Sheet (Cells) `sheet.move`
+- ✅ Tab Color (Cells) `sheet.tabColor`
 - ⬜ Protect Sheet (Cells) `review.protectSheet`
 - ⬜ Lock Cell (Cells) `home.lockCell`
 - ✅ Format Cells (Cells) `home.formatCells`
 - ✅ AutoSum (Editing) `formulas.autoSum`
 - ✅ Fill Down (Editing) `edit.fillDown`
 - ✅ Fill Right (Editing) `edit.fillRight`
-- ⬜ Fill Up (Editing) `edit.fillUp`
-- ⬜ Fill Left (Editing) `edit.fillLeft`
+- ✅ Fill Up (Editing) `edit.fillUp`
+- ✅ Fill Left (Editing) `edit.fillLeft`
 - ✅ Series (Editing) `edit.fillSeries`
 - ⬜ Flash Fill (Editing) `edit.flashFill`
 - ✅ Clear All (Editing) `edit.clearAll`
 - ✅ Clear Formats (Editing) `edit.clearFormats`
 - ✅ Clear Contents (Editing) `edit.clearContents`
-- ⬜ Clear Comments (Editing) `edit.clearComments`
-- ⬜ Clear Hyperlinks (Editing) `edit.clearHyperlinks`
+- ✅ Clear Comments (Editing) `edit.clearComments`
+- ✅ Clear Hyperlinks (Editing) `edit.clearHyperlinks`
 - ✅ Sort A to Z (Editing) `data.sortAscending`
 - ✅ Sort Z to A (Editing) `data.sortDescending`
 - ✅ Custom Sort (Editing) `data.sort`
@@ -135,8 +135,10 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Find (Editing) `edit.find`
 - ✅ Replace (Editing) `edit.replace`
 - ✅ Go To (Editing) `edit.goTo`
-- ⬜ Go To Special (Editing) `edit.goToSpecial`
-- ⬜ Add-ins (Add-ins) `home.addIns`
+- ✅ Go To Special (Editing) `edit.goToSpecial`
+- ➖ Add-ins (Add-ins) `home.addIns`
+
+Not done on Home: New Cell Style (Ledger's cell styles are a fixed set; the Format Painter reuses a look). Format as Table, Flash Fill, Protect Sheet and Lock Cell are the table and data work's. Orientation sets and saves the angle; PDF export draws the text at its angle, the screen shows it upright. Draw Border (in the Borders list) draws on the next cells dragged over, one stroke at a time. Add-ins: Ledger has none.
 
 ### Insert (2 of 17 by name)
 
@@ -152,9 +154,9 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ⬜ Sparklines (Sparklines) `insert.sparkline`
 - ⬜ Slicer (Filters) `insert.slicer`
 - ✅ Link (Links) `insert.link`
-- ⬜ Comment (Comments) `review.newComment`
+- ✅ Comment (Comments) `review.newComment`
 - ⬜ Text Box (Text) `insert.textBox`
-- ⬜ Header & Footer (Text) `pageLayout.headerFooter`
+- ✅ Header & Footer (Text) `pageLayout.headerFooter`
 - ✅ Symbol (Symbols) `insert.symbol`
 - ⬜ Checkbox (Cell Controls) `insert.checkbox`
 
@@ -167,23 +169,23 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 
 ### Page Layout (1 of 23 by name)
 
-- ⬜ Themes (Themes) `pageLayout.theme`
-- ⬜ Colors (Themes) `pageLayout.themeColors`
+- ✅ Themes (Themes) `pageLayout.theme`
+- ✅ Colors (Themes) `pageLayout.themeColors`
 - ✅ Fonts (Themes) `pageLayout.themeFonts`
-- ⬜ Effects (Themes) `pageLayout.themeEffects`
-- ⬜ Margins (Page Setup) `pageLayout.margins`
-- ⬜ Orientation (Page Setup) `pageLayout.orientation`
-- ⬜ Size (Page Setup) `pageLayout.size`
-- ⬜ Print Area (Page Setup) `pageLayout.printArea`
-- ⬜ Breaks (Page Setup) `pageLayout.breaks`
+- ➖ Effects (Themes) `pageLayout.themeEffects`
+- ✅ Margins (Page Setup) `pageLayout.margins`
+- ✅ Orientation (Page Setup) `pageLayout.orientation`
+- ✅ Size (Page Setup) `pageLayout.size`
+- ✅ Print Area (Page Setup) `pageLayout.printArea`
+- ✅ Breaks (Page Setup) `pageLayout.breaks`
 - ⬜ Background (Page Setup) `pageLayout.background`
-- ⬜ Print Titles (Page Setup) `pageLayout.printTitles`
-- ⬜ Page Setup (Page Setup) `pageLayout.pageSetup`
-- ⬜ Scale to Fit (Scale to Fit) `pageLayout.scaleToFit`
-- ⬜ View Gridlines (Sheet Options) `view.gridlines`
-- ⬜ Print Gridlines (Sheet Options) `pageLayout.printGridlines`
-- ⬜ View Headings (Sheet Options) `view.headings`
-- ⬜ Print Headings (Sheet Options) `pageLayout.printHeadings`
+- ✅ Print Titles (Page Setup) `pageLayout.printTitles`
+- ✅ Page Setup (Page Setup) `pageLayout.pageSetup`
+- ✅ Scale to Fit (Scale to Fit) `pageLayout.scaleToFit`
+- ✅ View Gridlines (Sheet Options) `view.gridlines`
+- ✅ Print Gridlines (Sheet Options) `pageLayout.printGridlines`
+- ✅ View Headings (Sheet Options) `view.headings`
+- ✅ Print Headings (Sheet Options) `pageLayout.printHeadings`
 - ⬜ Bring Forward (Arrange) `arrange.bringForward`
 - ⬜ Send Backward (Arrange) `arrange.sendBackward`
 - ⬜ Selection Pane (Arrange) `arrange.selectionPane`
@@ -191,10 +193,12 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ⬜ Group (Arrange) `arrange.group`
 - ⬜ Rotate (Arrange) `arrange.rotate`
 
+Not done on Page Layout: Background (a picture behind the cells: it needs the pictures the chart work brings). Effects only matter to charts and shapes (GridCraft keeps just the name), so they are left out here. The Arrange group (Bring Forward ... Rotate) is for pictures and shapes: the chart work's.
+
 ### Formulas (13 of 23 by name)
 
 - ✅ Insert Function (Function Library) `formulas.insertFunction`
-- ⬜ Recently Used (Function Library) `formulas.recentlyUsed`
+- ✅ Recently Used (Function Library) `formulas.recentlyUsed`
 - ✅ Financial (Function Library) `formulas.financial`
 - ✅ Logical (Function Library) `formulas.logical`
 - ✅ Text (Function Library) `formulas.text`
@@ -205,17 +209,17 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Name Manager (Defined Names) `formulas.nameManager`
 - ✅ Define Name (Defined Names) `formulas.defineName`
 - ✅ Use in Formula (Defined Names) `formulas.useInFormula`
-- ⬜ Create from Selection (Defined Names) `formulas.createFromSelection`
-- ⬜ Trace Precedents (Formula Auditing) `formulas.tracePrecedents`
-- ⬜ Trace Dependents (Formula Auditing) `formulas.traceDependents`
-- ⬜ Remove Arrows (Formula Auditing) `formulas.removeArrows`
+- ✅ Create from Selection (Defined Names) `formulas.createFromSelection`
+- ✅ Trace Precedents (Formula Auditing) `formulas.tracePrecedents`
+- ✅ Trace Dependents (Formula Auditing) `formulas.traceDependents`
+- ✅ Remove Arrows (Formula Auditing) `formulas.removeArrows`
 - ✅ Show Formulas (Formula Auditing) `formulas.showFormulas`
-- ⬜ Error Checking (Formula Auditing) `formulas.errorChecking`
-- ⬜ Evaluate Formula (Formula Auditing) `formulas.evaluateFormula`
-- ⬜ Watch Window (Formula Auditing) `formulas.watchWindow`
-- ⬜ Calculation Options (Calculation) `formulas.calculationOptions`
+- ✅ Error Checking (Formula Auditing) `formulas.errorChecking`
+- ✅ Evaluate Formula (Formula Auditing) `formulas.evaluateFormula`
+- ✅ Watch Window (Formula Auditing) `formulas.watchWindow`
+- ✅ Calculation Options (Calculation) `formulas.calculationOptions`
 - ✅ Calculate Now (Calculation) `formulas.calculateNow`
-- ⬜ Calculate Sheet (Calculation) `formulas.calculateSheet`
+- ✅ Calculate Sheet (Calculation) `formulas.calculateSheet`
 
 ### Data (3 of 23 by name)
 
@@ -245,35 +249,37 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 
 ### Review (3 of 15 by name)
 
-- ⬜ Spelling (Proofing) `review.spelling`
-- ⬜ Thesaurus (Proofing) `review.thesaurus`
+- ✅ Spelling (Proofing) `review.spelling`
+- ✅ Thesaurus (Proofing) `review.thesaurus`
 - ✅ Workbook Statistics (Proofing) `review.workbookStatistics`
-- ⬜ Check Accessibility (Accessibility) `review.checkAccessibility`
-- ⬜ Delete Comment (Comments) `review.deleteComment`
-- ⬜ Previous Comment (Comments) `review.previousComment`
-- ⬜ Next Comment (Comments) `review.nextComment`
-- ⬜ Show Comments (Comments) `review.showComments`
+- ✅ Check Accessibility (Accessibility) `review.checkAccessibility`
+- ✅ Delete Comment (Comments) `review.deleteComment`
+- ✅ Previous Comment (Comments) `review.previousComment`
+- ✅ Next Comment (Comments) `review.nextComment`
+- ✅ Show Comments (Comments) `review.showComments`
 - ✅ New Note (Notes) `review.newNote`
-- ⬜ Show/Hide Note (Notes) `review.showNote`
+- ✅ Show/Hide Note (Notes) `review.showNote`
 - ✅ Show All Notes (Notes) `review.showAllNotes`
-- ⬜ Convert to Comments (Notes) `review.convertToComments`
+- ✅ Convert to Comments (Notes) `review.convertToComments`
 - ⬜ Unprotect Sheet (Protect) `review.unprotectSheet`
 - ⬜ Protect Workbook (Protect) `review.protectWorkbook`
 - ⬜ Allow Edit Ranges (Protect) `review.allowEditRanges`
 
+The Protect group (Unprotect Sheet, Protect Workbook, Allow Edit Ranges) is the data work's. Thesaurus offers words sharing the word's stem in the dictionary, as GridCraft's does; Check Accessibility makes GridCraft's checks (merged cells, default sheet names).
+
 ### View (13 of 20 by name)
 
 - ✅ Normal (Workbook Views) `view.normal`
-- ⬜ Page Break Preview (Workbook Views) `view.pageBreakPreview`
+- ✅ Page Break Preview (Workbook Views) `view.pageBreakPreview`
 - ✅ Page Layout (Workbook Views) `view.pageLayout`
-- ⬜ Custom Views (Workbook Views) `view.customViews`
-- ⬜ Ruler (Show) `view.ruler`
+- ✅ Custom Views (Workbook Views) `view.customViews`
+- ✅ Ruler (Show) `view.ruler`
 - ✅ Formula Bar (Show) `view.formulaBar`
 - ✅ Zoom (Zoom) `view.zoom`
-- ⬜ 100% (Zoom) `view.zoom100`
+- ✅ 100% (Zoom) `view.zoom100`
 - ✅ Zoom to Selection (Zoom) `view.zoomToSelection`
 - ✅ New Window (Window) `view.newWindow`
-- ⬜ Arrange All (Window) `view.arrangeAll`
+- ✅ Arrange All (Window) `view.arrangeAll`
 - ✅ Freeze Panes (Window) `view.freezePanes`
 - ✅ Freeze Top Row (Window) `view.freezeTopRow`
 - ✅ Freeze First Column (Window) `view.freezeFirstColumn`
@@ -282,7 +288,9 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Hide (Window) `view.hideWindow`
 - ✅ Unhide (Window) `view.unhideWindow`
 - ✅ Switch Windows (Window) `view.switchWindows`
-- ⬜ Macros (Macros) `view.macros`
+- ➖ Macros (Macros) `view.macros`
+
+Not done on View: Split (panes that scroll on their own; Freeze Panes and New Window cover most of its uses). Custom Views are kept while Ledger runs, not saved in the file. Macros: left out, as is scripting.
 
 ### Automate (0 of 4 by name)
 

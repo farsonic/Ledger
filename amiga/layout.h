@@ -66,6 +66,7 @@ ULONG lx_bits_hash(void);                 /* changes whenever one of the bits do
 void  lx_command(ULONG id);                /* an ID_LX_ command */
 int   lx_ribbon_choice(ULONG id, LONG v);  /* a choice from one of the Home tab's lists that Ledger's own code doesn't know (1: done) */
 void  lx_update(void);                     /* after any change: watch window, error checking, ribbon lists */
+int   lx_brush_done(void);              /* the grid let go after Draw Border's stroke: 1 if it was that */
 void  lx_init(void);                       /* at start: the dictionary, the ribbon lists */
 void  lx_cleanup(void);                    /* at the end */
 

@@ -994,9 +994,45 @@ void lx_command(ULONG id)
   else if (id == ID_LX_SCROLLED || id == ID_LX_REFRESH) vt_command(id, v);
   else ft_command(id, v);
 }
+/* Draw Border: the next cells dragged over get an outline (or every line, or none) */
+static int draw_mode = -1;
+static void edge_one(Style *st, Font *f, const void *arg)
+{
+  const int *e = (const int *)arg;           /* side, kind */
+  (void)f;
+  if (e[0] < 0) { int k; for (k = 0; k < 4; k++) { st->border[k] = (u8)e[1]; st->bcolor[k] = COLOR_AUTO; } }
+  else { st->border[e[0]] = (u8)e[1]; st->bcolor[e[0]] = COLOR_AUTO; }
+}
+int lx_brush_done(void)
+{
+  Rect a, e;
+  int arg[2];
+  if (draw_mode < 0 || lx_xget(grid, MUIA_Grid_Brush)) return 0;
+  a = cur_sel();
+  book_begin(book);
+  if (draw_mode == 0) {
+    arg[1] = BS_THIN;
+    e = a; e.r2 = a.r1; arg[0] = B_TOP; book_restyle(book, cur_index(), e, edge_one, arg);
+    e = a; e.r1 = a.r2; arg[0] = B_BOTTOM; book_restyle(book, cur_index(), e, edge_one, arg);
+    e = a; e.c2 = a.c1; arg[0] = B_LEFT; book_restyle(book, cur_index(), e, edge_one, arg);
+    e = a; e.c1 = a.c2; arg[0] = B_RIGHT; book_restyle(book, cur_index(), e, edge_one, arg);
+  } else { arg[0] = -1; arg[1] = draw_mode == 1 ? BS_THIN : BS_NONE; book_restyle(book, cur_index(), a, edge_one, arg); }
+  book_end(book);
+  draw_mode = -1;
+  refresh_all();
+  return 1;
+}
 int lx_ribbon_choice(ULONG id, LONG v)
 {
   switch (id) {
+  case ID_BORDERDD:
+    if (v >= 11 && v <= 13) {
+      draw_mode = (int)v - 11;
+      set(grid, MUIA_Grid_Brush, 1);
+      update_controls();
+      return 1;
+    }
+    break;
   case ID_FILLDD: if (v == 5) { fill_justify(); return 1; } break;
   case ID_CLEARDD: if (v == 3 || v == 4) { clear_notes_links(v == 4); return 1; } break;
   case ID_FINDDD: if (v == 3) { ft_command(ID_LX_GOTOSPECIAL, -1); return 1; } break;
