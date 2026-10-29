@@ -792,14 +792,6 @@ static Value f_trimmean(Ctx *cx, Value *a, int n)
   free(v);
   return num_or_err(s);
 }
-static Value f_permutationa(Ctx *cx, Value *a, int n)
-{
-  double x[2];
-  NUMS(0, 2, x);
-  x[0] = trunc_(x[0]); x[1] = trunc_(x[1]);
-  if (x[0] < 0 || x[1] < 0) return val_err(E_NUM);
-  return num_or_err(pow(x[0], x[1]));
-}
 static Value f_rank_avg(Ctx *cx, Value *a, int n)
 {
   double x, asc = 0, *v; long cnt, i, less = 0, eq = 0; int e;
@@ -1680,7 +1672,6 @@ const FuncDef func_stat_defs[] = {
   { "PERCENTRANK", 2, 3, 0, f_percentrank_inc },
   { "PERCENTRANK.EXC", 2, 3, X, f_percentrank_exc },
   { "PERCENTRANK.INC", 2, 3, X, f_percentrank_inc },
-  { "PERMUTATIONA", 2, 2, X, f_permutationa },
   { "PHI", 1, 1, X, f_phi },
   { "POISSON", 3, 3, 0, f_poisson_dist },
   { "POISSON.DIST", 3, 3, X, f_poisson_dist },
