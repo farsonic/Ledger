@@ -690,6 +690,7 @@ static int save_to(const char *path)
 {
   size_t n = strlen(path);
   int ok = 0, csv = n > 4 && !Stricmp((STRPTR)path + n - 4, (STRPTR)".csv");
+  if (lx_save_as_other(path)) return 1;          /* (.pdf, .html: an export, the workbook keeps its name) */
   set(win, MUIA_Window_Sleep, TRUE);
   if (csv) {
     char *t = csv_save(book, cur_index(), ',');

@@ -95,6 +95,7 @@ int   lx_pref_line(const char *line);      /* 1 if the line was one of these opt
 void  lx_pref_save(FILE *f);
 void  lx_save_prefs(void);                 /* (main.c) Ledger.prefs written again */
 Book *lx_new_book(void);
+int   lx_save_as_other(const char *path);   /* Save As with a .pdf or .html name: exported (1), else 0 */
 
 /* main.c's workbook windows (View > Window) */
 int   win_slots(void);

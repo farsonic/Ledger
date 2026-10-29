@@ -543,6 +543,31 @@ static void export_pdf(void)
   snprintf(msg, sizeof msg, tr("%d pages written to %s"), pages, (const char *)FilePart((STRPTR)path));
   ask("OK", "%s", msg);
 }
+/* Save As a .pdf or .htm(l) file: the export, straight to that name */
+int lx_save_as_other(const char *path)
+{
+  size_t n = strlen(path);
+  int pdf = n > 4 && !Stricmp((STRPTR)path + n - 4, (STRPTR)".pdf");
+  int html = (n > 5 && !Stricmp((STRPTR)path + n - 5, (STRPTR)".html")) || (n > 4 && !Stricmp((STRPTR)path + n - 4, (STRPTR)".htm"));
+  int ok;
+  if (!pdf && !html) return 0;
+  set(win, MUIA_Window_Sleep, TRUE);
+  if (pdf) {
+    PdfOptions o;
+    char u1[200];
+    memset(&o, 0, sizeof o);
+    o.what = PDF_BOOK; o.now = ledger_now();
+    lx_latin1_utf8(FilePart((STRPTR)path), u1, sizeof u1); o.file = u1;
+    ok = pdf_save_book(book, &fonts, &o, path);
+  } else {
+    char *h = html_book(book, -1);
+    ok = h && file_write(path, h, strlen(h));
+    free(h);
+  }
+  set(win, MUIA_Window_Sleep, FALSE);
+  if (!ok) ask("OK", "Ledger couldn't write\n%s", path);
+  return 1;
+}
 static void export_html(void)
 {
   char path[512], *h;
