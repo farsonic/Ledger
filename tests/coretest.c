@@ -1091,6 +1091,59 @@ static void whatif(void)
   book_free(b);
 }
 
+
+static int has_formula(Book *b, int sheet, const char *ref, const char *want)
+{
+  Rect r = rc(b, ref);
+  Cell *c = sheet_cell(b->sh[sheet], r.r1, r.c1);
+  Buf o;
+  int ok_;
+  buf_init(&o);
+  if (c && c->f) formula_text(b, sheet, c->f, &o);
+  ok_ = !strcmp(o.data ? o.data : "", want);
+  if (!ok_) printf("   %s holds formula \"%s\" (want \"%s\")\n", ref, o.data ? o.data : "", want);
+  buf_free(&o);
+  return ok_;
+}
+static void imports(void)
+{
+  int k;
+  for (k = 0; k < 2; k++) {
+    const char *path = k ? "tests/fixtures/import.ods" : "tests/fixtures/import.xls", *what = k ? "ods" : "xls";
+    size_t len;
+    u8 *data = file_read(path, &len);
+    char err[200], t[80];
+    Book *b;
+    const Font *f;
+    ok(path, data != NULL);
+    if (!data) continue;
+    b = k ? ods_load(data, len, err, sizeof err) : xls_load(data, len, err, sizeof err);
+    free(data);
+    snprintf(t, sizeof t, "%s: loads", what); ok(t, b != NULL);
+    if (!b) { printf("   %s\n", err); continue; }
+    snprintf(t, sizeof t, "%s: sheets", what); ok(t, b->nsh == 2 && !strcmp(b->sh[0]->name, "Data") && !strcmp(b->sh[1]->name, "Other"));
+    snprintf(t, sizeof t, "%s: values", what);
+    ok(t, text_at(b, "A1", "Item") && num_at(b, "B4") == 10 && num_at(b, "C3") == 0.75 && text_at(b, "A13", "Caf\xc3\xa9 \xc3\xbc" "ber"));
+    snprintf(t, sizeof t, "%s: formulas", what);
+    ok(t, has_formula(b, 0, "D2", "B2*C2") && has_formula(b, 0, "D6", "SUM(D2:D5)") && has_formula(b, 0, "B7", "IF(D6>10,\"big\",\"small\")") &&
+       has_formula(b, 0, "C7", "ROUND(AVERAGE(C2:C5),2)") && has_formula(b, 0, "D7", "COUNTIF(B2:B5,\">2\")") && has_formula(b, 0, "B8", "Other!B2*2") &&
+       has_formula(b, 0, "C8", "-C2%") && has_formula(b, 0, "D8", "CONCATENATE(A2,\" & \",A3)") && has_formula(b, 0, "A9", "VLOOKUP(\"Plum\",$A$2:$C$5,3,FALSE)") &&
+       has_formula(b, 0, "C9", "SUM(B:B)") && has_formula(b, 0, "D10", "EDATE(A10,1)") && has_formula(b, 1, "A3", "Data!D6+B2"));
+    snprintf(t, sizeof t, "%s: results", what);
+    ok(t, near(num_at(b, "D6"), 1.5 + 3 + 2 + 2.5) && shows(b, 0, 6, 1, "small") && num_at(b, "D7") == 3 && num_at(b, "B8") == 42 && num_at(b, "B9") == -1000 - E_DIV0 && num_at(b, "Other!A3") == 30);
+    snprintf(t, sizeof t, "%s: formats", what);
+    ok(t, shows(b, 0, 9, 0, "2026-10-27") && shows(b, 0, 9, 1, "25.0%") && shows(b, 0, 9, 2, "1,234.50") && cell_value(b, 0, 7, 0)->t == V_BOOL);
+    f = &b->fonts[b->styles[sheet_cell_style(b->sh[0], 0, 0)].font];
+    snprintf(t, sizeof t, "%s: fonts and fills", what);
+    ok(t, f->bold && f->size == 140 && (f->color & 0xC00000) == 0xC00000 && !(f->color & 0xFFFF) && b->fonts[b->styles[sheet_cell_style(b->sh[0], 0, 1)].font].italic &&
+       (b->styles[sheet_cell_style(b->sh[0], 0, 2)].fill & 0xFFFFFF) == 0xFFFF00 && b->styles[sheet_cell_style(b->sh[0], 0, 3)].halign == HA_CENTER);
+    snprintf(t, sizeof t, "%s: widths, heights, merges", what);
+    ok(t, sheet_col_width(b->sh[0], 0) > 120 && sheet_row_height(b->sh[0], 2) == 40 && b->sh[0]->nmerges == 1 && b->sh[0]->merges[0].c2 == 2 && b->sh[0]->merges[0].r1 == 11);
+    book_free(b);
+  }
+  ok("xls: not one", !xls_load((const u8 *)"PK\3\4", 4, NULL, 0));
+}
+
 int main(void)
 {
   values_dates();
@@ -1111,6 +1164,7 @@ int main(void)
   flashfill();
   datatools();
   whatif();
+  imports();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }
