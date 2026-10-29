@@ -34,6 +34,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "charttab.h"
 #include "layout.h"
 #include "splash.h"
 #include "sysfonts.h"
@@ -41,6 +42,8 @@
 #include "../core/calc.h"
 #include "../core/xlsx.h"
 #include "../core/template.h"
+#include "../core/xls.h"
+#include "datatab.h"
 
 #ifndef MUIA_Window_DisableKeys
 #define MUIA_Window_DisableKeys 0x80424c36UL   /* in MUI 3.8, undocumented: MUIKEYF_ keys the window ignores */
@@ -102,6 +105,7 @@ static struct NewMenu menus[] = {
   I("Function...", 0, ID_FUNCTION), I("AutoSum", "=", ID_AUTOSUM), I("Today's Date", ";", ID_DATE), I("Time Now", ":", ID_TIME), BAR,
   I("Link...", 0, ID_LINK), I("Note...", 0, ID_NOTENEW), BAR,
   I("Define Name...", 0, ID_DEFNAME), I("Name Manager...", 0, ID_NAMES),
+  CHART_MENUS,                     /* charts, pictures, shapes, ink, sparklines (charttab.h) */
   M("Format"),
   I("Cells...", "1", ID_FORMATCELLS), I("Bold", "B", ID_BOLD), I("Italic", "I", ID_ITALIC), I("Underline", "U", ID_UNDERLINE), BAR,
   I("New or Edit Note...", 0, ID_NOTENEW), I("Delete Note", 0, ID_NOTEDEL), BAR,
@@ -114,14 +118,23 @@ static struct NewMenu menus[] = {
   LX_FORMAT_ITEMS
   M("Data"),
   I("Sort A to Z", 0, ID_SORTAZ), I("Sort Z to A", 0, ID_SORTZA), I("Sort...", 0, ID_CUSTOMSORT), BAR,
-  T("Filter", 0, ID_FILTER), I("Clear Filter", 0, ID_CLEARFILTER), I("Reapply Filter", 0, ID_REAPPLY), BAR, I("Remove Duplicates", 0, ID_REMOVEDUP), BAR,
+  T("Filter", 0, ID_FILTER), I("Clear Filter", 0, ID_CLEARFILTER), I("Reapply Filter", 0, ID_REAPPLY), I("Advanced Filter...", 0, ID_ADVFILTER), BAR,
+  I("Get Data from Text/CSV...", 0, ID_GETDATA), I("Text to Columns...", 0, ID_TEXTCOLS), I("Flash Fill", "E", ID_FLASHFILL), I("Remove Duplicates...", 0, ID_REMOVEDUP),
+  I("Data Validation...", 0, ID_DV), I("Circle Invalid Data", 0, ID_CIRCLE), I("Clear Validation Circles", 0, ID_CIRCLECLEAR), I("Clear Validation", 0, ID_DVCLEAR),
+  I("Consolidate...", 0, ID_CONSOLIDATE), BAR,
   I("Calculate Now", 0, ID_CALCNOW), T("Manual Calculation", 0, ID_MANUALCALC), BAR, I("Workbook Statistics...", 0, ID_STATS),
-  TABLE_MENUS,
+  BAR,
+  I("Scenario Manager...", 0, ID_SCENARIOS), I("Goal Seek...", 0, ID_GOALSEEK), I("Data Table...", 0, ID_DATATABLE), BAR,
+  I("Group...", 0, ID_GROUP), I("Ungroup...", 0, ID_UNGROUP), I("Clear Outline", 0, ID_CLEAROUTLINE), I("Subtotal...", 0, ID_SUBTOTAL),
+  I("Show Detail", 0, ID_SHOWDETAIL), I("Hide Detail", 0, ID_HIDEDETAIL), I("Outline Settings...", 0, ID_OUTLINESET), BAR,
+  T("Protect Sheet...", 0, ID_PROTECTSHEET), T("Protect Workbook...", 0, ID_PROTECTBOOK),
   M("View"),
   T("Show All Notes", 0, ID_NOTESHOW), T("Formula Bar", 0, ID_FORMULABAR), T("Gridlines", 0, ID_GRIDLINES), T("Headings", 0, ID_HEADINGS), T("Show Formulas", 0, ID_SHOWFORMULAS), BAR,
   I("Zoom In", "+", ID_ZOOMIN), I("Zoom Out", "-", ID_ZOOMOUT), I("Zoom 100%", 0, ID_ZOOM100), I("Zoom to Selection", 0, ID_ZOOMSEL), BAR,
   I("Freeze Panes", 0, ID_FREEZE), I("Unfreeze Panes", 0, ID_UNFREEZE), BAR, T("Dark Mode", 0, ID_DARKUI),
+  LX_WINDOW_ITEMS
   LX_MENUS
+  TABLE_MENUS,
   { NM_END, 0, 0, 0, 0, 0 }
 };
 
@@ -360,6 +373,7 @@ static void fmt_edit(Style *st, Font *f, const void *arg)
     if (m & SM_FONT) *f = *e->font;
     if (m & SM_BORDER) { memcpy(st->border, e->st->border, sizeof st->border); memcpy(st->bcolor, e->st->bcolor, sizeof st->bcolor); }
     if (m & SM_FILL) st->fill = e->st->fill;
+    if (m & SM_PROT) { st->locked = e->st->locked; st->hidden = e->st->hidden; }
     break; }
   }
 }
@@ -521,6 +535,7 @@ void update_controls(void)
   /* the formula bar: what is being typed, or the cell's entry */
   if (xget(grid, MUIA_Grid_Editing)) { strncpy(t, (const char *)xget(grid, MUIA_Grid_EditText), sizeof t - 1); t[sizeof t - 1] = 0; }
   else grid_edit_text(book, cur_index(), s->cur_r, s->cur_c, t, sizeof t);
+  if (!xget(grid, MUIA_Grid_Editing) && datatab_hide_formula(book, cur_index(), s->cur_r, s->cur_c)) t[0] = 0;   /* (a hidden formula) */
   if (strcmp(t, fx_shown)) { strcpy(fx_shown, t); SetAttrs(fxbar, MUIA_NoNotify, TRUE, MUIA_String_Contents, (ULONG)t, TAG_DONE); }
   /* the ribbon */
   if (f->bold) on |= RBIT(RB_BOLD);
@@ -547,11 +562,14 @@ void update_controls(void)
   if (s->filter.r1 >= 0) on |= RBIT(RB_FILTER);
   if (xget(grid, MUIA_Grid_ShowNotes)) on |= RBIT(RB_NOTES);
   if (sheet_note(s, s->cur_r, s->cur_c)) on |= RBIT(RB_HASNOTE);
+  if (s->protect) on |= RBIT(RB_PROTECTED);
+  if (book->lockstruct) on |= RBIT(RB_BOOKLOCK);
   if (a.r1 != a.r2 || a.c1 != a.c2) on |= RBIT(RB_MULTI);
   memset(&rs, 0, sizeof rs);
   rs.MethodID = MUIM_Ribbon_State;
   rs.on = on; rs.font = f->name; rs.size = f->size; rs.numfmt = numfmt_name(book_fmt_code(book, st->numfmt)); rs.fs = &fonts;
   tabletab_state(&rs.ctx, &rs.ctxname);     /* (Table Design, PivotTable Analyze and Design) */
+  rs.ext = chart_ribbon_state();   /* charttab.c: the chart, object and sparkline tabs */
   DoMethodA(ribbon, (Msg)&rs);
   /* the menus' ticks */
   menu_set(ID_GRIDLINES, MUIA_Menuitem_Checked, s->gridlines);
@@ -562,6 +580,8 @@ void update_controls(void)
   menu_set(ID_SHOWFORMULAS, MUIA_Menuitem_Checked, xget(grid, MUIA_Grid_Formulas));
   menu_set(ID_MANUALCALC, MUIA_Menuitem_Checked, book->manualcalc);
   menu_set(ID_DARKUI, MUIA_Menuitem_Checked, pref_dark);
+  menu_set(ID_PROTECTSHEET, MUIA_Menuitem_Checked, s->protect);
+  menu_set(ID_PROTECTBOOK, MUIA_Menuitem_Checked, book->lockstruct);
   status_update();
   lx_update();
 }
@@ -657,8 +677,8 @@ static Book *load_file(const char *path)
   char err[200] = "";
   if (!data) { ask("OK", "Ledger couldn't read\n%s", path); return NULL; }
   set(win, MUIA_Window_Sleep, TRUE);
-  if (len >= 4 && data[0] == 'P' && data[1] == 'K') b = xlsx_load(data, len, err, sizeof err);
-  else if (len >= 8 && data[0] == 0xD0 && data[1] == 0xCF) strcpy(err, "This is an old Excel file (.xls). Save it as .xlsx in Excel or GridCraft first.");
+  if (len >= 4 && data[0] == 'P' && data[1] == 'K') b = ods_is(data, len) ? ods_load(data, len, err, sizeof err) : xlsx_load(data, len, err, sizeof err);
+  else if (len >= 8 && data[0] == 0xD0 && data[1] == 0xCF) b = xls_load(data, len, err, sizeof err);   /* (datatab: old Excel) */
   else b = csv_load((const char *)data, len, 0);
   set(win, MUIA_Window_Sleep, FALSE);
   free(data);
@@ -685,9 +705,16 @@ static void open_path(const char *path)
   Book *b;
   if (win_find(path)) return;
   if (!(b = load_file(path))) return;
-  if (book_untouched()) show_book(b, path);
-  else win_new(b, path);
   add_recent(path);
+  {
+    /* (datatab) an .xls or .ods is saved as .xlsx beside it */
+    char p2[512], *dot;
+    strncpy(p2, path, sizeof p2 - 6); p2[sizeof p2 - 6] = 0;
+    dot = strrchr(p2, '.');
+    if (dot && dot > (char *)FilePart((STRPTR)p2) && (!Stricmp((STRPTR)dot, (STRPTR)".xls") || !Stricmp((STRPTR)dot, (STRPTR)".ods"))) { strcpy(dot, ".xlsx"); path = p2; }
+    if (book_untouched()) show_book(b, path);
+    else win_new(b, path);
+  }
 }
 static int save_to(const char *path)
 {
@@ -1201,6 +1228,7 @@ static void backstage_command(ULONG id)
 static void ribbon_choice(ULONG id)
 {
   LONG v = (LONG)xget(ribbon, MUIA_Ribbon_Value);
+  if (datatab_refused(id, v)) return;                                          /* (a protected sheet or workbook) */
   if (lx_ribbon_choice(id, v)) return;
   switch (id) {
   case ID_FONTDD: { const char *n = ribbon_font_name((int)v); char l[64]; if (n) { utf8_to_latin1(n, (u32)strlen(n), l, sizeof l); apply_format(FX_FONT, 0, l); } break; }
@@ -1237,6 +1265,7 @@ static void ribbon_choice(ULONG id)
     case 9: rename_sheet(); break;
     case 10: { LONG c = ask_color(cur_sheet()->tabcolor & 0xFFFFFF); if (c >= 0) { cur_sheet()->tabcolor = FILL_ON | (ULONG)c; book->dirty = 1; refresh_all(); } break; }
     case 11: dlg_format_cells(0); break;
+    case 15: datatab_command(ID_PROTECTSHEET, 0); break;     /* (datatab) */
     }
     break;
   case ID_AUTOSUMDD: {
@@ -1272,12 +1301,13 @@ static int toggled(int now) { return !now; }
 static void command(ULONG id)
 {
   Sheet *s = cur_sheet();
+  if (datatab_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value))) return;    /* (the Data tab's, and protection's guard) */
   switch (id) {
   case ID_NEW: win_new(lx_new_book(), ""); break;
   case ID_OPEN: {
     char path[512];
     strcpy(path, bookpath);
-    if (file_request(0, "Open Workbook", path, sizeof path, "#?.(xlsx|csv|txt|tsv)")) open_path(path);
+    if (file_request(0, "Open Workbook", path, sizeof path, "#?.(xlsx|xls|ods|csv|txt|tsv)")) open_path(path);
     break; }
   case ID_IMPORTCSV: {
     char path[512];
@@ -1905,6 +1935,7 @@ int main(int argc, char **argv)
     else if (id == ID_FILETAB || id == ID_BACKSTAGE || id == ID_TEMPLATE || id == ID_RECENT || id == ID_OPTIONS) backstage_command(id);
     else if ((id >= ID_FONTDD && id <= ID_FN_MORE)) ribbon_choice(id);
     else if (id >= ID_TBL_FIRST && id < ID_TBL_LAST) tabletab_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value));
+    else if (id >= ID_X_FIRST && id < ID_X_LAST) chart_command(id);     /* charttab.c */
     else if (id >= ID_LX_FIRST && id < ID_LX_LAST) { if (back_shown && id != ID_LX_REFRESH && id != ID_LX_SCROLLED) backstage_show(0, 0); lx_command(id); }
     else if (id) {
       if (back_shown && (id == ID_OPEN || id == ID_SAVE || id == ID_SAVEAS || id == ID_SAVECSV || id == ID_NEW)) backstage_show(0, 0);

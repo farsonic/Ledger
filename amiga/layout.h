@@ -134,8 +134,10 @@ Clip *app_clip(void);              /* what was copied last */
   I("Spelling...", 0, ID_LX_SPELLING), I("Thesaurus...", 0, ID_LX_THESAURUS), I("Check Accessibility...", 0, ID_LX_ACCESS), BAR, \
   T("Show/Hide Note", 0, ID_LX_NOTESHOWHIDE), I("Convert Notes to Comments", 0, ID_LX_CONVERTNOTES), BAR, \
   I("New Comment...", 0, ID_LX_COMMENTNEW), I("Delete Comment", 0, ID_LX_COMMENTDEL), I("Previous Comment", 0, ID_LX_COMMENTPREV), \
-  I("Next Comment", 0, ID_LX_COMMENTNEXT), I("Show Comments...", 0, ID_LX_COMMENTSHOW), \
-  M("Window"), \
+  I("Next Comment", 0, ID_LX_COMMENTNEXT), I("Show Comments...", 0, ID_LX_COMMENTSHOW),
+/* the window commands, at the end of the View menu */
+#define LX_WINDOW_ITEMS \
+  BAR, \
   I("New Window", 0, ID_LX_NEWWIN), I("Arrange All...", 0, ID_LX_ARRANGE), I("Switch Windows...", 0, ID_LX_SWITCHDD), BAR, \
   I("Hide", 0, ID_LX_HIDEWIN), I("Unhide...", 0, ID_LX_UNHIDEWIN), BAR, \
   T("View Side by Side", 0, ID_LX_SIDEBYSIDE), T("Synchronous Scrolling", 0, ID_LX_SYNCSCROLL), I("Reset Window Position", 0, ID_LX_RESETWIN), BAR, \

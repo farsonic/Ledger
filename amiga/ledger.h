@@ -43,6 +43,8 @@ extern struct Library *MUIMasterBase;
 #define MUIA_Grid_Status    (QTAG + 16)    /* the status bar the grid tells about point mode */
 #define MUIA_Grid_ShowNotes (QTAG + 18)    /* every note shown beside its cell (else only the one under the mouse) */
 #define MUIA_Grid_FilterCol (QTAG + 17)    /* (get) the column whose AutoFilter button was clicked (after ID_FILTERCOL) */
+#define MUIA_Grid_ObjView   (QTAG + 40)    /* (get) the grid's charts and drawings view (chartview.h) */
+#define MUIA_Grid_CellBox   (QTAG + 41)    /* (get) LONG[4]: the active cell's box in window pixels (x0, y0, x1, y1; -1 not shown) */
 
 #define MUIM_Grid_Refresh   (QTAG + 0x100)   /* everything drawn afresh (after main.c changed the workbook) */
 #define MUIM_Grid_Edit      (QTAG + 0x101)   /* struct MUIP_Grid_Edit: start editing the active cell */
@@ -76,7 +78,8 @@ void grid_edit_text(Book *b, int sheet, i32 r, i32 c, char *out, size_t cap);
 enum {
   RB_BOLD = 1, RB_ITALIC, RB_UNDERLINE, RB_STRIKE, RB_CANUNDO, RB_CANREDO, RB_WRAP, RB_MERGED,
   RB_ALEFT, RB_ACENTER, RB_ARIGHT, RB_ATOP, RB_AMIDDLE, RB_ABOTTOM, RB_GRIDLINES, RB_HEADINGS, RB_FORMULABAR,
-  RB_FORMULAS, RB_MANUAL, RB_BRUSH, RB_DARK, RB_ZEROS, RB_MULTI, RB_EDITING, RB_FROZEN, RB_FILTER, RB_NOTES, RB_HASNOTE
+  RB_FORMULAS, RB_MANUAL, RB_BRUSH, RB_DARK, RB_ZEROS, RB_MULTI, RB_EDITING, RB_FROZEN, RB_FILTER, RB_NOTES, RB_HASNOTE,
+  RB_PROTECTED, RB_BOOKLOCK         /* (datatab) the sheet, the workbook's structure protected */
 };
 #define RBIT(b) (1UL << (b))
 struct MUIP_Ribbon_State {
@@ -88,6 +91,7 @@ struct MUIP_Ribbon_State {
   FontSet *fs;
   ULONG ctx;                /* the contextual tabs' states: CBIT(CB_...) (tabletab.c) */
   const char *ctxname;      /* the table's or pivot table's name the active cell is in (Latin-1) */
+  ULONG ext;                /* more states, the Item.st/en values 96-127 (chartids.h RBX_) */
 };
 /* contextual states (Item.st and .en values from CB_INTABLE, above layout.h's LXB_ ones): the active cell is in a table or a pivot
    table, and the options shown ticked on Table Design and PivotTable Design */
@@ -97,6 +101,8 @@ enum {
 };
 #define CBIT(b) (1UL << ((b) - CB_INTABLE))
 struct MUI_CustomClass *ribbon_class(void);
+/* (chartrib.h) the Format tab's list of the selected chart's parts (labels kept by the caller), the one shown */
+void ribbon_set_elems(const char *const *labels, int n, int shown);
 void ribbon_class_free(void);
 /* the font list: the usual families, then the installed ones (made once); one by number */
 const char *const *ribbon_font_names(FontSet *fs);

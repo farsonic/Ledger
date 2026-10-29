@@ -98,6 +98,6 @@ static const Item pd_styles[] = {
 };
 static const Group pdesign[] = { { "Layout", G_COLS, pd_layout, N(pd_layout) }, { "PivotTable Style Options", G_COLS, pd_opts, N(pd_opts) },
                                  { "PivotTable Styles", G_COLS, pd_styles, N(pd_styles) } };
-#define TT_CONTEXT_FIRST 8        /* tabs[] from here are contextual */
+#define TT_CONTEXT_FIRST 9        /* tabs[] from here are contextual */
 #undef TT_TOOLS
 #endif

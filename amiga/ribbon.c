@@ -23,6 +23,7 @@
 #include "lang.h"
 #include "ids.h"
 #include "tabletab.h"
+#include "datatab.h"
 #include "layout.h"
 
 /* ------------------------------------------------------------------ */
@@ -78,7 +79,7 @@ static const char *const inserts[] = { "Insert Cells...", "Insert Sheet Rows", "
 static const char *const deletes[] = { "Delete Cells...", "Delete Sheet Rows", "Delete Sheet Columns", "Delete Sheet" };
 static const char *const formats[] = { "Row Height...", "AutoFit Row Height", "Column Width...", "AutoFit Column Width", "Default Width...",
                                        "Hide Rows", "Hide Columns", "Unhide Rows", "Unhide Columns", "Rename Sheet", "Tab Colour...", "Format Cells...",
-                                       "Hide Sheet", "Unhide Sheet...", "Move or Copy Sheet..." };
+                                       "Hide Sheet", "Unhide Sheet...", "Move or Copy Sheet...", "Protect Sheet..." };
 static const char *const autosums[] = { "Sum", "Average", "Count Numbers", "Max", "Min", "More Functions..." };
 static const char *const fills[] = { "Down", "Right", "Up", "Left", "Series...", "Justify" };
 static const char *const clears[] = { "Clear All", "Clear Formats", "Clear Contents", "Clear Notes", "Clear Hyperlinks" };
@@ -115,6 +116,10 @@ static const char *const condfmts[] = { "Greater Than...", "Less Than...", "Betw
                                         "Colour Scale: Green - Yellow - Red", "Colour Scale: Red - Yellow - Green", "Colour Scale: Green - White - Red",
                                         "Colour Scale: Blue - White - Red", "Colour Scale: White - Red", "Colour Scale: Green - White",
                                         "New Rule...", "Clear Rules from Selected Cells", "Clear Rules from Entire Sheet", "Manage Rules..." };
+/* the Data tab's lists (datatab.c goes by these numbers) */
+static const char *const dvs[] = { "Data Validation...", "Circle Invalid Data", "Clear Validation Circles", "Clear Validation" };
+static const char *const whatifs[] = { "Scenario Manager...", "Goal Seek...", "Data Table..." };
+static const char *const groups[] = { "Group...", "Ungroup...", "Clear Outline" };
 /* (ledger.h) the cell styles: their names here, their looks in cell_style_look below */
 static const char *const cellstyles[] = { "Normal", "Good", "Bad", "Neutral", "Title", "Heading 1", "Heading 2", "Heading 3", "Total",
                                           "Input", "Output", "Calculation", "Note", "Accent 1", "Accent 2", "Accent 3", "Accent 4" };
@@ -124,7 +129,7 @@ static const char *const cellstyles[] = { "Normal", "Good", "Bad", "Neutral", "T
 enum { L_NONE, L_FONTS, L_SIZES, L_COLORS, L_FILLS, L_BORDERS, L_MERGES, L_NUMFMTS, L_INSERTS, L_DELETES, L_FORMATS, L_AUTOSUMS,
        L_FILL, L_CLEARS, L_SORTS, L_FINDS, L_PASTES, L_SYMBOLS, L_TABCOLORS, L_CALCS, L_ZOOMS, L_FREEZES,
        L_FNFIN, L_FNLOGIC, L_FNTEXT, L_FNDATE, L_FNLOOKUP, L_FNMATH, L_FNMORE, L_CELLSTYLES, L_CONDFMTS,
-       L_TSTYLES, L_TOTFN, L_PVSUBTOT, L_PVGRAND, L_PVLAYOUT, L_PVBLANK, L_PVMOVE };
+       L_TSTYLES, L_TOTFN, L_PVSUBTOT, L_PVGRAND, L_PVLAYOUT, L_PVBLANK, L_PVMOVE, L_DVS, L_WHATIFS, L_GROUPS };
 #define N(a) ((int)(sizeof(a) / sizeof(a[0])))
 static const List lists[] = {
   { NULL, 0, PL_TEXT, NULL }, { usual_fonts, 10, PL_FONTS, NULL }, { sizes, N(sizes), PL_TEXT, NULL },
@@ -141,6 +146,7 @@ static const List lists[] = {
   { tstyles, N(tstyles), PL_TSTYLE, NULL }, { totfns, N(totfns), PL_TEXT, NULL }, { pvsubtots, N(pvsubtots), PL_TEXT, NULL },
   { pvgrands, N(pvgrands), PL_TEXT, NULL }, { pvlayouts, N(pvlayouts), PL_TEXT, NULL }, { pvblanks, N(pvblanks), PL_TEXT, NULL },
   { pvmoves, N(pvmoves), PL_TEXT, NULL },
+  { dvs, N(dvs), PL_TEXT, NULL }, { whatifs, N(whatifs), PL_TEXT, NULL }, { groups, N(groups), PL_TEXT, NULL },
 };
 /* a list by number: Ledger's own here, or (from LXL_FIRST) layout.h's */
 static const List *list_of(int k) { return k >= LXL_FIRST && k < LXL_LAST ? (const List *)(const void *)&lx_lists[k - LXL_FIRST] : &lists[k]; }
@@ -287,8 +293,15 @@ static const Item i_links[] = {
 static const Item i_text[] = {
   { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
 };
-static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Functions", G_COLS, i_fn, N(i_fn) },
-                                { "Links", G_COLS, i_links, N(i_links) }, { "Names", G_COLS, i_names, N(i_names) }, { "Text", G_COLS, i_text, N(i_text) } };
+#include "chartrib.h"            /* charts, pictures, shapes, ink, sparklines (charttab.c does their commands) */
+static const Item i_textx[] = {
+  { K_BUTTON, S_LARGE, IC_TEXTBOX, 0, "Text Box", ID_X_TEXTBOX, 0, 0, 0, 0, "A box of text over the cells: drag on the sheet to draw it" },
+  { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
+};
+static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Illustrations", G_COLS, ix_illus, N(ix_illus) },
+                                { "Charts", G_COLS, ix_charts, N(ix_charts) }, { "Sparklines", G_COLS, ix_spark, N(ix_spark) },
+                                { "Functions", G_COLS, i_fn, N(i_fn) }, { "Links", G_COLS, i_links, N(i_links) }, { "Text", G_COLS, i_textx, N(i_textx) },
+                                { "Names", G_COLS, i_names, N(i_names) } };
 /* Page Layout: themes, the page setup (Ledger doesn't print, but PDF export, Page Break Preview and
    Excel use it), scaling, the sheet options, and Ledger's sheet tools */
 static const Item p_themes[] = {
@@ -302,6 +315,7 @@ static const Item p_setup[] = {
   { K_DROP, S_LARGE, IC_SIZE, LXL_PAPERS, "Size", ID_LX_SIZEDD, 0, 0, 0, 0, "Paper size" },
   { K_DROP, S_LARGE, IC_PRINTAREA, LXL_AREA, "Print Area", ID_LX_AREADD, 0, 0, 0, 0, "The cells that make the pages" },
   { K_DROP, S_LARGE, IC_BREAKS, LXL_BREAKS, "Breaks", ID_LX_BREAKSDD, 0, 0, 0, 0, "Page breaks above and left of the active cell" },
+  { K_BUTTON, S_LARGE, IC_PAGECOLOR, 0, "Background", ID_X_BACKGROUND, 0, 0, 0, 0, "A picture behind the cells, repeated across the sheet (again: take it off)" },
   { K_BUTTON, S_LARGE, IC_PRINTTITLES, 0, "Print Titles", ID_LX_TITLES, 0, 0, 0, 0, "Rows and columns repeated on every page" },
   { K_BUTTON, S_LARGE, IC_PAGESETUPDLG, 0, "Page Setup", ID_LX_PAGESETUP, 0, 0, 0, 0, "Page Setup: page, margins, header and footer, sheet" },
 };
@@ -330,6 +344,11 @@ static const Item p_arrange[] = {
   { K_BUTTON, S_SMALL, IC_ARROWLEFT, 0, "Move Left", ID_MOVESHEETL, 0, 0, 0, 0, "Move this sheet one place left" },
   { K_BUTTON, S_SMALL, IC_ARROWRIGHT, 0, "Move Right", ID_MOVESHEETR, 0, 0, 0, 0, "Move this sheet one place right" },
   { K_BUTTON, S_SMALL, IC_DELETECELLS, 0, "Delete", ID_DELSHEET, 0, 0, 0, 0, "Delete this sheet" },
+  { K_BUTTON, S_SMALL, IC_FORWARD, 0, "Bring Forward", ID_X_FORWARD, 0, RBX(RBX_OBJECT), F_NEWCOL, 0, "Bring the selected picture, shape or chart one step to the front" },
+  { K_BUTTON, S_SMALL, IC_BACKWARD, 0, "Send Backward", ID_X_BACKWARD, 0, RBX(RBX_OBJECT), 0, 0, "Send it one step back" },
+  { K_BUTTON, S_SMALL, IC_SELPANE, 0, "Selection Pane", ID_X_SELPANE, 0, 0, 0, 0, "The sheet's pictures, shapes and charts by name: select, rename, reorder" },
+  { K_DROP, S_SMALL, IC_ALIGNOBJ, LX_ALIGN, "Align", ID_X_ALIGNDD, 0, RBX(RBX_OBJECT), F_NEWCOL, 0, "Line the selected objects up with the first one selected" },
+  { K_BUTTON, S_SMALL, IC_ROTATE, 0, "Rotate", ID_X_ROTATE, 0, RBX(RBX_SHAPE), 0, 0, "Turn the selected shape a quarter turn" },
 };
 static const Group playout[] = { { "Themes", G_COLS, p_themes, N(p_themes) }, { "Page Setup", G_COLS, p_setup, N(p_setup) },
                                  { "Scale to Fit", G_COLS, p_fit, N(p_fit) }, { "Sheet Options", G_COLS, p_opts, N(p_opts) },
@@ -371,7 +390,7 @@ static const Group formulas[] = { { "Function Library", G_COLS, f_lib, N(f_lib) 
                                   { "Formula Auditing", G_COLS, f_audit, N(f_audit) }, { "Calculation", G_COLS, f_calc, N(f_calc) } };
 /* Data */
 static const Item d_get[] = {
-  { K_BUTTON, S_LARGE, IC_IMPORT, 0, "From Text/CSV", ID_IMPORTCSV, 0, 0, 0, 0, "Bring in a CSV or text file as a new sheet" },
+  { K_BUTTON, S_LARGE, IC_IMPORT, 0, "Get Data", ID_GETDATA, 0, 0, 0, 0, "Bring in a CSV or text file: pick its separator and see it first" },
 };
 static const Item d_sort[] = {
   { K_BUTTON, S_SMALL, IC_SORTAZ, 0, "Sort A to Z", ID_SORTAZ, 0, 0, 0, 0, "Sort the rows by the active cell's column, smallest first" },
@@ -380,13 +399,29 @@ static const Item d_sort[] = {
   { K_BUTTON, S_LARGE, IC_FILTER, 0, "Filter", ID_FILTER, RB_FILTER, 0, 0, 0, "Filter buttons on the heading row of the table around the active cell" },
   { K_BUTTON, S_SMALL, IC_CLEARFILTER, 0, "Clear", ID_CLEARFILTER, 0, 0, 0, 0, "Show every row again" },
   { K_BUTTON, S_SMALL, IC_REAPPLY, 0, "Reapply", ID_REAPPLY, 0, 0, 0, 0, "Filter again, after the values changed" },
+  { K_BUTTON, S_SMALL, IC_ADVFILTER, 0, "Advanced", ID_ADVFILTER, 0, 0, 0, 0, "Filter by a range of conditions, or copy the matching rows elsewhere" },
 };
 static const Item d_tools[] = {
-  { K_BUTTON, S_LARGE, IC_REMOVEDUP, 0, "Remove Duplicates", ID_REMOVEDUP, 0, 0, 0, 0, "Delete repeated rows from the selection" },
-  { K_DROP, S_LARGE, IC_FILLDOWN, L_FILL, "Fill", ID_FILLDD, 0, 0, 0, 0, "Fill down, right, up, left, or a series" },
+  { K_BUTTON, S_LARGE, IC_TEXTCOLS, 0, "Text to Columns", ID_TEXTCOLS, 0, 0, 0, 0, "Split each cell's text into columns at commas, spaces or set widths" },
+  { K_BUTTON, S_SMALL, IC_FLASHFILL, 0, "Flash Fill", ID_FLASHFILL, 0, 0, 0, 0, "Fill the column from the examples typed in it (Ctrl-E)" },
+  { K_BUTTON, S_SMALL, IC_REMOVEDUP, 0, "Remove Duplicates", ID_REMOVEDUP, 0, 0, 0, 0, "Delete repeated rows from the selection" },
+  { K_DROP, S_SMALL, IC_VALIDATE, L_DVS, "Data Validation", ID_DVDD, 0, 0, F_SPLIT, 0, "Rules for what cells may hold, drop-down lists, invalid data circled" },
+  { K_BUTTON, S_SMALL, IC_CONSOLIDATE, 0, "Consolidate", ID_CONSOLIDATE, 0, 0, F_NEWCOL, 0, "Combine ranges from several places into one summary" },
 };
-static const Group data[] = { { "Get Data", G_COLS, d_get, N(d_get) }, { "Sort", G_COLS, d_sort, N(d_sort) },
-                              { "Data Tools", G_COLS, d_tools, N(d_tools) } };
+static const Item d_forecast[] = {
+  { K_DROP, S_LARGE, IC_WHATIF, L_WHATIFS, "What-If Analysis", ID_WHATIFDD, 0, 0, 0, 0, "Scenarios, Goal Seek and Data Tables" },
+};
+static const Item d_outline[] = {
+  { K_DROP, S_SMALL, IC_GROUPROWS, L_GROUPS, "Group", ID_GROUPDD, 0, 0, F_SPLIT, 0, "Group the selected rows or columns (Alt-Shift-Right)" },
+  { K_BUTTON, S_SMALL, IC_UNGROUPROWS, 0, "Ungroup", ID_UNGROUP, 0, 0, 0, 0, "Ungroup the selected rows or columns (Alt-Shift-Left)" },
+  { K_BUTTON, S_SMALL, IC_SUBTOTAL, 0, "Subtotal", ID_SUBTOTAL, 0, 0, 0, 0, "Totals at each change in a column, with an outline" },
+  { K_BUTTON, S_SMALL, IC_SHOWDETAIL, 0, "Show Detail", ID_SHOWDETAIL, 0, 0, F_NEWCOL, 0, "Show the rows or columns of the group" },
+  { K_BUTTON, S_SMALL, IC_HIDEDETAIL, 0, "Hide Detail", ID_HIDEDETAIL, 0, 0, 0, 0, "Hide the rows or columns of the group" },
+  { K_BUTTON, S_SMALL, IC_OUTLINESET, 0, "Settings", ID_OUTLINESET, 0, 0, 0, 0, "Where summary rows and columns sit" },
+};
+static const Group data[] = { { "Get Data", G_COLS, d_get, N(d_get) }, { "Sort & Filter", G_COLS, d_sort, N(d_sort) },
+                              { "Data Tools", G_COLS, d_tools, N(d_tools) }, { "Forecast", G_COLS, d_forecast, N(d_forecast) },
+                              { "Outline", G_COLS, d_outline, N(d_outline) } };
 /* Review */
 static const Item r_proof[] = {
   { K_BUTTON, S_LARGE, IC_SPELLING, 0, "Spelling", ID_LX_SPELLING, 0, 0, 0, 0, "Check the spelling of the text in the cells (F7)" },
@@ -410,6 +445,10 @@ static const Item r_notes[] = {
   { K_BUTTON, S_SMALL, IC_SHOWCOMMENTS, 0, "Show All Notes", ID_NOTESHOW, RB_NOTES, 0, 0, 0, "Show every note beside its cell" },
   { K_BUTTON, S_SMALL, IC_COMMENT, 0, "Convert to Comments", ID_LX_CONVERTNOTES, 0, 0, 0, 0, "Turn the workbook's notes into comments that can have replies" },
 };
+static const Item r_protect[] = {
+  { K_BUTTON, S_LARGE, IC_PROTECT, 0, "Protect Sheet", ID_PROTECTSHEET, RB_PROTECTED, 0, 0, 0, "Stop changes to the sheet's locked cells (press again to unprotect)" },
+  { K_BUTTON, S_LARGE, IC_PROTECTBOOK, 0, "Protect Workbook", ID_PROTECTBOOK, RB_BOOKLOCK, 0, 0, 0, "Stop sheets being added, moved, renamed, hidden or deleted" },
+};
 static const Item r_comments[] = {
   { K_BUTTON, S_LARGE, IC_COMMENT, 0, "New Comment", ID_LX_COMMENTNEW, 0, 0, 0, 0, "Start a conversation on the active cell, or reply to its comment" },
   { K_BUTTON, S_SMALL, IC_DELETE, 0, "Delete", ID_LX_COMMENTDEL, 0, LXB_COMMENTS, 0, 0, "Delete the active cell's comment and its replies" },
@@ -418,7 +457,8 @@ static const Item r_comments[] = {
   { K_BUTTON, S_LARGE, IC_SHOWCOMMENTS, 0, "Show Comments", ID_LX_COMMENTSHOW, 0, 0, 0, 0, "Every comment of the workbook with its replies" },
 };
 static const Group review[] = { { "Proofing", G_COLS, r_proof, N(r_proof) }, { "Accessibility", G_COLS, r_access, N(r_access) },
-                                { "Comments", G_COLS, r_comments, N(r_comments) }, { "Notes", G_COLS, r_notes, N(r_notes) }, { "Find", G_COLS, r_find, N(r_find) } };
+                                { "Comments", G_COLS, r_comments, N(r_comments) }, { "Notes", G_COLS, r_notes, N(r_notes) },
+                                { "Protect", G_COLS, r_protect, N(r_protect) }, { "Find", G_COLS, r_find, N(r_find) } };
 /* View */
 static const Item v_views[] = {
   { K_BUTTON, S_LARGE, IC_NORMALVIEW, 0, "Normal", ID_LX_NORMAL, LXB_NORMAL, 0, 0, 0, "The sheet as cells, without pages" },
@@ -496,6 +536,17 @@ static const struct { UWORD id; const char *tip; } tips[] = {
   { ID_CLEARFILTER, "Shows every row the filter hid. The filter buttons stay." },
   { ID_REAPPLY, "Tests each row again after values have changed, hiding the ones that no longer match." },
   { ID_IMPORTCSV, "Reads a CSV or tab-separated text file into a new sheet of this workbook." },
+  { ID_GETDATA, "Reads a CSV or text file into a new sheet or at the active cell. You choose the separator and see how the columns will come out first." },
+  { ID_TEXTCOLS, "Splits the text of each selected cell into several columns: at commas, tabs, semicolons, spaces or a character of your own, or at set widths." },
+  { ID_FLASHFILL, "Type an example or two of what you want beside your data (say the first names out of full names), then Flash Fill finishes the column the same way." },
+  { ID_DVDD, "Rules for what the selected cells may hold: whole numbers or decimals within limits, dates, times, text of a length, or a choice from a list shown as a drop-down on the cell. Circle Invalid Data rings the cells that break their rules." },
+  { ID_CONSOLIDATE, "Adds up (or averages, counts...) ranges from several sheets into one table, matching them by their position or by the labels in their top row and left column." },
+  { ID_WHATIFDD, "Goal Seek finds the input that gives a formula the result you want. Data Table works a formula out for a range of inputs. Scenarios keep sets of input values to switch between." },
+  { ID_GROUPDD, "Groups the selected rows or columns: a bracket with a minus button appears beside the headings, and the level buttons show or hide whole levels at a time." },
+  { ID_SUBTOTAL, "Inserts a total row at each change in a column of a sorted list (SUBTOTAL formulas), a grand total, and an outline to show just the totals." },
+  { ID_ADVFILTER, "Filters a list by conditions written in cells: a heading row naming columns, conditions under it (on one row they must all hold; any row will do). Can copy the matching rows elsewhere, each one once." },
+  { ID_PROTECTSHEET, "Protects the sheet: its locked cells (every cell, unless Format Cells' Protection unlocked it) can't be changed until it is unprotected, with the password if one was given." },
+  { ID_PROTECTBOOK, "Protects the workbook's structure: sheets can't be added, deleted, renamed, moved or hidden until it is unprotected." },
   { ID_DARKUI, "Shows the ribbon, the sheet and everything else in dark colours. The workbook itself doesn't change." },
 };
 static ULONG split_id(UWORD id);
@@ -508,10 +559,11 @@ static const char *tip_for(UWORD id)
 }
 /* the tab strip, left to right. File isn't a tab of tools: a click on it opens the File page */
 static const Tab tabs[] = {
-  { "File", NULL, 0 }, { "Home", home, N(home) }, { "Insert", insert, N(insert) }, { "Page Layout", playout, N(playout) },
+  { "File", NULL, 0 }, { "Home", home, N(home) }, { "Insert", insert, N(insert) }, { "Draw", x_draw, N(x_draw) }, { "Page Layout", playout, N(playout) },
   { "Formulas", formulas, N(formulas) }, { "Data", data, N(data) }, { "Review", review, N(review) }, { "View", view, N(view) },
   /* contextual (TT_CONTEXT_FIRST on): shown while the active cell is in a table or a pivot table */
   { "Table Design", tdesign, N(tdesign) }, { "PivotTable Analyze", panalyze, N(panalyze) }, { "PivotTable Design", pdesign, N(pdesign) },
+  { "Chart Design", x_design, N(x_design) }, { "Format", x_format, N(x_format) }, { "Sparkline", x_spark, N(x_spark) },
 };
 #define NTABS N(tabs)
 /* (ledger.h) the label of entry v of the list of the item that returns id */
@@ -568,13 +620,24 @@ static int rowh(void) { return fh() + 7; }
 static int bodyh(void) { return 3 * rowh() + 4; }
 static int caph(void) { return fh() + 3; }
 
-static int bit_on(struct RData *d, int b) { return b >= CB_INTABLE ? (d->st.ctx & CBIT(b)) != 0 : b >= LXB_FIRST ? lx_bit(b) : (d->st.on & RBIT(b)) != 0; }
-/* a contextual tab is shown while the active cell is in a table (Table Design) or a pivot table */
-static int tab_shown(struct RData *d, int t) { return t < TT_CONTEXT_FIRST || bit_on(d, t == TT_CONTEXT_FIRST ? CB_INTABLE : CB_INPIVOT); }
+static int bit_on(struct RData *d, int b)
+{
+  if (b >= CB_INTABLE) return (d->st.ctx & CBIT(b)) != 0;
+  if (b >= RBX(0)) return (d->st.ext & (1UL << (b - RBX(0)))) != 0;
+  return b >= LXB_FIRST ? lx_bit(b) : (d->st.on & RBIT(b)) != 0;
+}
+/* a contextual tab is shown while the active cell is in a table (Table Design) or a pivot table,
+   or while a chart, an object or a sparkline is selected (charttab.c) */
+static int tab_shown(struct RData *d, int t)
+{
+  if (x_tab_hidden(tabs[t].groups, d->st.ext)) return 0;
+  if (t < TT_CONTEXT_FIRST || t >= TT_CONTEXT_FIRST + 3) return 1;
+  return bit_on(d, t == TT_CONTEXT_FIRST ? CB_INTABLE : CB_INPIVOT);
+}
 static const char *tab_name(struct RData *d, int t)
 {
   static const char *const shortnames[3] = { "Design", "Analyze", "Design" };
-  return t >= TT_CONTEXT_FIRST && d->shortctx ? shortnames[t - TT_CONTEXT_FIRST] : tabs[t].name;
+  return t >= TT_CONTEXT_FIRST && t < TT_CONTEXT_FIRST + 3 && d->shortctx ? shortnames[t - TT_CONTEXT_FIRST] : tabs[t].name;
 }
 static int item_on(struct RData *d, const Item *it) { return it->st && bit_on(d, it->st); }
 static int item_enabled(struct RData *d, const Item *it) { return !it->en || bit_on(d, it->en); }
@@ -649,13 +712,17 @@ static void layout_ribbon(struct RData *d, Object *obj)
   LONG gw[12];
   if (!tab_shown(d, d->tab)) d->tab = 1;
   {
-    LONG all = 0;
-    for (t = 0; t < NTABS; t++) if (tab_shown(d, t)) all += theme_textlen(rp, theme_font(), tabs[t].name) + 16;
-    d->shortctx = all > _mwidth(obj) - NQA * 24 - 8;
+    /* the padding shrinks, then the table tabs take short names, when they would run off the strip */
+    LONG all = 0, pad = 16;
+    int shown = 0;
+    for (t = 0; t < NTABS; t++) if (tab_shown(d, t)) { all += theme_textlen(rp, theme_font(), tabs[t].name); shown++; }
+    while (pad > 4 && all + pad * shown > _mwidth(obj) - NQA * 24 - 8) pad -= 2;
+    d->shortctx = all + pad * shown > _mwidth(obj) - NQA * 24 - 8;
+    for (t = 0; t < NTABS; t++) d->tabbox[t].x0 = (WORD)(tab_shown(d, t) ? pad : -1);
   }
   for (t = 0; t < NTABS; t++) {
-    LONG w = theme_textlen(rp, theme_font(), tab_name(d, t)) + 16;
-    if (!tab_shown(d, t)) { d->tabbox[t].x0 = d->tabbox[t].x1 = -1; continue; }
+    LONG w = theme_textlen(rp, theme_font(), tab_name(d, t)) + d->tabbox[t].x0;
+    if (d->tabbox[t].x0 < 0) { d->tabbox[t].x1 = -1; continue; }
     d->tabbox[t].x0 = (WORD)x; d->tabbox[t].x1 = (WORD)(x + w - 1);
     d->tabbox[t].y0 = (WORD)_mtop(obj); d->tabbox[t].y1 = (WORD)(_mtop(obj) + tabh() - 1);
     x += w;
@@ -762,6 +829,7 @@ static void field_text(struct RData *d, const Item *it, char *out, size_t cap)
   case ID_SIZEDD: sprintf(out, "%d%s", d->st.size / 10, d->st.size % 10 ? ".5" : ""); break;
   case ID_NUMFMTDD: strncpy(out, tr(d->st.numfmt ? d->st.numfmt : "General"), cap - 1); out[cap - 1] = 0; break;
   case ID_TBLNAME: case ID_PVNAME: strncpy(out, d->ctxname, cap - 1); out[cap - 1] = 0; break;
+  default: chartrib_field(it->id, out, cap); break;
   }
 }
 static void draw_item(struct RData *d, Object *obj, int k)
@@ -1168,6 +1236,8 @@ static ULONG split_id(UWORD id)
   case ID_PASTEDD: return ID_PASTE;
   case ID_MERGEDD: return ID_MERGECENTER;
   case ID_AUTOSUMDD: return ID_AUTOSUM;
+  case ID_DVDD: return ID_DV;
+  case ID_GROUPDD: return ID_GROUP;
   case ID_LX_REMOVEDD: return ID_LX_REMOVEARROWS;
   case ID_ZOOMDD: return ID_LX_ZOOMDLG;
   }
@@ -1368,7 +1438,7 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
   case MUIM_Ribbon_State: {
     struct MUIP_Ribbon_State *m = (struct MUIP_Ribbon_State *)msg;
     d = INST_DATA(cl, obj);
-    if (m->on == d->st.on && m->ctx == d->st.ctx && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt)
+    if (m->on == d->st.on && m->ctx == d->st.ctx && m->ext == d->st.ext && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt)
         && !strcmp(m->ctxname ? m->ctxname : "", d->ctxname) && lx_bits_hash() == d->lxhash) return 0;
     d->lxhash = lx_bits_hash();
     d->st = *m;

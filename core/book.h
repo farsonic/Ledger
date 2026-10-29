@@ -133,8 +133,8 @@ typedef struct {
   u8 calcstate;                   /* 0 idle, 1 being computed (circularity check) */
   u8 spill;                       /* a value spilled from a dynamic array formula above or left (no formula of its own) */
 } Cell;
-typedef struct { Cell *c; int n, cap; u16 height; u16 style; u8 hidden, custom, filtered; } Row;   /* filtered: hidden by the AutoFilter */
-typedef struct { u16 width; u16 style; u8 hidden, custom; } ColInfo;
+typedef struct { Cell *c; int n, cap; u16 height; u16 style; u8 hidden, custom, filtered, outline, collapsed; } Row;   /* filtered: hidden by the AutoFilter; outline: level 0-7 (outline.c); collapsed: its group's detail hidden */
+typedef struct { u16 width; u16 style; u8 hidden, custom, outline, collapsed; } ColInfo;
 typedef struct { i32 r1, c1, r2, c2; } Rect;
 /* an AutoFilter column's choice: the shown values (as the cells show them, UTF-8) that pass, and
    whether empty cells do */
@@ -182,11 +182,19 @@ typedef struct {
   Link *links; int nlinks;        /* hyperlinks on cells, in no order */
   struct LTable *tables; int ntables;   /* tables (Format as Table), table.h */
   struct LPivot *pivots; int npivots;   /* pivot tables whose report is on this sheet, pivot.h */
+  struct Drawing *drw;            /* charts, pictures, shapes and sparklines (drawing.h), NULL none */
   u8 hidden, gridlines, headings, showzeros, rtl;
   i32 cur_r, cur_c;               /* where the cursor was, and the selection */
   Rect sel;
   i32 top, left;                  /* the scroll position when last shown */
   u16 zoom;                       /* per cent */
+  /* the Data tab's tools (data.h): validation rules, scenarios, the outline's summary side, protection */
+  struct DVRule *dvs; int ndvs;
+  struct Scenario *scens; int nscens;
+  u8 sumabove, sumleft;           /* outline summaries above / left of their detail (Excel's default: below / right) */
+  u8 protect;                     /* sheet protected: locked cells can't be changed */
+  u16 pwhash, protallow;          /* its password's legacy hash (0 none); what users may still do (PA_ bits) */
+  char protkey[144];              /* or a newer file's password check, "SHA-512:spin:salt:hash" ("" none) */
   struct PageSetup *page;         /* page setup (pagesetup.h), NULL: the defaults */
 } Sheet;
 
@@ -213,6 +221,9 @@ typedef struct {
   UndoStep *open;                 /* the step being recorded (book_begin .. book_end) */
   int nesting;
   double now_override;            /* tests: NOW() returns this when non-zero */
+  u8 lockstruct;                  /* workbook structure protected (sheets can't be added, moved, renamed...) */
+  u16 bookpwhash;                 /* its password's legacy hash (0 none) */
+  char bookkey[144];              /* or a newer file's password check (as Sheet.protkey) */
   struct LayoutBook *lx;          /* more properties, the theme, calculation options (pagesetup.h), NULL: defaults */
 } Book;
 
@@ -240,6 +251,8 @@ int    sheet_cell_style(Sheet *s, i32 r, i32 c);            /* the cell's, else 
 u16    sheet_col_width(Sheet *s, i32 c);                     /* pixels (0 when hidden) */
 u16    sheet_row_height(Sheet *s, i32 r);
 int    sheet_merge_at(Sheet *s, i32 r, i32 c, Rect *m);     /* the merged area holding r,c, if any */
+Row   *sheet_row(Sheet *s, i32 r, int make);                /* row r's info (made if make); NULL if absent */
+ColInfo *sheet_col(Sheet *s, i32 c, int make);
 
 /* editing through the book (recorded for undo; formulas are recomputed unless manual calc) */
 void   book_begin(Book *b);               /* group the following changes into one undo step */

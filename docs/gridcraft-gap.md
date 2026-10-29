@@ -111,7 +111,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Rename Sheet (Cells) `sheet.rename`
 - ✅ Move or Copy Sheet (Cells) `sheet.move`
 - ✅ Tab Color (Cells) `sheet.tabColor`
-- ⬜ Protect Sheet (Cells) `review.protectSheet`
+- ✅ Protect Sheet (Cells) `review.protectSheet`
 - ⬜ Lock Cell (Cells) `home.lockCell`
 - ✅ Format Cells (Cells) `home.formatCells`
 - ✅ AutoSum (Editing) `formulas.autoSum`
@@ -140,34 +140,34 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 
 New Cell Style keeps the active cell's look under a name in Home > My Styles while Ledger runs (not saved in the file). Format as Table, Flash Fill, Protect Sheet and Lock Cell are the table and data work's. Orientation sets and saves the angle; PDF export draws the text at its angle, the screen shows it upright. Draw Border (in the Borders list) draws on the next cells dragged over, one stroke at a time. Add-ins: Ledger has none.
 
-### Insert (2 of 17 by name)
+### Insert (9 of 17 by name)
 
 - ✅ PivotTable (Tables) `insert.pivotTable`
 - ⬜ Recommended PivotTables (Tables) `insert.recommendedPivotTables`
 - ✅ Table (Tables) `insert.table`
-- ⬜ Pictures (Illustrations) `insert.picture`
-- ⬜ Shapes (Illustrations) `insert.shape`
-- ⬜ Icons (Illustrations) `insert.icons`
-- ⬜ Recommended Charts (Charts) `insert.recommendedCharts`
-- ⬜ Charts (Charts) `insert.chart`
+- ✅ Pictures (Illustrations) `insert.picture`
+- ✅ Shapes (Illustrations) `insert.shape`
+- ✅ Icons (Illustrations) `insert.icons`
+- ✅ Recommended Charts (Charts) `insert.recommendedCharts`
+- ✅ Charts (Charts) `insert.chart`
 - ⬜ PivotChart (Charts) `insert.pivotChart`
-- ⬜ Sparklines (Sparklines) `insert.sparkline`
+- ✅ Sparklines (Sparklines) `insert.sparkline`
 - ⬜ Slicer (Filters) `insert.slicer`
 - ✅ Link (Links) `insert.link`
 - ✅ Comment (Comments) `review.newComment`
-- ⬜ Text Box (Text) `insert.textBox`
+- ✅ Text Box (Text) `insert.textBox`
 - ✅ Header & Footer (Text) `pageLayout.headerFooter`
 - ✅ Symbol (Symbols) `insert.symbol`
 - ⬜ Checkbox (Cell Controls) `insert.checkbox`
 
-### Draw (0 of 4 by name)
+### Draw (4 of 4 by name)
 
-- ⬜ Pen (Tools) `draw.pen`
-- ⬜ Eraser (Tools) `draw.eraser`
-- ⬜ Lasso Select (Tools) `draw.lasso`
-- ⬜ Ink to Shape (Convert) `draw.inkToShape`
+- ✅ Pen (Tools) `draw.pen`
+- ✅ Eraser (Tools) `draw.eraser`
+- ✅ Lasso Select (Tools) `draw.lasso`
+- ✅ Ink to Shape (Convert) `draw.inkToShape`
 
-### Page Layout (1 of 23 by name)
+### Page Layout (21 of 23 by name)
 
 - ✅ Themes (Themes) `pageLayout.theme`
 - ✅ Colors (Themes) `pageLayout.themeColors`
@@ -178,7 +178,7 @@ New Cell Style keeps the active cell's look under a name in Home > My Styles whi
 - ✅ Size (Page Setup) `pageLayout.size`
 - ✅ Print Area (Page Setup) `pageLayout.printArea`
 - ✅ Breaks (Page Setup) `pageLayout.breaks`
-- ⬜ Background (Page Setup) `pageLayout.background`
+- ✅ Background (Page Setup) `pageLayout.background`
 - ✅ Print Titles (Page Setup) `pageLayout.printTitles`
 - ✅ Page Setup (Page Setup) `pageLayout.pageSetup`
 - ✅ Scale to Fit (Scale to Fit) `pageLayout.scaleToFit`
@@ -186,14 +186,14 @@ New Cell Style keeps the active cell's look under a name in Home > My Styles whi
 - ✅ Print Gridlines (Sheet Options) `pageLayout.printGridlines`
 - ✅ View Headings (Sheet Options) `view.headings`
 - ✅ Print Headings (Sheet Options) `pageLayout.printHeadings`
-- ⬜ Bring Forward (Arrange) `arrange.bringForward`
-- ⬜ Send Backward (Arrange) `arrange.sendBackward`
-- ⬜ Selection Pane (Arrange) `arrange.selectionPane`
-- ⬜ Align (Arrange) `arrange.align`
+- ✅ Bring Forward (Arrange) `arrange.bringForward`
+- ✅ Send Backward (Arrange) `arrange.sendBackward`
+- ✅ Selection Pane (Arrange) `arrange.selectionPane`
+- ✅ Align (Arrange) `arrange.align`
 - ⬜ Group (Arrange) `arrange.group`
-- ⬜ Rotate (Arrange) `arrange.rotate`
+- ✅ Rotate (Arrange) `arrange.rotate`
 
-Not done on Page Layout: Background (a picture behind the cells: it needs the pictures the chart work brings). Effects only matter to charts and shapes (GridCraft keeps just the name), so they are left out here. The Arrange group (Bring Forward ... Rotate) is for pictures and shapes: the chart work's.
+Not done on Page Layout: Effects only matter to charts and shapes (GridCraft keeps just the name), so they are left out here. Group isn't done: GridCraft's only lines the objects up on the first one (Align does that); a real group would need group shapes (xdr:grpSp) on the sheet and in files.
 
 ### Formulas (13 of 23 by name)
 
@@ -221,29 +221,29 @@ Not done on Page Layout: Background (a picture behind the cells: it needs the pi
 - ✅ Calculate Now (Calculation) `formulas.calculateNow`
 - ✅ Calculate Sheet (Calculation) `formulas.calculateSheet`
 
-### Data (3 of 23 by name)
+### Data (17 of 23 by name; 3 not applicable)
 
 - ✅ Get Data (Get & Transform Data) `data.getData`
 - ✅ From Text/CSV (Get & Transform Data) `data.fromTextCsv`
-- ⬜ From Table/Range (Get & Transform Data) `data.fromTableRange`
-- ⬜ Refresh All (Queries & Connections) `data.refreshAll`
-- ⬜ Queries & Connections (Queries & Connections) `data.queriesConnections`
-- ⬜ Advanced (Sort & Filter) `data.advancedFilter`
-- ⬜ Text to Columns (Data Tools) `data.textToColumns`
-- ⬜ Flash Fill (Data Tools) `data.flashFill`
+- ➖ From Table/Range (Get & Transform Data) `data.fromTableRange` (Ledger has no tables, queries or pivot tables to refresh)
+- ➖ Refresh All (Queries & Connections) `data.refreshAll` (Ledger has no tables, queries or pivot tables to refresh)
+- ➖ Queries & Connections (Queries & Connections) `data.queriesConnections` (Ledger has no tables, queries or pivot tables to refresh)
+- ✅ Advanced (Sort & Filter) `data.advancedFilter`
+- ✅ Text to Columns (Data Tools) `data.textToColumns`
+- ✅ Flash Fill (Data Tools) `data.flashFill`
 - ✅ Remove Duplicates (Data Tools) `data.removeDuplicates`
-- ⬜ Data Validation (Data Tools) `data.validation`
-- ⬜ Circle Invalid Data (Data Tools) `data.circleInvalid`
-- ⬜ Consolidate (Data Tools) `data.consolidate`
-- ⬜ Scenario Manager (Forecast) `data.scenarioManager`
-- ⬜ Goal Seek (Forecast) `data.goalSeek`
-- ⬜ Data Table (Forecast) `data.dataTable`
+- ✅ Data Validation (Data Tools) `data.validation`
+- ✅ Circle Invalid Data (Data Tools) `data.circleInvalid`
+- ✅ Consolidate (Data Tools) `data.consolidate`
+- ✅ Scenario Manager (Forecast) `data.scenarioManager`
+- ✅ Goal Seek (Forecast) `data.goalSeek`
+- ✅ Data Table (Forecast) `data.dataTable`
 - ⬜ Forecast Sheet (Forecast) `data.forecastSheet`
-- ⬜ Group (Outline) `data.group`
-- ⬜ Ungroup (Outline) `data.ungroup`
-- ⬜ Subtotal (Outline) `data.subtotal`
-- ⬜ Show Detail (Outline) `data.showDetail`
-- ⬜ Hide Detail (Outline) `data.hideDetail`
+- ✅ Group (Outline) `data.group`
+- ✅ Ungroup (Outline) `data.ungroup`
+- ✅ Subtotal (Outline) `data.subtotal`
+- ✅ Show Detail (Outline) `data.showDetail`
+- ✅ Hide Detail (Outline) `data.hideDetail`
 - ⬜ Solver (Analysis) `data.solver`
 - ⬜ Data Analysis (Analysis) `data.analysisToolPak`
 
@@ -261,8 +261,8 @@ Not done on Page Layout: Background (a picture behind the cells: it needs the pi
 - ✅ Show/Hide Note (Notes) `review.showNote`
 - ✅ Show All Notes (Notes) `review.showAllNotes`
 - ✅ Convert to Comments (Notes) `review.convertToComments`
-- ⬜ Unprotect Sheet (Protect) `review.unprotectSheet`
-- ⬜ Protect Workbook (Protect) `review.protectWorkbook`
+- ✅ Unprotect Sheet (Protect) `review.unprotectSheet`
+- ✅ Protect Workbook (Protect) `review.protectWorkbook`
 - ⬜ Allow Edit Ranges (Protect) `review.allowEditRanges`
 
 The Protect group (Unprotect Sheet, Protect Workbook, Allow Edit Ranges) is the data work's. Thesaurus offers words sharing the word's stem in the dictionary, as GridCraft's does; Check Accessibility makes GridCraft's checks (merged cells, default sheet names).
@@ -315,22 +315,22 @@ Not done on View: Split (panes that scroll on their own; Freeze Panes and New Wi
 - ✅ Banded Columns (Table Style Options) `table.bandedColumns`
 - ✅ Table Styles (Table Styles) `table.style`
 
-### Chart Design (0 of 8 by name)
+### Chart Design (8 of 8 by name)
 
-- ⬜ Add Chart Element (Chart Layouts) `chart.addElement`
-- ⬜ Quick Layout (Chart Layouts) `chart.quickLayout`
-- ⬜ Change Colors (Chart Styles) `chart.changeColors`
-- ⬜ Chart Styles (Chart Styles) `chart.set`
-- ⬜ Switch Row/Column (Data) `chart.switchRowColumn`
-- ⬜ Select Data (Data) `chart.selectData`
-- ⬜ Change Chart Type (Type) `chart.changeType`
-- ⬜ Move Chart (Location) `chart.move`
+- ✅ Add Chart Element (Chart Layouts) `chart.addElement`
+- ✅ Quick Layout (Chart Layouts) `chart.quickLayout`
+- ✅ Change Colors (Chart Styles) `chart.changeColors`
+- ✅ Chart Styles (Chart Styles) `chart.set`
+- ✅ Switch Row/Column (Data) `chart.switchRowColumn`
+- ✅ Select Data (Data) `chart.selectData`
+- ✅ Change Chart Type (Type) `chart.changeType`
+- ✅ Move Chart (Location) `chart.move`
 
-### Format (0 of 3 by name)
+### Format (3 of 3 by name)
 
-- ⬜ Format Selection (Current Selection) `chart.formatSelection`
-- ⬜ Shape Fill (Shape Styles) `chart.shapeFill`
-- ⬜ Shape Outline (Shape Styles) `chart.shapeOutline`
+- ✅ Format Selection (Current Selection) `chart.formatSelection`
+- ✅ Shape Fill (Shape Styles) `chart.shapeFill`
+- ✅ Shape Outline (Shape Styles) `chart.shapeOutline`
 
 ### PivotTable Analyze (3 of 13 by name)
 
