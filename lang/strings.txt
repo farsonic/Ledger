@@ -2533,3 +2533,160 @@ Month/Day/Year	Monat/Tag/Jahr	Mois/Jour/Année	Mes/Día/Año	Mese/Giorno/Anno
 Win/Loss	Gewinn/Verlust	Positif/Négatif	Ganancia/Pérdida	Positivi/Negativi
 Win/Loss...	Gewinn/Verlust...	Positif/Négatif...	Ganancia/Pérdida...	Positivi/Negativi...
 Header/Footer	Kopf-/Fußzeile	En-tête/Pied	Encabezado/Pie	Intestaz./Piè di pag.
+## Solver, Analysis ToolPak, Forecast Sheet, Allow Edit Ranges (anatab.c)
+Forecast Sheet	Prognoseblatt	Feuille de prévision	Hoja de previsión	Foglio previsione
+Forecast Sheet...	Prognoseblatt...	Feuille de prévision...	Hoja de previsión...	Foglio previsione...
+Solver	Solver	Solveur	Solver	Risolutore
+Solver...	Solver...	Solveur...	Solver...	Risolutore...
+Solver Parameters	Solver-Parameter	Paramètres du solveur	Parámetros de Solver	Parametri del Risolutore
+Solver Results	Solver-Ergebnisse	Résultats du solveur	Resultados de Solver	Risultati del Risolutore
+Data Analysis	Datenanalyse	Analyse de données	Análisis de datos	Analisi dati
+Data Analysis...	Datenanalyse...	Analyse de données...	Análisis de datos...	Analisi dati...
+Analysis	Analyse	Analyse	Análisis	Analisi
+Allow Edit Ranges	Bearbeiten von Bereichen zulassen	Permettre la modification des plages	Permitir editar rangos	Consenti modifica intervalli
+Allow Edit Ranges...	Bearbeiten von Bereichen zulassen...	Permettre la modification des plages...	Permitir editar rangos...	Consenti modifica intervalli...
+Checkbox	Kontrollkästchen	Case à cocher	Casilla	Casella di controllo
+Lock Cell	Zelle sperren	Verrouiller la cellule	Bloquear celda	Blocca cella
+Modify Range	Bereich ändern	Modifier la plage	Modificar rango	Modifica intervallo
+New Range	Neuer Bereich	Nouvelle plage	Nuevo rango	Nuovo intervallo
+Refers to cells:	Bezieht sich auf Zellen:	Fait référence aux cellules :	Correspondiente a las celdas:	Riferito a celle:
+Range password:	Bereichskennwort:	Mot de passe de la plage :	Contraseña del rango:	Password intervallo:
+Refers to cells must be cells of this sheet, as A1:B5 or A1:A9,C1:C9.	"Bezieht sich auf Zellen" muss Zellen dieses Blatts angeben, z. B. A1:B5 oder A1:A9;C1:C9.	Les cellules doivent être des cellules de cette feuille, comme A1:B5 ou A1:A9,C1:C9.	Las celdas deben ser de esta hoja, como A1:B5 o A1:A9,C1:C9.	Le celle devono essere di questo foglio, come A1:B5 o A1:A9,C1:C9.
+Allow Users to Edit Ranges	Benutzer dürfen Bereiche bearbeiten	Permettre aux utilisateurs de modifier des plages	Permitir que los usuarios modifiquen rangos	Consenti agli utenti di modificare intervalli
+Ranges unlocked by a password when the sheet is protected:	Bereiche, die bei geschütztem Blatt durch ein Kennwort entsperrt werden:	Plages déverrouillées par un mot de passe quand la feuille est protégée :	Rangos desbloqueados por contraseña cuando la hoja está protegida:	Intervalli sbloccati da una password quando il foglio è protetto:
+Modify...	Ändern...	Modifier...	Modificar...	Modifica...
+Unprotect Sheet...	Blattschutz aufheben...	Ôter la protection de la feuille...	Desproteger hoja...	Rimuovi protezione foglio...
+  (password)	  (Kennwort)	  (mot de passe)	  (contraseña)	  (password)
+A cell you are trying to change is password protected. Password for	Eine Zelle, die Sie ändern möchten, ist kennwortgeschützt. Kennwort für	Une cellule que vous tentez de modifier est protégée par mot de passe. Mot de passe de	Una celda que intenta cambiar está protegida con contraseña. Contraseña de	Una cella che stai cercando di modificare è protetta da password. Password per
+Unlock Range	Bereich entsperren	Déverrouiller la plage	Desbloquear rango	Sblocca intervallo
+Value Of:	Wert:	Valeur :	Valor de:	Valore di:
+GRG Nonlinear	GRG-Nichtlinear	GRG non linéaire	GRG Nonlinear	GRG non lineare
+Simplex LP	Simplex-LP	Simplex PL	Simplex LP	Simplex LP
+Evolutionary	EA (Evolutionär)	Évolutionnaire	Evolutionary	Evolutivo
+GRG Nonlinear: a local optimum of a smooth model, from the variables' current values.	GRG-Nichtlinear: ein lokales Optimum eines glatten Modells, ausgehend von den aktuellen Werten der Variablen.	GRG non linéaire : un optimum local d'un modèle régulier, à partir des valeurs actuelles des variables.	GRG Nonlinear: un óptimo local de un modelo suave, desde los valores actuales de las variables.	GRG non lineare: un ottimo locale di un modello regolare, dai valori correnti delle variabili.
+Simplex LP: linear models, solved exactly; whole numbers by branch and bound.	Simplex-LP: lineare Modelle, exakt gelöst; ganze Zahlen per Branch and Bound.	Simplex PL : modèles linéaires, résolus exactement ; entiers par séparation et évaluation.	Simplex LP: modelos lineales, resueltos exactamente; enteros por ramificación y acotación.	Simplex LP: modelli lineari, risolti esattamente; interi con branch and bound.
+Evolutionary: a genetic search for models that aren't smooth; every variable needs bounds.	Evolutionär: eine genetische Suche für nicht glatte Modelle; jede Variable braucht Grenzen.	Évolutionnaire : une recherche génétique pour les modèles non réguliers ; chaque variable doit être bornée.	Evolutionary: una búsqueda genética para modelos no suaves; cada variable necesita límites.	Evolutivo: una ricerca genetica per modelli non regolari; ogni variabile richiede limiti.
+Change Constraint	Nebenbedingung ändern	Modifier la contrainte	Cambiar restricción	Cambia vincolo
+Add Constraint	Nebenbedingung hinzufügen	Ajouter une contrainte	Agregar restricción	Aggiungi vincolo
+Cell Reference:	Zellbezug:	Référence de cellule :	Referencia de la celda:	Riferimento di cella:
+Constraint:	Nebenbedingung:	Contrainte :	Restricción:	Vincolo:
+Enter a cell reference.	Geben Sie einen Zellbezug ein.	Entrez une référence de cellule.	Escriba una referencia de celda.	Immetti un riferimento di cella.
+Enter a constraint value: a number or a cell reference.	Geben Sie einen Wert für die Nebenbedingung ein: eine Zahl oder einen Zellbezug.	Entrez une valeur de contrainte : un nombre ou une référence de cellule.	Escriba un valor de restricción: un número o una referencia de celda.	Immetti un valore di vincolo: un numero o un riferimento di cella.
+Keep Solver Solution	Solver-Lösung beibehalten	Garder la solution du solveur	Conservar solución de Solver	Mantieni soluzione Risolutore
+Restore Original Values	Ausgangswerte wiederherstellen	Rétablir les valeurs d'origine	Restaurar valores originales	Ripristina valori originali
+Reports:	Berichte:	Rapports :	Informes:	Rapporti:
+Answer	Antwort	Réponses	Respuestas	Valori
+Limits	Grenzen	Limites	Límites	Limiti
+Return to Solver Parameters Dialog	Zurück zum Dialogfeld "Solver-Parameter"	Revenir à la boîte de dialogue Paramètres du solveur	Volver al cuadro de diálogo Parámetros de Solver	Torna a Parametri del Risolutore
+Set Objective:	Ziel festlegen:	Objectif à définir :	Establecer objetivo:	Imposta obiettivo:
+To:	Bis:	À :	Para:	A:
+By Changing Variable Cells:	Durch Ändern von Variablenzellen:	Cellules variables :	Cambiando las celdas de variables:	Modificando le celle variabili:
+Subject to the Constraints:	Unterliegt den Nebenbedingungen:	Contraintes :	Sujeto a las restricciones:	Vincoli:
+Change...	Ändern...	Modifier...	Cambiar...	Cambia...
+Reset All	Alles zurücksetzen	Réinitialiser	Restablecer todo	Reimposta tutto
+Make Unconstrained Variables Non-Negative	Nicht eingeschränkte Variablen als nicht-negativ festlegen	Rendre les variables sans contrainte non négatives	Convertir variables sin restricciones en no negativas	Rendi non negative le variabili senza vincoli
+Select a Solving Method:	Lösungsmethode auswählen:	Sélectionner une méthode de résolution :	Método de resolución:	Selezionare un metodo di risoluzione:
+Multistart	Multistart	Démarrage multiple	Inicio múltiple	Multistart
+Max evaluations:	Max. Auswertungen:	Évaluations max. :	Evaluaciones máx.:	Valutazioni max:
+Solve	Lösen	Résoudre	Resolver	Risolvi
+Reset all Solver options and cell selections?	Alle Solver-Optionen und Zellauswahlen zurücksetzen?	Réinitialiser toutes les options et sélections de cellules du solveur ?	¿Restablecer todas las opciones y selecciones de celdas de Solver?	Reimpostare tutte le opzioni e le selezioni di celle del Risolutore?
+Enter the objective cell (Set Objective).	Geben Sie die Zielzelle ein (Ziel festlegen).	Entrez la cellule objectif (Objectif à définir).	Escriba la celda objetivo (Establecer objetivo).	Immetti la cella obiettivo (Imposta obiettivo).
+Solver: working...	Solver: wird berechnet...	Solveur : calcul en cours...	Solver: trabajando...	Risolutore: calcolo in corso...
+Uniform	Gleichverteilung	Uniforme	Uniforme	Uniforme
+Bernoulli	Bernoulli	Bernoulli	Bernoulli	Bernoulli
+Binomial	Binomial	Binomiale	Binomial	Binomiale
+Poisson	Poisson	Poisson	Poisson	Poisson
+Patterned	Gemustert	Modèle	Frecuencia relativa	Modello
+Discrete	Diskret	Discrète	Discreta	Discreta
+Random	Zufällig	Aléatoire	Aleatorio	Casuale
+Periodic	Periodisch	Périodique	Periódico	Periodico
+Input Range:	Eingabebereich:	Plage d'entrée :	Rango de entrada:	Intervallo di input:
+Grouped By:	Geordnet nach:	Groupées par :	Agrupado por:	Dati raggruppati per:
+Labels in first row	Beschriftungen in erster Zeile	Intitulés en première ligne	Rótulos en la primera fila	Etichette nella prima riga
+Alpha:	Alpha:	Seuil de signification :	Alfa:	Alfa:
+Variable 1 Range:	Bereich Variable 1:	Plage pour la variable 1 :	Rango para la variable 1:	Intervallo variabile 1:
+Variable 2 Range:	Bereich Variable 2:	Plage pour la variable 2 :	Rango para la variable 2:	Intervallo variabile 2:
+Rows per sample:	Zeilen pro Stichprobe:	Lignes par échantillon :	Filas por muestra:	Righe per campione:
+Labels	Beschriftungen	Intitulés	Rótulos	Etichette
+Summary statistics	Statistische Kenngrößen	Rapport détaillé	Resumen de estadísticas	Riepilogo statistiche
+Confidence Level for Mean (%, 0 none):	Konfidenzniveau für Mittelwert (%, 0 keins):	Niveau de confiance pour la moyenne (%, 0 aucun) :	Nivel de confianza para la media (%, 0 ninguno):	Livello di confidenza per media (%, 0 nessuno):
+Kth Largest (0 none):	k-größter Wert (0 keiner):	K-ième plus grande valeur (0 aucune) :	K-ésimo mayor (0 ninguno):	K-esimo più grande (0 nessuno):
+Kth Smallest (0 none):	k-kleinster Wert (0 keiner):	K-ième plus petite valeur (0 aucune) :	K-ésimo menor (0 ninguno):	K-esimo più piccolo (0 nessuno):
+Damping factor:	Dämpfungsfaktor:	Facteur d'amortissement :	Factor de suavización:	Fattore di smorzamento:
+Standard Errors	Standardfehler	Erreurs-types	Errores típicos	Errori standard
+Inverse	Invertieren	Inverse	Inversa	Inverti
+Bin Range (blank: automatic):	Klassenbereich (leer: automatisch):	Plage des classes (vide : automatique) :	Rango de clases (vacío: automático):	Intervallo della classe (vuoto: automatico):
+Pareto (sorted histogram)	Pareto (sortiertes Histogramm)	Pareto (histogramme trié)	Pareto (histograma ordenado)	Pareto (istogramma ordinato)
+Cumulative Percentage	Kumulierte Häufigkeit	Pourcentage cumulé	Porcentaje acumulado	Percentuale cumulativa
+Interval:	Intervall:	Intervalle :	Intervalo:	Intervallo:
+Number of Variables:	Anzahl der Variablen:	Nombre de variables :	Número de variables:	Numero di variabili:
+Number of Random Numbers:	Anzahl der Zufallszahlen:	Nombre de nombres aléatoires :	Cantidad de números aleatorios:	Numero di numeri casuali:
+Distribution:	Verteilung:	Distribution :	Distribución:	Distribuzione:
+Value and Probability Input Range:	Eingabebereich für Werte und Wahrscheinlichkeiten:	Plage de valeurs et de probabilités :	Rango de entrada de valores y probabilidades:	Intervallo di input valori e probabilità:
+Random Seed (0 none):	Ausgangswert (0 keiner):	Graine aléatoire (0 aucune) :	Iniciar con (0 ninguno):	Seme casuale (0 nessuno):
+Input Y Range:	Y-Eingabebereich:	Plage pour la variable Y :	Rango Y de entrada:	Intervallo di input Y:
+Input X Range:	X-Eingabebereich:	Plage pour la variable X :	Rango X de entrada:	Intervallo di input X:
+Constant is Zero	Konstante ist Null	Intersection à l'origine	Constante igual a cero	Passa per l'origine
+Confidence Level (%):	Konfidenzniveau (%):	Niveau de confiance (%) :	Nivel de confianza (%):	Livello di confidenza (%):
+Residuals	Residuen	Résidus	Residuos	Residui
+Standardized Residuals	Standardisierte Residuen	Résidus normalisés	Residuos estándares	Residui standardizzati
+Normal Probability	Wahrscheinlichkeitsdiagramm	Tracé des probabilités normales	Gráfico de probabilidad normal	Tracciato probabilità normale
+Sampling Method:	Verfahren:	Méthode d'échantillonnage :	Método de muestreo:	Metodo di campionamento:
+Period or Number of Samples:	Periode oder Anzahl der Stichproben:	Période ou nombre d'échantillons :	Período o número de muestras:	Periodo o numero di campioni:
+Hypothesized Mean Difference:	Hypothetische Differenz der Mittelwerte:	Différence hypothétique des moyennes :	Diferencia hipotética entre las medias:	Differenza ipotizzata per le medie:
+Variable 1 Variance (known):	Varianz der Variablen 1 (bekannt):	Variance de la variable 1 (connue) :	Varianza de la variable 1 (conocida):	Varianza variabile 1 (nota):
+Variable 2 Variance (known):	Varianz der Variablen 2 (bekannt):	Variance de la variable 2 (connue) :	Varianza de la variable 2 (conocida):	Varianza variabile 2 (nota):
+Between:	Zwischen:	Entre :	Entre:	Tra:
+and:	und:	et :	y:	e:
+Mean:	Mittelwert:	Moyenne :	Media:	Media:
+Standard deviation:	Standardabweichung:	Écart type :	Desviación estándar:	Deviazione standard:
+p Value:	p-Wert:	Valeur p :	Valor p:	Valore p:
+Number of trials:	Anzahl der Versuche:	Nombre d'essais :	Número de ensayos:	Numero di prove:
+Lambda:	Lambda:	Lambda :	Lambda:	Lambda:
+From:	Von:	De :	De:	Da:
+In steps of:	Schrittweite:	Par pas de :	Con incrementos de:	Con incrementi di:
+Repeating each number:	Zahlen wiederholen:	Répétition de chaque nombre :	Repetir cada número:	Ripeti ogni numero:
+Repeating each sequence:	Folge wiederholen:	Répétition de chaque séquence :	Repetir cada secuencia:	Ripeti ogni sequenza:
+Output Range	Ausgabebereich	Plage de sortie	Rango de salida	Intervallo di output
+New Worksheet Ply	Neues Tabellenblatt	Nouvelle feuille	En una hoja nueva	Nuovo foglio di lavoro
+Output options	Ausgabeoptionen	Options de sortie	Opciones de salida	Opzioni di output
+Output to:	Ausgabe in:	Sortie vers :	Salida en:	Output in:
+Output Range:	Ausgabebereich:	Plage de sortie :	Rango de salida:	Intervallo di output:
+New Worksheet Ply:	Neues Tabellenblatt:	Nouvelle feuille :	En una hoja nueva:	Nuovo foglio di lavoro:
+Enter the output range's top left cell.	Geben Sie die linke obere Zelle des Ausgabebereichs ein.	Entrez la cellule en haut à gauche de la plage de sortie.	Escriba la celda superior izquierda del rango de salida.	Immetti la cella in alto a sinistra dell'intervallo di output.
+Output range will overwrite existing data. Press OK to overwrite data in range:	Der Ausgabebereich überschreibt vorhandene Daten. Drücken Sie OK, um die Daten im Bereich zu überschreiben:	La plage de sortie va écraser des données existantes. Cliquez sur OK pour écraser les données de la plage :	El rango de salida sobrescribirá datos existentes. Pulse Aceptar para sobrescribir los datos del rango:	L'intervallo di output sovrascriverà dati esistenti. Premi OK per sovrascrivere i dati nell'intervallo:
+The tool couldn't make its report.	Das Tool konnte seinen Bericht nicht erstellen.	L'outil n'a pas pu produire son rapport.	La herramienta no pudo crear su informe.	Lo strumento non è riuscito a creare il rapporto.
+Analysis Tools	Analysefunktionen	Outils d'analyse	Funciones para análisis	Strumenti di analisi
+Detect Automatically	Automatisch erkennen	Détecter automatiquement	Detectar automáticamente	Rileva automaticamente
+Set Manually	Manuell festlegen	Définir manuellement	Establecer manualmente	Imposta manualmente
+Interpolation	Interpolation	Interpolation	Interpolación	Interpolazione
+Zeros	Nullen	Zéros	Ceros	Zeri
+CountA	Anzahl2	NbVal	ContarA	Conta.valori
+Median	Median	Médiane	Mediana	Mediana
+Select a timeline column and a values column for the forecast.	Markieren Sie für die Prognose eine Zeitachsenspalte und eine Wertespalte.	Sélectionnez une colonne de chronologie et une colonne de valeurs pour la prévision.	Seleccione una columna de escala de tiempo y una de valores para la previsión.	Seleziona una colonna della sequenza temporale e una dei valori per la previsione.
+Create Forecast Worksheet	Prognosearbeitsblatt erstellen	Créer une feuille de prévision	Crear hoja de previsión	Crea foglio previsione
+Timeline Range:	Zeitachsenbereich:	Plage chronologique :	Rango de escala de tiempo:	Intervallo sequenza temporale:
+Values Range:	Wertebereich:	Plage de valeurs :	Rango de valores:	Intervallo valori:
+Forecast End:	Prognoseende:	Fin de la prévision :	Fin de la previsión:	Fine previsione:
+Seasonality:	Saisonalität:	Caractère saisonnier :	Estacionalidad:	Stagionalità:
+Confidence Interval:	Konfidenzintervall:	Intervalle de confiance :	Intervalo de confianza:	Intervallo di confidenza:
+Fill Missing Points Using:	Fehlende Punkte füllen mit:	Compléter les points manquants à l'aide de :	Rellenar puntos faltantes con:	Riempi punti mancanti con:
+Aggregate Duplicates Using:	Duplikate aggregieren mit:	Agréger les doublons à l'aide de :	Agregar duplicados con:	Aggrega duplicati con:
+Chart:	Diagramm:	Graphique :	Gráfico:	Grafico:
+Include Forecast Statistics	Prognosestatistik einschließen	Inclure les statistiques de prévision	Incluir estadísticas de previsión	Includi statistiche previsione
+Create	Erstellen	Créer	Crear	Crea
+Forecast End must be a number or a date on the timeline.	Das Prognoseende muss eine Zahl oder ein Datum auf der Zeitachse sein.	La fin de la prévision doit être un nombre ou une date de la chronologie.	El fin de la previsión debe ser un número o una fecha de la escala de tiempo.	La fine della previsione deve essere un numero o una data della sequenza temporale.
+The forecast couldn't be made.	Die Prognose konnte nicht erstellt werden.	Impossible de faire la prévision.	No se pudo hacer la previsión.	Impossibile fare la previsione.
+The workbook's structure is protected: sheets can't be added.\nUnprotect it first (Review, Protect Workbook).	Die Struktur der Arbeitsmappe ist geschützt: Es können keine Blätter hinzugefügt werden.\nHeben Sie zuerst den Schutz auf (Überprüfen, Arbeitsmappe schützen).	La structure du classeur est protégée : impossible d'ajouter des feuilles.\nÔtez d'abord la protection (Révision, Protéger le classeur).	La estructura del libro está protegida: no se pueden agregar hojas.\nDesprotéjalo primero (Revisar, Proteger libro).	La struttura della cartella è protetta: non si possono aggiungere fogli.\nRimuovi prima la protezione (Revisione, Proteggi cartella di lavoro).
+Allow Edit Ranges can't be changed while the sheet is protected.\nUnprotect it first (Review, Protect Sheet).	"Bearbeiten von Bereichen zulassen" kann bei geschütztem Blatt nicht geändert werden.\nHeben Sie zuerst den Blattschutz auf (Überprüfen, Blatt schützen).	Permettre la modification des plages ne peut pas changer tant que la feuille est protégée.\nÔtez d'abord la protection (Révision, Protéger la feuille).	Permitir editar rangos no se puede cambiar mientras la hoja esté protegida.\nDesprotéjala primero (Revisar, Proteger hoja).	Consenti modifica intervalli non si può cambiare mentre il foglio è protetto.\nRimuovi prima la protezione (Revisione, Proteggi foglio).
+Select fewer cells (100,000 at most).	Markieren Sie weniger Zellen (höchstens 100.000).	Sélectionnez moins de cellules (100 000 au plus).	Seleccione menos celdas (100.000 como máximo).	Seleziona meno celle (al massimo 100.000).
+Cell controls: checkboxes in the selected cells (TRUE ticked, FALSE not; click or Space to tick)	Zellsteuerelemente: Kontrollkästchen in den markierten Zellen (TRUE angehakt, FALSE nicht; Klick oder Leertaste zum Ankreuzen)	Contrôles de cellule : cases à cocher dans les cellules sélectionnées (TRUE cochée, FALSE non ; clic ou Espace pour cocher)	Controles de celda: casillas en las celdas seleccionadas (TRUE marcada, FALSE no; clic o Espacio para marcar)	Controlli cella: caselle di controllo nelle celle selezionate (TRUE spuntata, FALSE no; clic o Spazio per spuntare)
+A new sheet forecasting the selected timeline's values, with a chart	Ein neues Blatt mit einer Prognose der Werte der markierten Zeitachse, mit Diagramm	Une nouvelle feuille prévoyant les valeurs de la chronologie sélectionnée, avec un graphique	Una hoja nueva con la previsión de los valores de la escala de tiempo seleccionada, con un gráfico	Un nuovo foglio con la previsione dei valori della sequenza temporale selezionata, con un grafico
+Find the variable cells' values that make a formula largest, smallest or a value	Die Werte der Variablenzellen finden, die eine Formel maximieren, minimieren oder auf einen Wert bringen	Trouver les valeurs des cellules variables qui rendent une formule maximale, minimale ou égale à une valeur	Hallar los valores de las celdas de variables que hacen una fórmula máxima, mínima o igual a un valor	Trova i valori delle celle variabili che rendono una formula massima, minima o pari a un valore
+The Analysis ToolPak: regression, Anova, t-tests, histograms and more	Die Analyse-Funktionen: Regression, Anova, t-Tests, Histogramme und mehr	L'utilitaire d'analyse : régression, analyse de variance, tests t, histogrammes et plus	Las herramientas para análisis: regresión, análisis de varianza, pruebas t, histogramas y más	Gli strumenti di analisi: regressione, analisi varianza, test t, istogrammi e altro
+Ranges that stay editable on a protected sheet, with or without a password	Bereiche, die auf einem geschützten Blatt bearbeitbar bleiben, mit oder ohne Kennwort	Les plages qui restent modifiables sur une feuille protégée, avec ou sans mot de passe	Rangos que siguen siendo editables en una hoja protegida, con o sin contraseña	Intervalli che restano modificabili in un foglio protetto, con o senza password
+Makes a new sheet from a timeline and its values: the history, a forecast by exponential smoothing (FORECAST.ETS) with its confidence bounds, and a chart.	Erstellt aus einer Zeitachse und ihren Werten ein neues Blatt: den Verlauf, eine Prognose durch exponentielle Glättung (FORECAST.ETS) mit ihren Konfidenzgrenzen und ein Diagramm.	Crée une nouvelle feuille à partir d'une chronologie et de ses valeurs : l'historique, une prévision par lissage exponentiel (FORECAST.ETS) avec ses bornes de confiance, et un graphique.	Crea una hoja nueva a partir de una escala de tiempo y sus valores: el historial, una previsión por suavizado exponencial (FORECAST.ETS) con sus límites de confianza y un gráfico.	Crea un nuovo foglio da una sequenza temporale e dai suoi valori: lo storico, una previsione per livellamento esponenziale (FORECAST.ETS) con i limiti di confidenza e un grafico.
+Solver changes the variable cells to make the objective cell as large or small as it can be, or a set value, keeping to the constraints. Simplex LP for linear models, GRG Nonlinear for smooth ones, Evolutionary for others.	Der Solver ändert die Variablenzellen so, dass die Zielzelle so groß oder klein wie möglich wird oder einen festen Wert annimmt, unter Einhaltung der Nebenbedingungen. Simplex-LP für lineare Modelle, GRG-Nichtlinear für glatte, Evolutionär für andere.	Le solveur modifie les cellules variables pour rendre la cellule objectif aussi grande ou petite que possible, ou égale à une valeur, en respectant les contraintes. Simplex PL pour les modèles linéaires, GRG non linéaire pour les modèles réguliers, Évolutionnaire pour les autres.	Solver cambia las celdas de variables para que la celda objetivo sea lo mayor o menor posible, o un valor dado, respetando las restricciones. Simplex LP para modelos lineales, GRG Nonlinear para los suaves, Evolutionary para el resto.	Il Risolutore modifica le celle variabili per rendere la cella obiettivo più grande o più piccola possibile, o pari a un valore, rispettando i vincoli. Simplex LP per modelli lineari, GRG non lineare per quelli regolari, Evolutivo per gli altri.
+The Analysis ToolPak's tools: Anova, correlation, covariance, descriptive statistics, smoothing, F, t and z tests, Fourier analysis, histograms, random numbers, rank and percentile, regression and sampling.	Die Analyse-Funktionen: Anova, Korrelation, Kovarianz, Populationskenngrößen, Glättung, F-, t- und z-Tests, Fourieranalyse, Histogramme, Zufallszahlen, Rang und Quantil, Regression und Stichproben.	Les outils de l'utilitaire d'analyse : analyse de variance, corrélation, covariance, statistiques descriptives, lissage, tests F, t et z, analyse de Fourier, histogrammes, nombres aléatoires, rang et centile, régression et échantillonnage.	Las herramientas para análisis: análisis de varianza, correlación, covarianza, estadística descriptiva, suavizado, pruebas F, t y z, análisis de Fourier, histogramas, números aleatorios, jerarquía y percentil, regresión y muestreo.	Gli strumenti di analisi: analisi varianza, correlazione, covarianza, statistica descrittiva, livellamento, test F, t e z, analisi di Fourier, istogrammi, numeri casuali, rango e percentile, regressione e campionamento.
+Ranges of cells that can still be changed when the sheet is protected, each with a password or none.	Zellbereiche, die bei geschütztem Blatt noch geändert werden können, jeweils mit oder ohne Kennwort.	Les plages de cellules encore modifiables quand la feuille est protégée, chacune avec ou sans mot de passe.	Rangos de celdas que aún se pueden cambiar con la hoja protegida, cada uno con contraseña o sin ella.	Intervalli di celle ancora modificabili quando il foglio è protetto, ognuno con o senza password.
+Makes the selected cells checkboxes: a ticked box is TRUE, an empty one FALSE, so formulas can use them. Click a box or press Space to tick it.	Macht die markierten Zellen zu Kontrollkästchen: Ein angehaktes ist TRUE, ein leeres FALSE, sodass Formeln sie verwenden können. Kästchen anklicken oder Leertaste drücken zum Ankreuzen.	Transforme les cellules sélectionnées en cases à cocher : une case cochée vaut TRUE, une vide FALSE, pour que les formules puissent les utiliser. Cliquez sur une case ou appuyez sur Espace pour la cocher.	Convierte las celdas seleccionadas en casillas: una marcada es TRUE y una vacía FALSE, para que las fórmulas puedan usarlas. Haga clic en una casilla o pulse Espacio para marcarla.	Trasforma le celle selezionate in caselle di controllo: una spuntata vale TRUE, una vuota FALSE, così le formule possono usarle. Fai clic su una casella o premi Spazio per spuntarla.

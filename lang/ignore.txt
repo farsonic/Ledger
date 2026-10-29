@@ -121,3 +121,7 @@ Icon: %s %lu
 Straight Connector
 Pivot
 Field%d
+Range%d
+int
+bin
+dif
