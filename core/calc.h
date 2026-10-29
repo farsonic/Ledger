@@ -18,7 +18,7 @@ typedef struct {
    with e = 1); it returns a new value (owned by the caller) */
 typedef Value (*FuncFn)(Ctx *cx, Value *args, int argc);
 typedef struct { const char *name; u8 minargs, maxargs; u8 flags; FuncFn fn; } FuncDef;
-enum { FF_VOLATILE = 1 };
+enum { FF_VOLATILE = 1, FF_XLFN = 2 };   /* FF_XLFN: files write it with the _xlfn. prefix (new since Excel 2007) */
 extern const FuncDef *func_table;   /* every function, in name order (after func_init) */
 extern int func_count;
 void func_init(void);

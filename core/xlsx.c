@@ -959,7 +959,15 @@ static void file_formula(Book *b, int sheet, const Formula *f, Buf *o)
       int k;
       while (isalnum((u8)*e) || *e == '.' || *e == '_') e++;
       n = (size_t)(e - p);
-      if (*e == '(') for (k = 0; xlfn[k]; k++) if (strlen(xlfn[k]) == n && !strncasecmp(xlfn[k], p, n)) { buf_adds(o, "_xlfn."); break; }
+      if (*e == '(') {
+        char nm[64];
+        int id;
+        for (k = 0; xlfn[k]; k++) if (strlen(xlfn[k]) == n && !strncasecmp(xlfn[k], p, n)) { buf_adds(o, "_xlfn."); break; }
+        if (!xlfn[k] && n < sizeof nm) {
+          memcpy(nm, p, n); nm[n] = 0;
+          if ((id = func_lookup(nm)) >= 0 && (func_table[id].flags & FF_XLFN)) buf_adds(o, "_xlfn.");
+        }
+      }
       buf_add(o, p, n);
       p = e;
       continue;
