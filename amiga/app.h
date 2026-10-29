@@ -64,7 +64,7 @@ enum { FX_BOLD, FX_ITALIC, FX_UNDERLINE, FX_STRIKE, FX_FONT, FX_SIZE, FX_COLOR, 
 typedef struct { int what; long value; const char *text; const Style *st; const Font *font; } FmtEdit;
 void   apply_format(int what, long value, const char *text);
 void   apply_style(const Style *st, const Font *f, unsigned mask);   /* (Format Cells: the masked parts of st and f) */
-enum { SM_NUMFMT = 1, SM_HALIGN = 2, SM_VALIGN = 4, SM_WRAP = 8, SM_INDENT = 16, SM_FONT = 32, SM_BORDER = 64, SM_FILL = 128 };
+enum { SM_NUMFMT = 1, SM_HALIGN = 2, SM_VALIGN = 4, SM_WRAP = 8, SM_INDENT = 16, SM_FONT = 32, SM_BORDER = 64, SM_FILL = 128, SM_PROT = 256 };
 /* the number format of a category of the Number list (ribbon order), with decimals places */
 const char *numfmt_code(int category, int decimals, char *out, size_t cap);
 /* the category a format code belongs to, for the Number field (Latin-1 name) */

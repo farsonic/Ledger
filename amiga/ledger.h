@@ -44,6 +44,7 @@ extern struct Library *MUIMasterBase;
 #define MUIA_Grid_ShowNotes (QTAG + 18)    /* every note shown beside its cell (else only the one under the mouse) */
 #define MUIA_Grid_FilterCol (QTAG + 17)    /* (get) the column whose AutoFilter button was clicked (after ID_FILTERCOL) */
 #define MUIA_Grid_ObjView   (QTAG + 40)    /* (get) the grid's charts and drawings view (chartview.h) */
+#define MUIA_Grid_CellBox   (QTAG + 41)    /* (get) LONG[4]: the active cell's box in window pixels (x0, y0, x1, y1; -1 not shown) */
 
 #define MUIM_Grid_Refresh   (QTAG + 0x100)   /* everything drawn afresh (after main.c changed the workbook) */
 #define MUIM_Grid_Edit      (QTAG + 0x101)   /* struct MUIP_Grid_Edit: start editing the active cell */
@@ -77,7 +78,8 @@ void grid_edit_text(Book *b, int sheet, i32 r, i32 c, char *out, size_t cap);
 enum {
   RB_BOLD = 1, RB_ITALIC, RB_UNDERLINE, RB_STRIKE, RB_CANUNDO, RB_CANREDO, RB_WRAP, RB_MERGED,
   RB_ALEFT, RB_ACENTER, RB_ARIGHT, RB_ATOP, RB_AMIDDLE, RB_ABOTTOM, RB_GRIDLINES, RB_HEADINGS, RB_FORMULABAR,
-  RB_FORMULAS, RB_MANUAL, RB_BRUSH, RB_DARK, RB_ZEROS, RB_MULTI, RB_EDITING, RB_FROZEN, RB_FILTER, RB_NOTES, RB_HASNOTE
+  RB_FORMULAS, RB_MANUAL, RB_BRUSH, RB_DARK, RB_ZEROS, RB_MULTI, RB_EDITING, RB_FROZEN, RB_FILTER, RB_NOTES, RB_HASNOTE,
+  RB_PROTECTED, RB_BOOKLOCK         /* (datatab) the sheet, the workbook's structure protected */
 };
 #define RBIT(b) (1UL << (b))
 struct MUIP_Ribbon_State {

@@ -11,6 +11,8 @@
 #include "../core/cond.h"
 #include "../core/table.h"
 #include "../core/pivot.h"
+#include "../core/data.h"
+#include "../core/xls.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -871,6 +873,368 @@ static void templates(void)
   book_free(b);
 }
 
+
+/* ------------------------------------------------------------------ the Data tab's tools */
+static Rect rc(Book *b, const char *ref) { u16 sh; Rect r; u8 fl; parse_ref(b, ref, &sh, &r, &fl); return r; }
+static Book *reload(Book *b)
+{
+  size_t len;
+  u8 *x = xlsx_save(b, &len);
+  char err[100];
+  Book *d = x ? xlsx_load(x, len, err, sizeof err) : NULL;
+  free(x);
+  return d;
+}
+static void validation(void)
+{
+  Book *b = book_new(), *d;
+  DVRule r;
+  Rect a;
+  const DVRule *got;
+  char **items;
+  int n, i;
+  i32 rows[10], cols[10];
+  /* a whole number between 1 and 10 on A1:A5 */
+  dv_rule_init(&r);
+  r.type = DV_WHOLE; r.op = CO_BETWEEN;
+  r.f1 = dv_value(b, 0, "1", 0); r.f2 = dv_value(b, 0, "10", 0);
+  free(r.errmsg); r.errmsg = str_dup("1 to 10, please");
+  a = rc(b, "A1:A5");
+  ok("dv: set", book_dv_set(b, 0, &a, 1, &r) && b->sh[0]->ndvs == 1);
+  dv_rule_free(&r);
+  ok("dv: whole in range", dv_check_text(b, 0, 2, 0, "7", &got) && got);
+  ok("dv: whole out of range", !dv_check_text(b, 0, 2, 0, "11", &got) && got && !strcmp(got->errmsg, "1 to 10, please"));
+  ok("dv: not whole", !dv_check_text(b, 0, 2, 0, "2.5", NULL));
+  ok("dv: text refused", !dv_check_text(b, 0, 2, 0, "abc", NULL));
+  ok("dv: blank passes", dv_check_text(b, 0, 2, 0, "", NULL));
+  ok("dv: no rule elsewhere", dv_check_text(b, 0, 2, 1, "abc", &got) && !got);
+  /* a list typed */
+  dv_rule_init(&r);
+  r.type = DV_LIST; r.f1 = dv_value(b, 0, "Open, In progress,Closed", 1);
+  a = rc(b, "C1:C3");
+  book_dv_set(b, 0, &a, 1, &r);
+  dv_rule_free(&r);
+  got = dv_at(b->sh[0], 1, 2);
+  n = dv_list_items(b, 0, got, 1, 2, &items);
+  ok("dv: list items", n == 3 && !strcmp(items[1], "In progress") && !strcmp(items[2], "Closed"));
+  for (i = 0; i < n; i++) free(items[i]);
+  free(items);
+  ok("dv: list match ignores case", dv_check_text(b, 0, 0, 2, "closed", NULL) && !dv_check_text(b, 0, 0, 2, "Shut", NULL));
+  {
+    char t[100];
+    dv_value_text(b, 0, got->f1, 1, t, sizeof t);
+    ok("dv: list text back", !strcmp(t, "Open, In progress,Closed"));
+  }
+  /* a list from a range, and a custom rule seeing the new value */
+  put(b, "E1", "red"); put(b, "E2", "green"); put(b, "E3", "blue");
+  dv_rule_init(&r);
+  r.type = DV_LIST; r.f1 = dv_value(b, 0, "=$E$1:$E$3", 1);
+  a = rc(b, "D1:D9");
+  book_dv_set(b, 0, &a, 1, &r);
+  dv_rule_free(&r);
+  ok("dv: list from a range", dv_check_text(b, 0, 4, 3, "Green", NULL) && !dv_check_text(b, 0, 4, 3, "pink", NULL));
+  dv_rule_init(&r);
+  r.type = DV_CUSTOM; r.f1 = dv_value(b, 0, "=F1<>G1", 0);
+  a = rc(b, "F1:F4");
+  book_dv_set(b, 0, &a, 1, &r);
+  dv_rule_free(&r);
+  put(b, "G3", "5");
+  ok("dv: custom, relative", !dv_check_text(b, 0, 2, 5, "5", NULL) && dv_check_text(b, 0, 2, 5, "6", NULL) && dv_check_text(b, 0, 1, 5, "5", NULL));
+  /* text length, date, decimal */
+  dv_rule_init(&r);
+  r.type = DV_TEXTLEN; r.op = CO_LE; r.f1 = dv_value(b, 0, "3", 0);
+  a = rc(b, "H1"); book_dv_set(b, 0, &a, 1, &r); dv_rule_free(&r);
+  ok("dv: text length", dv_check_text(b, 0, 0, 7, "abc", NULL) && !dv_check_text(b, 0, 0, 7, "abcd", NULL));
+  dv_rule_init(&r);
+  r.type = DV_DATE; r.op = CO_GE; r.f1 = dv_value(b, 0, "2026-01-01", 0);
+  a = rc(b, "I1"); book_dv_set(b, 0, &a, 1, &r); dv_rule_free(&r);
+  ok("dv: date", dv_check_text(b, 0, 0, 8, "2026-03-04", NULL) && !dv_check_text(b, 0, 0, 8, "2025-12-31", NULL));
+  /* invalid cells circled */
+  put(b, "A2", "50"); put(b, "A3", "5"); put(b, "C2", "Maybe");
+  n = dv_invalid_cells(b, 0, rows, cols, 10);
+  ok("dv: circle invalid", n == 2 && rows[0] == 1 && cols[0] == 0 && rows[1] == 1 && cols[1] == 2);
+  /* clearing part of a rule */
+  a = rc(b, "A2:A3");
+  book_dv_set(b, 0, &a, 1, NULL);
+  ok("dv: cleared cells", !dv_at(b->sh[0], 1, 0) && dv_at(b->sh[0], 0, 0) && dv_at(b->sh[0], 4, 0));
+  ok("dv: undo", book_undo(b, NULL, NULL) && dv_at(b->sh[0], 1, 0));
+  /* rows inserted: the cells follow */
+  book_insert_rows(b, 0, 0, 2);
+  ok("dv: rows inserted", dv_at(b->sh[0], 2, 0) && !dv_at(b->sh[0], 0, 0) && dv_check_text(b, 0, 3, 7, "abc", NULL) == 1);
+  book_undo(b, NULL, NULL);
+  /* saved and read back */
+  d = reload(b);
+  ok("dv: xlsx round trip", d && d->sh[0]->ndvs == b->sh[0]->ndvs && (got = dv_at(d->sh[0], 2, 0)) && got->type == DV_WHOLE && !strcmp(got->errmsg, "1 to 10, please") &&
+     !dv_check_text(d, 0, 2, 0, "11", NULL) && dv_check_text(d, 0, 2, 0, "10", NULL) && dv_check_text(d, 0, 2, 2, "Open", NULL) && !dv_check_text(d, 0, 2, 5, "5", NULL));
+  book_free(d);
+  book_free(b);
+}
+static void outline(void)
+{
+  Book *b = book_new(), *d;
+  OGroup g[16];
+  int n, i;
+  /* rows 2-5 grouped, 3-4 inside */
+  ok("outline: group", book_group(b, 0, 1, 1, 4, 1) && book_group(b, 0, 1, 2, 3, 1));
+  n = outline_groups(b->sh[0], 1, g, 16);
+  ok("outline: groups", n == 2 && g[0].level == 2 && g[0].start == 2 && g[0].end == 3 && g[1].level == 1 && g[1].start == 1 && g[1].end == 4 && ogroup_summary(&g[1]) == 5);
+  ok("outline: max level", outline_max_level(b->sh[0], 1) == 2 && outline_max_level(b->sh[0], 0) == 0);
+  ok("outline: hide detail", book_detail(b, 0, 1, 2, 2, 1, 0) && !sheet_row_height(b->sh[0], 2) && sheet_row_height(b->sh[0], 1) && b->sh[0]->rows[4]->collapsed);
+  ok("outline: hide outer", book_detail(b, 0, 1, 1, 1, 1, 0) && !sheet_row_height(b->sh[0], 1) && b->sh[0]->rows[5]->collapsed);
+  ok("outline: show outer keeps inner", book_detail(b, 0, 1, 5, 5, 0, 0) && sheet_row_height(b->sh[0], 1) && !sheet_row_height(b->sh[0], 2) && !b->sh[0]->rows[5]->collapsed);
+  ok("outline: levels", book_show_levels(b, 0, 1, 3) && sheet_row_height(b->sh[0], 2) && book_show_levels(b, 0, 1, 1) && !sheet_row_height(b->sh[0], 1));
+  book_show_levels(b, 0, 1, 3);
+  /* columns, and summaries above */
+  book_group(b, 0, 0, 3, 5, 1);
+  book_outline_settings(b, 0, 0, 1);
+  n = outline_groups(b->sh[0], 1, g, 16);
+  ok("outline: summary above", b->sh[0]->sumabove && n == 2 && ogroup_summary(&g[1]) == 0);
+  d = reload(b);
+  ok("outline: xlsx round trip", d && d->sh[0]->sumabove && !d->sh[0]->sumleft && outline_level(d->sh[0], 1, 3) == 2 && outline_level(d->sh[0], 0, 4) == 1 && outline_groups(d->sh[0], 1, g, 16) == 2);
+  book_free(d);
+  ok("outline: ungroup", book_group(b, 0, 1, 1, 4, 0) && outline_max_level(b->sh[0], 1) == 1 && book_outline_clear(b, 0) && !outline_max_level(b->sh[0], 1) && !outline_max_level(b->sh[0], 0));
+  book_free(b);
+  /* Subtotal */
+  b = book_new();
+  put(b, "A1", "Region"); put(b, "B1", "Sales");
+  put(b, "A2", "East"); put(b, "B2", "10"); put(b, "A3", "East"); put(b, "B3", "20");
+  put(b, "A4", "West"); put(b, "B4", "5"); put(b, "A5", "North"); put(b, "B5", "1"); put(b, "A6", "North"); put(b, "B6", "2");
+  {
+    i32 cols[1] = { 1 };
+    n = book_subtotal(b, 0, rc(b, "A1:B6"), 0, 9, cols, 1, 1, 1);
+  }
+  ok("subtotal: rows added", n == 4 && sheet_last_row(b->sh[0]) == 9);
+  ok("subtotal: labels and formulas", text_at(b, "A4", "East Total") && text_at(b, "B4", "=SUBTOTAL(9,B2:B3)") && text_at(b, "A6", "West Total") &&
+     text_at(b, "B9", "=SUBTOTAL(9,B7:B8)") && text_at(b, "A10", "Grand Total") && text_at(b, "B10", "=SUBTOTAL(9,B2:B9)"));
+  ok("subtotal: sums (nested totals skipped)", num_at(b, "B4") == 30 && num_at(b, "B10") == 38);
+  ok("subtotal: outline", outline_level(b->sh[0], 1, 1) == 2 && outline_level(b->sh[0], 1, 3) == 1 && outline_level(b->sh[0], 1, 9) == 0 && b->fonts[b->styles[sheet_cell_style(b->sh[0], 3, 1)].font].bold);
+  ok("subtotal: replace", book_subtotal(b, 0, rc(b, "A1:B10"), 0, 9, (i32[]){ 1 }, 1, 1, 1) == 4 && sheet_last_row(b->sh[0]) == 9);
+  ok("subtotal: remove all", book_subtotal_remove(b, 0, rc(b, "A1:B10")) == 4 && sheet_last_row(b->sh[0]) == 5 && !outline_max_level(b->sh[0], 1) && text_at(b, "A4", "West"));
+  ok("subtotal: undo", book_undo(b, NULL, NULL) && sheet_last_row(b->sh[0]) == 9);
+  for (i = 0; i < 2; i++) book_undo(b, NULL, NULL);
+  ok("subtotal: undone", sheet_last_row(b->sh[0]) == 5 && !outline_max_level(b->sh[0], 1));
+  book_free(b);
+}
+#define SHAKEY "f3vNikyWE04Elo3PTi3Sqzxgur6tdkO1RQfLaWWzuxCR8ld6N2WHZB0r9SDVDBa1RAKEtSZx/PAd82iYEEdn4g=="
+static void protection(void)
+{
+  Book *b = book_new(), *d;
+  Style st;
+  int k;
+  ok("protect: hash", prot_hash("password") == 0x83AF && prot_hash("") == 0);
+  put(b, "A1", "=1+2"); put(b, "B1", "5");
+  /* B1 unlocked, A1's formula hidden */
+  st = b->styles[0]; st.locked = 0;
+  k = book_style(b, &st); book_set_style(b, 0, 0, 1, k);
+  st = b->styles[0]; st.hidden = 1;
+  k = book_style(b, &st); book_set_style(b, 0, 0, 0, k);
+  ok("protect: off", !prot_locked(b, 0, 0, 0) && !prot_hidden(b, 0, 0, 0));
+  ok("protect: on", book_protect_sheet(b, 0, "secret", PA_DEFAULT | PA_FMTCELLS) && prot_locked(b, 0, 0, 0) && !prot_locked(b, 0, 0, 1) && prot_locked(b, 0, 5, 5) && prot_hidden(b, 0, 0, 0));
+  ok("protect: areas", prot_area_locked(b, 0, rc(b, "A1:B1")) && !prot_area_locked(b, 0, rc(b, "B1")) && prot_area_locked(b, 0, rc(b, "C:C")));
+  d = reload(b);
+  ok("protect: xlsx round trip", d && d->sh[0]->protect && d->sh[0]->pwhash == prot_hash("secret") && d->sh[0]->protallow == (PA_DEFAULT | PA_FMTCELLS) && prot_hidden(d, 0, 0, 0) && !prot_locked(d, 0, 0, 1));
+  book_free(d);
+  ok("protect: wrong password", !book_unprotect_sheet(b, 0, "Secret") && b->sh[0]->protect);
+  ok("protect: right password", book_unprotect_sheet(b, 0, "secret") && !b->sh[0]->protect && !prot_locked(b, 0, 0, 0));
+  ok("protect: workbook", book_protect_book(b, "") && b->lockstruct && (d = reload(b)) && d->lockstruct && book_unprotect_book(d, "x"));
+  book_free(d);
+  book_unprotect_book(b, "");
+  /* a newer file's SHA-512 key */
+  strcpy(b->sh[0]->protkey, "SHA-512:2:c2FsdA==:");
+  b->sh[0]->protect = 1;
+  ok("protect: bad key refuses", !book_unprotect_sheet(b, 0, "x"));
+  {
+    /* made with Python: hashlib, salt "salt", 2 spins, password "pw" */
+    strcpy(b->sh[0]->protkey, "SHA-512:2:c2FsdA==:" SHAKEY);
+    ok("protect: SHA-512 key", !book_unprotect_sheet(b, 0, "pX") && book_unprotect_sheet(b, 0, "pw"));
+  }
+  book_free(b);
+}
+static void flashfill(void)
+{
+  static const char *s1[] = { "John Smith" }, *d1[] = { "Smith, John" };
+  static const char *s2[] = { "jane doe" }, *d2[] = { "JD" };
+  static const char *s3[] = { "alice@example.com" }, *d3[] = { "alice" };
+  static const char *s4[] = { "ABC-123-X" }, *d4[] = { "123" };
+  static const char *s5[] = { "ada lovelace" }, *d5[] = { "Ada" };
+  char *g;
+  Book *b;
+  ok("flash: swap names", (g = flash_guess(s1, d1, 1, "Ada Lovelace")) && !strcmp(g, "Lovelace, Ada")); free(g);
+  ok("flash: initials", (g = flash_guess(s2, d2, 1, "alan turing")) && !strcmp(g, "AT")); free(g);
+  ok("flash: before @", (g = flash_guess(s3, d3, 1, "bob@example.com")) && !strcmp(g, "bob")); free(g);
+  ok("flash: middle part", (g = flash_guess(s4, d4, 1, "QRS-987-Y")) && !strcmp(g, "987")); free(g);
+  ok("flash: proper case", (g = flash_guess(s5, d5, 1, "grace hopper")) && !strcmp(g, "Grace")); free(g);
+  b = book_new();
+  put(b, "A1", "Ada Lovelace"); put(b, "A2", "Alan Turing"); put(b, "A3", "Grace Hopper"); put(b, "A4", "Linus Torvalds");
+  put(b, "B1", "LOVELACE");
+  ok("flash: fill a column", book_flash_fill(b, 0, 1, 1) == 3 && text_at(b, "B2", "TURING") && text_at(b, "B4", "TORVALDS"));
+  ok("flash: undo in one", book_undo(b, NULL, NULL) && !sheet_cell(b->sh[0], 1, 1));
+  book_free(b);
+}
+static void datatools(void)
+{
+  TTCOpts o;
+  char **p;
+  int n, i;
+  Book *b;
+  memset(&o, 0, sizeof o);
+  o.delims = TTC_COMMA; o.quote = '"';
+  n = ttc_split("a,\"b,c\",,d", &o, &p);
+  ok("ttc: delimited with quotes", n == 4 && !strcmp(p[1], "b,c") && !strcmp(p[2], "") && !strcmp(p[3], "d"));
+  for (i = 0; i < n; i++) free(p[i]);
+  free(p);
+  o.delims = TTC_SPACE | TTC_SEMI; o.consecutive = 1;
+  n = ttc_split("x  y;z", &o, &p);
+  ok("ttc: consecutive", n == 3 && !strcmp(p[1], "y"));
+  for (i = 0; i < n; i++) free(p[i]);
+  free(p);
+  memset(&o, 0, sizeof o);
+  o.fixed = 1; o.breaks[0] = 3; o.breaks[1] = 5; o.nbreaks = 2;
+  n = ttc_split("abc12 xyz", &o, &p);
+  ok("ttc: fixed width", n == 3 && !strcmp(p[0], "abc") && !strcmp(p[1], "12") && !strcmp(p[2], "xyz"));
+  for (i = 0; i < n; i++) free(p[i]);
+  free(p);
+  b = book_new();
+  put(b, "A1", "Name;Age"); put(b, "A2", "Ann;31"); put(b, "A3", "Bob;27");
+  memset(&o, 0, sizeof o); o.delims = TTC_SEMI;
+  ok("ttc: book", book_text_to_columns(b, 0, rc(b, "A1:A3"), &o, 0, 0) == 2 && text_at(b, "A2", "Ann") && num_at(b, "B3") == 27);
+  ok("ttc: undo", book_undo(b, NULL, NULL) && text_at(b, "A2", "Ann;31") && !sheet_cell(b->sh[0], 1, 1));
+  book_free(b);
+  /* Advanced Filter */
+  b = book_new();
+  put(b, "A1", "Item"); put(b, "B1", "Qty");
+  put(b, "A2", "apple"); put(b, "B2", "10"); put(b, "A3", "banana"); put(b, "B3", "3"); put(b, "A4", "apricot"); put(b, "B4", "7"); put(b, "A5", "apple"); put(b, "B5", "10");
+  put(b, "D1", "Item"); put(b, "E1", "Qty"); put(b, "D2", "ap"); put(b, "E2", ">5");
+  {
+    Rect cr = rc(b, "D1:E2");
+    ok("advfilter: in place", book_advanced_filter(b, 0, rc(b, "A1:B5"), &cr, -1, 0, 0, 0) == 3 && !sheet_row_height(b->sh[0], 2) && sheet_row_height(b->sh[0], 3));
+    ok("advfilter: show all", book_filter_show_all(b, 0) == 1 && sheet_row_height(b->sh[0], 2));
+    ok("advfilter: copy unique", book_advanced_filter(b, 0, rc(b, "A1:B5"), &cr, 0, 0, 6, 1) == 2 && text_at(b, "G1", "Item") && text_at(b, "G3", "apricot") && !sheet_cell(b->sh[0], 3, 6));
+  }
+  {
+    /* computed criterion and OR rows */
+    Rect cr;
+    put(b, "D4", "Item"); put(b, "D5", "'=banana"); put(b, "D6", "apricot");
+    cr = rc(b, "D4:D6");
+    ok("advfilter: or rows", book_advanced_filter(b, 0, rc(b, "A1:B5"), &cr, -1, 0, 0, 0) == 2);
+    book_filter_show_all(b, 0);
+    put(b, "F8", ""); put(b, "F9", "=B2>8");
+    cr = rc(b, "F8:F9");
+    ok("advfilter: computed", book_advanced_filter(b, 0, rc(b, "A1:B5"), &cr, -1, 0, 0, 0) == 2);
+  }
+  book_free(b);
+  /* Consolidate by labels */
+  b = book_new();
+  book_add_sheet(b, "Q2", -1);
+  put(b, "A1", "Fruit"); put(b, "B1", "Jan"); put(b, "A2", "Apple"); put(b, "B2", "1"); put(b, "A3", "Pear"); put(b, "B3", "2");
+  put(b, "Q2!A1", "Fruit"); put(b, "Q2!B1", "Jan"); put(b, "Q2!C1", "Feb"); put(b, "Q2!A2", "pear"); put(b, "Q2!B2", "10"); put(b, "Q2!C2", "4");
+  {
+    int sh[2] = { 0, 1 };
+    Rect src[2];
+    src[0] = rc(b, "A1:B3"); src[1] = rc(b, "A1:C2");
+    ok("consolidate: by labels", book_consolidate(b, 0, 5, 0, sh, src, 2, 9, 1, 1) == 4 && text_at(b, "B6", "Jan") && text_at(b, "C6", "Feb") && text_at(b, "A7", "Apple") &&
+       num_at(b, "B8") == 12 && num_at(b, "C8") == 4 && num_at(b, "B7") == 1 && !sheet_cell(b->sh[0], 6, 2));
+  }
+  book_free(b);
+}
+static void whatif(void)
+{
+  Book *b = book_new(), *d;
+  double x;
+  const char *why;
+  int r;
+  put(b, "A1", "3"); put(b, "B1", "=A1*A1+1");
+  r = book_goal_seek(b, 0, 0, 1, 26, 0, 0, 0, &x, &why);
+  ok("goal seek: found", r == 1 && fabs(x - 5) < 0.001 && fabs(num_at(b, "B1") - 26) <= 0.001);
+  ok("goal seek: undo", book_undo(b, NULL, NULL) && num_at(b, "A1") == 3);
+  ok("goal seek: needs a formula", book_goal_seek(b, 0, 0, 0, 1, 0, 0, 1, &x, &why) == -1 && why);
+  /* one-variable data table: rates down, a formula across */
+  put(b, "C1", "100"); put(b, "C2", "=C1*2");
+  put(b, "E2", "1"); put(b, "E3", "2"); put(b, "E4", "3"); put(b, "F1", "=C2");
+  ok("data table: column input", book_data_table(b, 0, rc(b, "E1:F4"), -1, -1, 0, 2) == 3 && num_at(b, "F2") == 2 && num_at(b, "F4") == 6 && num_at(b, "C2") == 200);
+  /* two variables */
+  put(b, "H1", "=A1*C1"); put(b, "I1", "1"); put(b, "J1", "2"); put(b, "H2", "10"); put(b, "H3", "20");
+  ok("data table: two variables", book_data_table(b, 0, rc(b, "H1:J3"), 0, 0, 0, 2) == 4 && num_at(b, "I2") == 10 && num_at(b, "J3") == 40 && num_at(b, "H1") == 300);
+  /* scenarios */
+  {
+    i32 rr[2] = { 0, 0 }, cc[2] = { 0, 2 };
+    const char *v1[2] = { "2", "50" }, *v2[2] = { "4", "30" };
+    ok("scenario: add", book_scenario_add(b, 0, "Low", rr, cc, v1, 2, "small") && book_scenario_add(b, 0, "High", rr, cc, v2, 2, "") && b->sh[0]->nscens == 2);
+    ok("scenario: show", book_scenario_show(b, 0, 1) && num_at(b, "A1") == 4 && num_at(b, "C1") == 30 && num_at(b, "H1") == 120);
+    d = reload(b);
+    ok("scenario: xlsx", d && d->sh[0]->nscens == 2 && !strcmp(d->sh[0]->scens[0].name, "Low") && d->sh[0]->scens[0].c[1] == 2 && !strcmp(d->sh[0]->scens[0].vals[1], "50") && !strcmp(d->sh[0]->scens[0].comment, "small"));
+    book_free(d);
+    {
+      Rect res = rc(b, "H1");
+      int at = book_scenario_summary(b, 0, &res, 1);
+      ok("scenario: summary", at == 1 && !strcmp(b->sh[1]->name, "Scenario Summary") && cell_value(b, 1, 7, 2)->n == 120 && cell_value(b, 1, 7, 3)->n == 100 && cell_value(b, 1, 7, 4)->n == 120 && cell_value(b, 1, 4, 3)->n == 2 && num_at(b, "H1") == 120);
+    }
+    ok("scenario: delete", book_scenario_delete(b, 0, 0) && b->sh[0]->nscens == 1 && !strcmp(b->sh[0]->scens[0].name, "High"));
+  }
+  book_free(b);
+}
+
+
+static int has_formula(Book *b, int sheet, const char *ref, const char *want)
+{
+  Rect r = rc(b, ref);
+  Cell *c = sheet_cell(b->sh[sheet], r.r1, r.c1);
+  Buf o;
+  int ok_;
+  buf_init(&o);
+  if (c && c->f) formula_text(b, sheet, c->f, &o);
+  ok_ = !strcmp(o.data ? o.data : "", want);
+  if (!ok_) printf("   %s holds formula \"%s\" (want \"%s\")\n", ref, o.data ? o.data : "", want);
+  buf_free(&o);
+  return ok_;
+}
+static void imports(void)
+{
+  int k;
+  for (k = 0; k < 2; k++) {
+    const char *path = k ? "tests/fixtures/import.ods" : "tests/fixtures/import.xls", *what = k ? "ods" : "xls";
+    size_t len;
+    u8 *data = file_read(path, &len);
+    char err[200], t[80];
+    Book *b;
+    const Font *f;
+    ok(path, data != NULL);
+    if (!data) continue;
+    b = k ? ods_load(data, len, err, sizeof err) : xls_load(data, len, err, sizeof err);
+    free(data);
+    snprintf(t, sizeof t, "%s: loads", what); ok(t, b != NULL);
+    if (!b) { printf("   %s\n", err); continue; }
+    snprintf(t, sizeof t, "%s: sheets", what); ok(t, b->nsh == 2 && !strcmp(b->sh[0]->name, "Data") && !strcmp(b->sh[1]->name, "Other"));
+    snprintf(t, sizeof t, "%s: values", what);
+    ok(t, text_at(b, "A1", "Item") && num_at(b, "B4") == 10 && num_at(b, "C3") == 0.75 && text_at(b, "A13", "Caf\xc3\xa9 \xc3\xbc" "ber"));
+    snprintf(t, sizeof t, "%s: formulas", what);
+    ok(t, has_formula(b, 0, "D2", "B2*C2") && has_formula(b, 0, "D6", "SUM(D2:D5)") && has_formula(b, 0, "B7", "IF(D6>10,\"big\",\"small\")") &&
+       has_formula(b, 0, "C7", "ROUND(AVERAGE(C2:C5),2)") && has_formula(b, 0, "D7", "COUNTIF(B2:B5,\">2\")") && has_formula(b, 0, "B8", "Other!B2*2") &&
+       has_formula(b, 0, "C8", "-C2%") && has_formula(b, 0, "D8", "CONCATENATE(A2,\" & \",A3)") && has_formula(b, 0, "A9", "VLOOKUP(\"Plum\",$A$2:$C$5,3,FALSE)") &&
+       has_formula(b, 0, "C9", "SUM(B:B)") && has_formula(b, 0, "D10", "EDATE(A10,1)") && has_formula(b, 1, "A3", "Data!D6+B2"));
+    snprintf(t, sizeof t, "%s: results", what);
+    ok(t, near(num_at(b, "D6"), 1.5 + 3 + 2 + 2.5) && shows(b, 0, 6, 1, "small") && num_at(b, "D7") == 3 && num_at(b, "B8") == 42 && num_at(b, "B9") == -1000 - E_DIV0 && num_at(b, "Other!A3") == 30);
+    snprintf(t, sizeof t, "%s: formats", what);
+    ok(t, shows(b, 0, 9, 0, "2026-10-27") && shows(b, 0, 9, 1, "25.0%") && shows(b, 0, 9, 2, "1,234.50") && cell_value(b, 0, 7, 0)->t == V_BOOL);
+    f = &b->fonts[b->styles[sheet_cell_style(b->sh[0], 0, 0)].font];
+    snprintf(t, sizeof t, "%s: fonts and fills", what);
+    ok(t, f->bold && f->size == 140 && (f->color & 0xC00000) == 0xC00000 && !(f->color & 0xFFFF) && b->fonts[b->styles[sheet_cell_style(b->sh[0], 0, 1)].font].italic &&
+       (b->styles[sheet_cell_style(b->sh[0], 0, 2)].fill & 0xFFFFFF) == 0xFFFF00 && b->styles[sheet_cell_style(b->sh[0], 0, 3)].halign == HA_CENTER);
+    snprintf(t, sizeof t, "%s: widths, heights, merges", what);
+    ok(t, sheet_col_width(b->sh[0], 0) > 120 && sheet_row_height(b->sh[0], 2) == 40 && b->sh[0]->nmerges == 1 && b->sh[0]->merges[0].c2 == 2 && b->sh[0]->merges[0].r1 == 11);
+    snprintf(t, sizeof t, "%s: validation", what);
+    {
+      const DVRule *dl = dv_at(b->sh[0], 2, 4), *dw = dv_at(b->sh[0], 3, 1);
+      ok(t, dl && dl->type == DV_LIST && dv_check_text(b, 0, 2, 4, "maybe", NULL) && !dv_check_text(b, 0, 2, 4, "Never", NULL) && !strcmp(dl->intitle, "Answer") &&
+         dw && dw->type == DV_WHOLE && dw->errstyle == DVE_WARNING && !strcmp(dw->errmsg, "1 to 10") && dv_check_text(b, 0, 3, 1, "7", NULL) && !dv_check_text(b, 0, 3, 1, "11", NULL));
+    }
+    snprintf(t, sizeof t, "%s: outline", what);
+    ok(t, outline_level(b->sh[0], 1, 1) == 1 && outline_level(b->sh[0], 1, 4) == 1 && outline_level(b->sh[0], 1, 5) == 0);
+    book_free(b);
+  }
+  ok("xls: not one", !xls_load((const u8 *)"PK\3\4", 4, NULL, 0));
+}
+
 /* dynamic arrays, LET/LAMBDA, the array and lookup functions (core/func_array.c, calc.c) */
 static int is_err(Book *b, const char *ref, int e) { return num_at(b, ref) == -1000 - e; }
 static int spills(Book *b, const char *ref, const char *want)
@@ -1045,7 +1409,7 @@ static void dynarrays(void)
   book_free(b);
 }
 /* ------------------------------------------------------------------ tables and pivot tables */
-static Rect rc(i32 r1, i32 c1, i32 r2, i32 c2) { Rect r; r.r1 = r1; r.c1 = c1; r.r2 = r2; r.c2 = c2; return r; }
+static Rect rc4(i32 r1, i32 c1, i32 r2, i32 c2) { Rect r; r.r1 = r1; r.c1 = c1; r.r2 = r2; r.c2 = c2; return r; }
 static void sales_data(Book *b)
 {
   static const char *const rows[][4] = {
@@ -1063,10 +1427,10 @@ static void tables(void)
   size_t n;
   char err[200];
   sales_data(b);
-  ti = book_table_add(b, 0, rc(0, 0, 6, 3), 1, "");
+  ti = book_table_add(b, 0, rc4(0, 0, 6, 3), 1, "");
   t = &b->sh[0]->tables[0];
   ok("table: made", ti == 0 && b->sh[0]->ntables == 1 && !strcmp(t->name, "Table1") && t->ncols == 4 && !strcmp(t->cols[2].name, "Sales") && !strcmp(t->style, "TableStyleMedium2"));
-  ok("table: overlapping refused", book_table_add(b, 0, rc(2, 2, 8, 5), 1, "") < 0);
+  ok("table: overlapping refused", book_table_add(b, 0, rc4(2, 2, 8, 5), 1, "") < 0);
   put(b, "F1", "=SUM(Table1[Sales])");
   put(b, "F2", "=ROWS(Table1[#All])");
   put(b, "F3", "=Table1[[#Headers],[Units]]");
@@ -1120,7 +1484,7 @@ static void tables(void)
   ok("table: dedupe", book_table_dedupe(b, 0, 0, 3) == 1 && (t = &b->sh[0]->tables[0])->r.r2 == 7 && num_at(b, "F1") == 635);
   book_undo(b, NULL, NULL);
   /* resize */
-  ok("table: resize", book_table_resize(b, 0, 0, rc(0, 0, 9, 3)) && (t = &b->sh[0]->tables[0])->ncols == 4 && t->r.r2 == 9);
+  ok("table: resize", book_table_resize(b, 0, 0, rc4(0, 0, 9, 3)) && (t = &b->sh[0]->tables[0])->ncols == 4 && t->r.r2 == 9);
   ok("table: removed column gives #REF!", num_at(b, "E8") == 10 || 1);
   book_undo(b, NULL, NULL);
   /* the look */
@@ -1151,7 +1515,7 @@ static void tables(void)
   /* a table without a header row gets one; SUBTOTAL leaves filtered rows out */
   b = book_new();
   put(b, "B2", "5"); put(b, "B3", "7"); put(b, "B4", "9");
-  ok("table: header row put in", book_table_add(b, 0, rc(1, 1, 3, 1), 0, "TableStyleLight9") == 0 && text_at(b, "B2", "Column1") && num_at(b, "B5") == 9);
+  ok("table: header row put in", book_table_add(b, 0, rc4(1, 1, 3, 1), 0, "TableStyleLight9") == 0 && text_at(b, "B2", "Column1") && num_at(b, "B5") == 9);
   put(b, "D1", "=SUBTOTAL(9,B3:B5)"); put(b, "D2", "=SUBTOTAL(109,B3:B5)");
   book_hide_rows(b, 0, 3, 3, 1);
   ok("SUBTOTAL: 9 counts hidden rows, 109 doesn't", num_at(b, "D1") == 21 && num_at(b, "D2") == 14);
@@ -1238,7 +1602,7 @@ static void pivots(void)
   free(x);
   pivot_free1(&np);
   /* from a table, which grows */
-  book_table_add(b, 0, rc(0, 0, 6, 3), 1, "");
+  book_table_add(b, 0, rc4(0, 0, 6, 3), 1, "");
   pi = book_pivot_add(b, sh, "Table1", 10, 0);
   pivot_copy1(&np, &b->sh[sh]->pivots[pi]);
   pivot_def_add(&np, PA_VALUES, "Units", PF_MAX);
@@ -1291,6 +1655,13 @@ int main(void)
   tables();
   pivots();
   drawings();
+  validation();
+  outline();
+  protection();
+  flashfill();
+  datatools();
+  whatif();
+  imports();
   layout_tests();
   dynarrays();
   printf("%d tests, %d failed\n", passed + failed, failed);

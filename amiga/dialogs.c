@@ -45,6 +45,7 @@ static Object *check_obj(int on)
   return ImageObject, ImageButtonFrame, MUIA_InputMode, MUIV_InputMode_Toggle, MUIA_Image_Spec, MUII_CheckMark,
     MUIA_Image_FreeVert, TRUE, MUIA_Selected, on, MUIA_Background, MUII_ButtonBack, MUIA_ShowSelState, FALSE, MUIA_CycleChain, 1, End;
 }
+static u8 checked_(Object *o) { return xget(o, MUIA_Selected) ? 1 : 0; }
 static Object *cycle_obj(const char **labels, int active)
 {
   return CycleObject, MUIA_Cycle_Entries, (ULONG)labels, MUIA_Cycle_Active, active, MUIA_CycleChain, 1, End;
@@ -78,7 +79,7 @@ static int color_index(ULONG c, const ULONG *vals, int n)
   for (i = 0; i < n; i++) if (vals[i] == c) return i;
   return n - 1;                                            /* (Custom...) */
 }
-static struct { Object *cat, *dec, *code, *sample, *ha, *va, *wrap, *indent, *font, *size, *b, *i, *u, *s, *color, *line[4], *fill; ULONG custcolor, custfill; } fc;
+static struct { Object *cat, *dec, *code, *sample, *ha, *va, *wrap, *indent, *font, *size, *b, *i, *u, *s, *color, *line[4], *fill, *locked, *hidden; ULONG custcolor, custfill; } fc;
 /* the sample: the active cell's value in the code as it stands */
 static void fc_sample(void)
 {
@@ -113,7 +114,7 @@ static void fc_each(ULONG id)
 }
 void dlg_format_cells(int page)
 {
-  static const char *pages_en[] = { "Number", "Alignment", "Font", "Border", "Fill", NULL };
+  static const char *pages_en[] = { "Number", "Alignment", "Font", "Border", "Fill", "Protection", NULL };
   static const char *pl[8], *cats[16], *has[10], *vas[6], *lines[4][10], *colors[20], *fills[18];
   static const ULONG ends[] = { ID_DLGOK, 0 };
   const Style *st0 = &book->styles[sheet_cell_style(cur_sheet(), cur_sheet()->cur_r, cur_sheet()->cur_c)];
@@ -197,6 +198,13 @@ void dlg_format_cells(int page)
       End,
       Child, VSpace(0),
     End,
+    /* Protection (datatab: Protect Sheet) */
+    Child, VGroup,
+      Child, HGroup, Child, fc.locked = check_obj(st0->locked), Child, LLabel1(tr("Locked")), Child, HSpace(0), End,
+      Child, HGroup, Child, fc.hidden = check_obj(st0->hidden), Child, LLabel1(tr("Hidden")), Child, HSpace(0), End,
+      Child, TextObject, MUIA_Text_Contents, (ULONG)tr("\33cLocking cells or hiding formulas has no effect until you protect the sheet\n(Review, Protect Sheet)."), End,
+      Child, VSpace(0),
+    End,
   End;
   w = dialog_window("Format Cells", reg, NULL);
   if (!w) return;
@@ -235,6 +243,8 @@ void dlg_format_cells(int page)
     fi = (int)xget(fc.fill, MUIA_Cycle_Active);
     st.fill = fi == 0 ? 0 : FILL_ON | (fc_fillvals[fi] == COLOR_MORE ? fc.custfill : fc_fillvals[fi]);
     if (st.fill != st0->fill) mask |= SM_FILL;
+    st.locked = checked_(fc.locked); st.hidden = checked_(fc.hidden);
+    if (st.locked != st0->locked || st.hidden != st0->hidden) mask |= SM_PROT;
     if (mask) apply_style(&st, &f, mask);
   }
   MUI_DisposeObject(w);
