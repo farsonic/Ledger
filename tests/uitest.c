@@ -86,8 +86,109 @@ static void ui_groups(void)
   book_free(b);
 }
 
+
+/* a formula as loaded from a file without the dynamic-array mark */
+static void legacy_input(Book *b, const char *ref, const char *text)
+{
+  u16 sh; Rect r; u8 fl;
+  Cell *c;
+  parse_ref(b, ref, &sh, &r, &fl);
+  book_input(b, 0, r.r1, r.c1, text, NULL);
+  c = sheet_cell(b->sh[0], r.r1, r.c1);
+  if (c && c->f) c->f->legacy = 1;
+}
+static double cnum(Book *b, const char *ref)
+{
+  u16 sh; Rect r; u8 fl;
+  const Value *v;
+  parse_ref(b, ref, &sh, &r, &fl);
+  v = cell_value(b, 0, r.r1, r.c1);
+  return !v ? -999999 : v->t == V_NUM ? v->n : v->t == V_ERR ? -1000 - v->e : v->t == V_BOOL ? v->e : -999999;
+}
+static void ui_legacy(void)
+{
+  Book *b = book_new();
+  book_input(b, 0, 0, 1, "4", NULL); book_input(b, 0, 1, 1, "9", NULL); book_input(b, 0, 2, 1, "16", NULL);
+  book_input(b, 0, 0, 3, "1", NULL); book_input(b, 0, 0, 4, "2", NULL);
+  legacy_input(b, "C2", "=B1:B3*10");
+  legacy_input(b, "C5", "=B1:B3*10");
+  legacy_input(b, "C3", "=SQRT(B1:B3)");
+  legacy_input(b, "C1", "=SUM(B1:B3*10)");
+  legacy_input(b, "E4", "=D1:E1+1");
+  legacy_input(b, "F2", "=SUM(B1:B3)");
+  legacy_input(b, "G3", "=IF(B1:B3>10,1,0)");
+  legacy_input(b, "H2", "=SUMPRODUCT(B1:B3*10)");
+  legacy_input(b, "H3", "=ABS(-B1:B3)");
+  book_input(b, 0, 1, 8, "=B1:B3*10", NULL);   /* I2: a dynamic array spills */
+  book_recalc(b);
+  ok("legacy: a range in an operator meets the formula's row", cnum(b, "C2") == 90);
+  ok("legacy: no row in common is #VALUE!", cnum(b, "C5") == -1000 - E_VALUE);
+  ok("legacy: a range for a single-value argument meets the row", near(cnum(b, "C3"), 4));
+  ok("legacy: inside SUM too (no CSE)", cnum(b, "C1") == 40);
+  ok("legacy: a row range meets the column", cnum(b, "E4") == 3);
+  ok("legacy: a range argument stays a range", cnum(b, "F2") == 29);
+  ok("legacy: IF's test intersects", cnum(b, "G3") == 1);
+  ok("legacy: SUMPRODUCT takes arrays", cnum(b, "H2") == 290);
+  ok("legacy: nested operators intersect", cnum(b, "H3") == 16);
+  ok("dynamic: the same formula spills", cnum(b, "I2") == 40 && cnum(b, "I4") == 160);
+  {
+    Rect a; int blocked = 0;
+    ok("a spilled cell knows its anchor", book_spill_range(b, 0, 2, 8, &a, &blocked) && a.r1 == 1 && a.c1 == 8 && a.r2 == 3 && !blocked);
+    book_input(b, 0, 2, 8, "5", NULL);         /* typed over a spilled cell */
+    book_recalc(b);
+    ok("typing in a spill range gives #SPILL! on the anchor", cnum(b, "I2") == -1000 - E_SPILL && cnum(b, "I3") == 5);
+    book_input(b, 0, 2, 8, "", NULL);
+    book_recalc(b);
+    ok("cleared, it spills again", cnum(b, "I3") == 90);
+  }
+  book_free(b);
+}
+
+static void ui_cellinfo(void)
+{
+  Book *b = book_new();
+  ColInfo *ci;
+  ok("CELL filename of a new book is empty", evs(b, "CELL(\"filename\")", ""));
+  strcpy(b->path, "DH0:Work/Accounts/Budget.xlsx");
+  ok("CELL filename as Excel writes it", evs(b, "CELL(\"filename\",A1)", "DH0:Work/Accounts/[Budget.xlsx]Sheet1"));
+  strcpy(b->path, "Budget.xlsx");
+  ok("CELL filename without a drawer", evs(b, "CELL(\"filename\")", "[Budget.xlsx]Sheet1"));
+  ok("CELL width: characters", evn(b, "INDEX(CELL(\"width\",A1),1)") == 8);
+  ok("CELL width: default", evn(b, "INDEX(CELL(\"width\",A1),2)") == 1);
+  ci = sheet_col(b->sh[0], 1, 1); ci->width = 145;
+  ok("CELL width of a sized column", evn(b, "INDEX(CELL(\"width\",B1),1)") == 20 && evn(b, "INDEX(CELL(\"width\",B1),2)") == 0);
+  book_free(b);
+}
+
+static void ui_groupby(void)
+{
+  Book *b = book_new();
+  static const char *const d[] = { "Region", "Product", "Sales", "East", "Pear", "5", "West", "Apple", "7", "East", "Apple", "10",
+                                   "West", "Pear", "1", "East", "Pear", "2", "North", "Fig", "4" };
+  int i;
+  for (i = 0; i < 21; i++) book_input(b, 0, i / 3, i % 3, d[i], NULL);
+  /* total_depth 2: a subtotal under each region, the grand total last */
+  ok("GROUPBY subtotals", evs(b, "ARRAYTOTEXT(GROUPBY(A2:B7,C2:C7,SUM,0,2),1)",
+     "{\"East\",\"Apple\",10;\"East\",\"Pear\",7;\"East\",,17;\"North\",\"Fig\",4;\"North\",,4;\"West\",\"Apple\",7;\"West\",\"Pear\",1;\"West\",,8;\"Total\",,29}"));
+  ok("GROUPBY subtotals above (-2)", evs(b, "ARRAYTOTEXT(TAKE(GROUPBY(A2:B7,C2:C7,SUM,0,-2),3),1)", "{\"Total\",,29;\"East\",,17;\"East\",\"Apple\",10}"));
+  ok("GROUPBY hierarchy sorts the second field within the first", evs(b, "ARRAYTOTEXT(TAKE(GROUPBY(A2:B7,C2:C7,SUM,0,0,-2),3),1)", "{\"East\",\"Pear\",7;\"East\",\"Apple\",10;\"North\",\"Fig\",4}"));
+  ok("GROUPBY table relationship sorts the field on its own", evs(b, "ARRAYTOTEXT(TAKE(GROUPBY(A2:B7,C2:C7,SUM,0,0,-2,,1),3),1)", "{\"East\",\"Pear\",7;\"West\",\"Pear\",1;\"North\",\"Fig\",4}"));
+  ok("GROUPBY sorted by a value within the hierarchy", evs(b, "ARRAYTOTEXT(TAKE(GROUPBY(A2:B7,C2:C7,SUM,0,0,-3),3),1)", "{\"East\",\"Apple\",10;\"East\",\"Pear\",7;\"West\",\"Apple\",7}"));
+  ok("GROUPBY bad relationship", evn(b, "ROWS(GROUPBY(A2:B7,C2:C7,SUM,0,0,1,,2))") == -1000 - E_VALUE);
+  ok("GROUPBY one field as before", evs(b, "ARRAYTOTEXT(GROUPBY(A2:A7,C2:C7,SUM),1)", "{\"East\",17;\"North\",4;\"West\",8;\"Total\",29}"));
+  /* PIVOTBY: regions down with subtotals of nothing (one field), products across with a total */
+  ok("PIVOTBY", evs(b, "ARRAYTOTEXT(PIVOTBY(A2:A7,B2:B7,C2:C7,SUM),1)",
+     "{,\"Apple\",\"Fig\",\"Pear\",\"Total\";\"East\",10,,7,17;\"North\",,4,,4;\"West\",7,,1,8;\"Total\",17,4,8,29}"));
+  ok("PIVOTBY row subtotals", evs(b, "ARRAYTOTEXT(INDEX(PIVOTBY(A2:B7,A2:A7,C2:C7,SUM,0,2,1,0),4,0),1)", "{\"East\",,17,,}"));
+  ok("PIVOTBY column subtotals", evs(b, "ARRAYTOTEXT(INDEX(PIVOTBY(A2:A7,A2:B7,C2:C7,SUM,0,0,1,2),1,0),1)", "{,\"East\",\"East\",\"East\",\"North\",\"North\",\"West\",\"West\",\"West\",\"Total\"}"));
+  book_free(b);
+}
+
 static void ui_tests(void)
 {
   ui_funcdesc();
   ui_groups();
+  ui_legacy();
+  ui_cellinfo();
+  ui_groupby();
 }

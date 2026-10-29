@@ -225,6 +225,7 @@ typedef struct {
   u16 bookpwhash;                 /* its password's legacy hash (0 none) */
   char bookkey[144];              /* or a newer file's password check (as Sheet.protkey) */
   struct LayoutBook *lx;          /* more properties, the theme, calculation options (pagesetup.h), NULL: defaults */
+  char path[256];                 /* the file it was opened from or last saved to (UTF-8; "" a new one): CELL("filename") */
 } Book;
 
 Book  *book_new(void);                    /* one empty sheet, "Sheet1" */
