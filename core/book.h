@@ -187,6 +187,10 @@ typedef struct {
   i32 cur_r, cur_c;               /* where the cursor was, and the selection */
   Rect sel;
   i32 top, left;                  /* the scroll position when last shown */
+  /* View > Split: the bars' places, pixels at 100% from the cells' top left (0 none; frozen panes
+     take precedence), the top and left panes' own scroll position, the active pane (bit 0 the
+     bottom one, bit 1 the right one) */
+  i32 splitx, splity, stop, sleft; u8 apane;
   u16 zoom;                       /* per cent */
   /* the Data tab's tools (data.h): validation rules, scenarios, the outline's summary side, protection */
   struct DVRule *dvs; int ndvs;

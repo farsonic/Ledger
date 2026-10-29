@@ -42,6 +42,7 @@
 #include "chartview.h"
 #include "../core/data.h"
 #include "datatab.h"
+#include "../core/splitpane.h"
 
 #ifndef MUIM_GoActive
 #define MUIM_GoActive   0x8042491aUL
@@ -55,7 +56,8 @@
 #define EMAX 2000                /* the editor's text, bytes */
 
 /* where the mouse is dragging */
-enum { DR_NONE, DR_CELLS, DR_COLW, DR_ROWH, DR_COLS, DR_ROWS, DR_FILL, DR_POINT, DR_LAYOUT };
+enum { DR_NONE, DR_CELLS, DR_COLW, DR_ROWH, DR_COLS, DR_ROWS, DR_FILL, DR_POINT, DR_LAYOUT, DR_SPLITX, DR_SPLITY };
+#define BARW 5                   /* View > Split: the bars' thickness */
 
 struct Data {
   Object *obj;
@@ -76,6 +78,7 @@ struct Data {
   LONG hw, hh, w, h;
   LONG bandw, bandh;             /* (datatab) the outline's bands, inside hw and hh */
   int nvr, nvc, nfr, nfcol;
+  LONG barx, bary;               /* View > Split: the bars' left and top pixels (0 none); the first nfr rows and nfcol columns are then the top and left panes' */
   i32 vr[MAXVR]; LONG vy[MAXVR + 1];
   i32 vc[MAXVC]; LONG vx[MAXVC + 1];
   /* the selection: from the active cell (the sheet's cur_r, cur_c) to this corner */
@@ -321,7 +324,19 @@ static void layout(struct Data *d, LONG w, LONG h)
   d->bandw = gx_band(s, 1); d->bandh = gx_band(s, 0);
   d->hw += d->bandw; d->hh += d->bandh;
   /* rows */
-  y = d->hh; d->nvr = 0; d->nfr = 0;
+  y = d->hh; d->nvr = 0; d->nfr = 0; d->bary = d->barx = 0;
+  if (sheet_is_split(s) && s->splity) {
+    /* the top pane's rows, from its own first row down to the bar */
+    LONG by = d->hh + s->splity * zoom(d) / 100;
+    if (by > h - BARW - 2) by = h - BARW - 2;
+    if (by < d->hh + 2) by = d->hh + 2;
+    for (r = s->stop; r < MAXROW && d->nvr < MAXVR && y < by; r++) {
+      LONG rh = rowh(d, r);
+      if (!rh) continue;
+      d->vr[d->nvr] = r; d->vy[d->nvr++] = y; y += rh;
+    }
+    d->bary = by; y = by + BARW;
+  } else
   for (r = 0; r < s->freezer && d->nvr < MAXVR; r++) {
     LONG rh = rowh(d, r);
     if (!rh) continue;
@@ -337,6 +352,17 @@ static void layout(struct Data *d, LONG w, LONG h)
   d->vy[d->nvr] = y;
   /* columns */
   x = d->hw; d->nvc = 0;
+  if (sheet_is_split(s) && s->splitx) {
+    LONG bx = d->hw + s->splitx * zoom(d) / 100;
+    if (bx > w - BARW - 2) bx = w - BARW - 2;
+    if (bx < d->hw + 2) bx = d->hw + 2;
+    for (c = s->sleft; c < MAXCOL && d->nvc < MAXVC && x < bx; c++) {
+      LONG cw = colw(d, c);
+      if (!cw) continue;
+      d->vc[d->nvc] = c; d->vx[d->nvc++] = x; x += cw;
+    }
+    d->barx = bx; x = bx + BARW;
+  } else
   for (c = 0; c < s->freezec && d->nvc < MAXVC; c++) {
     LONG cw = colw(d, c);
     if (!cw) continue;
@@ -352,11 +378,37 @@ static void layout(struct Data *d, LONG w, LONG h)
   d->vx[d->nvc] = x;
 }
 /* the screen x of column c's left edge (from the grid's left), visible or not */
+/* (split) column c is placed in the left pane: the active pane is a left one and c shows there */
+static int col_left_pane(struct Data *d, i32 c)
+{
+  Sheet *s = SH(d);
+  LONG x = d->hw;
+  i32 k;
+  if (!d->barx || (s->apane & 2) || c < s->sleft) return 0;
+  for (k = s->sleft; k < c && x <= d->barx; k++) x += colw(d, k);
+  return x <= d->barx;
+}
+static int row_top_pane(struct Data *d, i32 r)
+{
+  Sheet *s = SH(d);
+  LONG y = d->hh;
+  i32 k;
+  if (!d->bary || (s->apane & 1) || r < s->stop) return 0;
+  for (k = s->stop; k < r && y <= d->bary; k++) y += rowh(d, k);
+  return y <= d->bary;
+}
 static LONG col_x(struct Data *d, i32 c)
 {
   Sheet *s = SH(d);
   LONG x = d->hw;
   i32 k;
+  if (d->barx) {
+    if (col_left_pane(d, c)) { for (k = s->sleft; k < c; k++) x += colw(d, k); return x; }
+    x = d->barx + BARW;
+    if (c >= s->left) { for (k = s->left; k < c && x < 30000; k++) x += colw(d, k); }
+    else { for (k = c; k < s->left && x > -30000; k++) x -= colw(d, k); }
+    return x;
+  }
   if (c < s->freezec) { for (k = 0; k < c; k++) x += colw(d, k); return x; }
   for (k = 0; k < s->freezec; k++) x += colw(d, k);
   if (c >= s->left) { for (k = s->left; k < c; k++) x += colw(d, k); }
@@ -368,6 +420,13 @@ static LONG row_y(struct Data *d, i32 r)
   Sheet *s = SH(d);
   LONG y = d->hh;
   i32 k;
+  if (d->bary) {
+    if (row_top_pane(d, r)) { for (k = s->stop; k < r; k++) y += rowh(d, k); return y; }
+    y = d->bary + BARW;
+    if (r >= s->top) { for (k = s->top; k < r && y < 30000; k++) y += rowh(d, k); }
+    else { for (k = r; k < s->top && y > -30000; k++) y -= rowh(d, k); }
+    return y;
+  }
   if (r < s->freezer) { for (k = 0; k < r; k++) y += rowh(d, k); return y; }
   for (k = 0; k < s->freezer; k++) y += rowh(d, k);
   if (r >= s->top) { for (k = s->top; k < r && y < 30000; k++) y += rowh(d, k); }
@@ -425,21 +484,25 @@ static int in_rect(const Rect *a, i32 r, i32 c) { return r >= a->r1 && r <= a->r
 /* ------------------------------------------------------------------ the scroll bars */
 static LONG scroll_rows_fit(struct Data *d) { LONG n = d->nvr - d->nfr; return n > 1 ? n - 1 : 1; }
 static LONG scroll_cols_fit(struct Data *d) { LONG n = d->nvc - d->nfcol; return n > 1 ? n - 1 : 1; }
+/* the first row (column) of the pane the scroll bars move: the active pane's when split */
+static i32 *vtop(struct Data *d) { Sheet *s = SH(d); return d->bary && !(s->apane & 1) ? &s->stop : &s->top; }
+static i32 *vleft(struct Data *d) { Sheet *s = SH(d); return d->barx && !(s->apane & 2) ? &s->sleft : &s->left; }
 static void update_props(struct Data *d)
 {
   Sheet *s = SH(d);
   LONG vis, ent;
+  i32 t = *vtop(d), l = *vleft(d), fr = d->bary ? 0 : s->freezer, fc = d->barx ? 0 : s->freezec;
   if (d->vprop) {
     vis = scroll_rows_fit(d);
-    ent = imax(imax(sheet_last_row(s) + 1, s->cur_r + 1), s->top + vis) + vis - s->freezer;
+    ent = imax(imax(sheet_last_row(s) + 1, s->cur_r + 1), t + vis) + vis - fr;
     if (ent > MAXROW) ent = MAXROW;
-    SetAttrs(d->vprop, MUIA_NoNotify, TRUE, MUIA_Prop_Entries, ent, MUIA_Prop_Visible, vis, MUIA_Prop_First, s->top - s->freezer, TAG_DONE);
+    SetAttrs(d->vprop, MUIA_NoNotify, TRUE, MUIA_Prop_Entries, ent, MUIA_Prop_Visible, vis, MUIA_Prop_First, t - fr, TAG_DONE);
   }
   if (d->hprop) {
     vis = scroll_cols_fit(d);
-    ent = imax(imax(sheet_last_col(s) + 1, s->cur_c + 1), s->left + vis) + vis - s->freezec;
+    ent = imax(imax(sheet_last_col(s) + 1, s->cur_c + 1), l + vis) + vis - fc;
     if (ent > MAXCOL) ent = MAXCOL;
-    SetAttrs(d->hprop, MUIA_NoNotify, TRUE, MUIA_Prop_Entries, ent, MUIA_Prop_Visible, vis, MUIA_Prop_First, s->left - s->freezec, TAG_DONE);
+    SetAttrs(d->hprop, MUIA_NoNotify, TRUE, MUIA_Prop_Entries, ent, MUIA_Prop_Visible, vis, MUIA_Prop_First, l - fc, TAG_DONE);
   }
 }
 
@@ -693,6 +756,9 @@ static int rect_px(struct Data *d, const Rect *a, LONG *x0, LONG *y0, LONG *x1, 
   /* a rectangle that starts in the frozen part and runs under the scrolled one */
   if (a->c1 < SH(d)->freezec && a->c2 >= SH(d)->freezec && a->c2 < SH(d)->left) *x1 = col_x(d, SH(d)->freezec) - 1;
   if (a->r1 < SH(d)->freezer && a->r2 >= SH(d)->freezer && a->r2 < SH(d)->top) *y1 = row_y(d, SH(d)->freezer) - 1;
+  /* (split) a rectangle placed in the bottom or right pane starts no further up or left than its bar */
+  if (d->barx && !col_left_pane(d, a->c1) && *x0 < d->barx + BARW - 1) { if (*x1 < d->barx + BARW) return 0; *x0 = d->barx + BARW - 1; }
+  if (d->bary && !row_top_pane(d, a->r1) && *y0 < d->bary + BARW - 1) { if (*y1 < d->bary + BARW) return 0; *y0 = d->bary + BARW - 1; }
   if (*x1 > d->w + 4) *x1 = d->w + 4;
   if (*y1 > d->h + 4) *y1 = d->h + 4;
   if (*x0 < d->hw - 4) *x0 = d->hw - 4;
@@ -936,6 +1002,9 @@ static void draw_marks(struct Data *d, struct RastPort *rp)
   /* frozen panes: a darker line after the frozen rows and columns */
   if (s->freezer && d->nfr) hline(rp, d->hw, d->w - 1, d->vy[d->nfr] - 1, d->pen_frozen);
   if (s->freezec && d->nfcol) vline(rp, d->vx[d->nfcol] - 1, d->hh, d->h - 1, d->pen_frozen);
+  /* View > Split: the bars, across the headings too */
+  if (d->bary) { fill(rp, 0, d->bary, d->w - 1, d->bary + BARW - 1, d->pen_head); hline(rp, 0, d->w - 1, d->bary, d->pen_headline); hline(rp, 0, d->w - 1, d->bary + BARW - 1, d->pen_headline); }
+  if (d->barx) { fill(rp, d->barx, 0, d->barx + BARW - 1, d->h - 1, d->pen_head); vline(rp, d->barx, 0, d->h - 1, d->pen_headline); vline(rp, d->barx + BARW - 1, 0, d->h - 1, d->pen_headline); }
   {
     /* the active cell in a dynamic array's spill range: a thin line round the range (dashed where
        it would go when something is in its way: #SPILL!) */
@@ -1126,28 +1195,32 @@ static void show_cell(struct Data *d, i32 r, i32 c)
 {
   Sheet *s = SH(d);
   LONG h = d->h > 0 ? d->h : _mheight(d->obj), w = d->w > 0 ? d->w : _mwidth(d->obj), y, x;
-  i32 k;
-  if (r >= s->freezer) {
-    if (r < s->top) s->top = r;
+  i32 k, *tp = &s->top, *lp = &s->left, tmin = s->freezer, lmin = s->freezec;
+  LONG y0 = -1, x0 = -1;
+  /* (split) the active pane is the one that scrolls */
+  if (d->bary) { tmin = 0; if (s->apane & 1) y0 = d->bary + BARW; else { tp = &s->stop; y0 = d->hh; h = d->bary; } }
+  if (d->barx) { lmin = 0; if (s->apane & 2) x0 = d->barx + BARW; else { lp = &s->sleft; x0 = d->hw; w = d->barx; } }
+  if (r >= tmin) {
+    if (r < *tp) *tp = r;
     else {
       for (;;) {
-        y = d->hh;
-        for (k = 0; k < s->freezer; k++) y += rowh(d, k);
-        for (k = s->top; k <= r && y <= h; k++) y += rowh(d, k);
-        if (y <= h || s->top >= r) break;
-        s->top++;
+        y = y0;
+        if (y < 0) { y = d->hh; for (k = 0; k < s->freezer; k++) y += rowh(d, k); }
+        for (k = *tp; k <= r && y <= h; k++) y += rowh(d, k);
+        if (y <= h || *tp >= r) break;
+        (*tp)++;
       }
     }
   }
-  if (c >= s->freezec) {
-    if (c < s->left) s->left = c;
+  if (c >= lmin) {
+    if (c < *lp) *lp = c;
     else {
       for (;;) {
-        x = d->hw;
-        for (k = 0; k < s->freezec; k++) x += colw(d, k);
-        for (k = s->left; k <= c && x <= w; k++) x += colw(d, k);
-        if (x <= w || s->left >= c) break;
-        s->left++;
+        x = x0;
+        if (x < 0) { x = d->hw; for (k = 0; k < s->freezec; k++) x += colw(d, k); }
+        for (k = *lp; k <= c && x <= w; k++) x += colw(d, k);
+        if (x <= w || *lp >= c) break;
+        (*lp)++;
       }
     }
   }
@@ -1155,11 +1228,12 @@ static void show_cell(struct Data *d, i32 r, i32 c)
 static void scroll_rows(struct Data *d, LONG n)
 {
   Sheet *s = SH(d);
-  LONG t = s->top + n;
-  if (t < s->freezer) t = s->freezer;
+  i32 *tp = vtop(d);
+  LONG t = *tp + n;
+  if (t < (d->bary ? 0 : s->freezer)) t = d->bary ? 0 : s->freezer;
   if (t > MAXROW - 1) t = MAXROW - 1;
-  if (t == s->top) return;
-  s->top = (i32)t;
+  if (t == *tp) return;
+  *tp = (i32)t;
   redraw(d);
   update_props(d);
 }
@@ -1595,10 +1669,26 @@ static void resize_pointer(struct Data *d, Object *obj, int which)
   if (which == 1) SetPointer(w, p, 11, 16, -8, -5);
   else SetPointer(w, p, 16, 16, -6, -8);
 }
+/* (split) x, y on a bar: 1 the upright one (it moves across), 2 the level one; 0 neither */
+static int on_bar(struct Data *d, LONG x, LONG y)
+{
+  if (d->barx && x >= d->barx - 1 && x <= d->barx + BARW) return 1;
+  if (d->bary && y >= d->bary - 1 && y <= d->bary + BARW) return 2;
+  return 0;
+}
+/* (split) one bar taken away: the pane before it keeps its place */
+static void unsplit_one(Sheet *s, int across)
+{
+  i32 x = across ? 0 : s->splitx, y = across ? s->splity : 0;
+  if (!x && !y) { sheet_unsplit(s); return; }
+  if (across) { if (s->sleft < s->left) s->left = s->sleft; s->sleft = 0; s->splitx = 0; s->apane &= 1; }
+  else { if (s->stop < s->top) s->top = s->stop; s->stop = 0; s->splity = 0; s->apane &= 2; }
+}
 /* the heading edge under the mouse (x, y from the grid's corner) lit, and the pointer to match */
 static void hover_edge(struct Data *d, Object *obj, LONG x, LONG y, int inside)
 {
   i32 hc = -1, hr = -1;
+  if (inside && on_bar(d, x, y)) { resize_pointer(d, obj, on_bar(d, x, y)); return; }
   if (inside && SH(d)->headings) {
     if (y < d->hh && x >= d->hw) hc = col_edge(d, x);
     else if (x < d->hw && y >= d->hh) hr = row_edge(d, y);
@@ -1622,6 +1712,8 @@ static void drag_to(struct Data *d, Object *obj, LONG x, LONG y)
   i32 r, c;
   if (d->drag == DR_COLW) { d->drag_size = imax(0, d->drag_size + (x - d->drag_px) * 100 / zoom(d)); d->drag_px = x; redraw(d); return; }
   if (d->drag == DR_ROWH) { d->drag_size = imax(0, d->drag_size + (y - d->drag_px) * 100 / zoom(d)); d->drag_px = y; redraw(d); return; }
+  if (d->drag == DR_SPLITX) { if (d->drag_px != x) { d->drag_px = x; s->splitx = imax(1, (x - d->hw) * 100 / zoom(d)); redraw(d); } return; }
+  if (d->drag == DR_SPLITY) { if (d->drag_px != y) { d->drag_px = y; s->splity = imax(1, (y - d->hh) * 100 / zoom(d)); redraw(d); } return; }
   if (y >= d->h && d->drag != DR_COLS) { s->top++; update_props(d); }
   else if (y < d->hh && s->top > s->freezer && d->drag != DR_COLS) { s->top--; update_props(d); }
   if (x >= d->w && d->drag != DR_ROWS) { s->left++; update_props(d); }
@@ -1649,6 +1741,14 @@ static void drag_end(struct Data *d, Object *obj)
   int k = d->drag;
   d->drag = DR_NONE;
   events_set(d, obj, EV_IDLE);
+  if (k == DR_SPLITX || k == DR_SPLITY) {
+    /* a bar let go at an edge goes away */
+    Sheet *s = SH(d);
+    if (k == DR_SPLITX && (d->drag_px < d->hw + 8 || d->drag_px > d->w - 12)) unsplit_one(s, 1);
+    if (k == DR_SPLITY && (d->drag_px < d->hh + 8 || d->drag_px > d->h - 12)) unsplit_one(s, 0);
+    redraw(d); update_props(d); changed(d);
+    return;
+  }
   if ((k == DR_COLW || k == DR_ROWH) && !datatab_may(d->book, SI(d), k == DR_COLW ? DT_COLS : DT_ROWS, sel_rect(d))) { redraw(d); return; }
   if (k == DR_COLW) {
     Rect sel = sel_rect(d);
@@ -1726,6 +1826,25 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
   if (im->Code == SELECTUP) { if (d->drag) { drag_end(d, obj); return MUI_EventHandlerRC_Eat; } return 0; }
   if (im->Code != SELECTDOWN || !inside) return 0;
   if (!d->editing && lx_grid_mouse(obj, 0, x, y)) { d->drag = DR_LAYOUT; events_set(d, obj, EV_DRAG); return MUI_EventHandlerRC_Eat; }
+  if (!d->editing && on_bar(d, x, y)) {
+    /* View > Split: a bar dragged, or double-clicked away */
+    int which = on_bar(d, x, y), dbl = DoubleClick(d->secs, d->micros, im->Seconds, im->Micros) && d->click_region == 10 + which;
+    d->secs = im->Seconds; d->micros = im->Micros; d->click_region = 10 + which;
+    if (dbl) { unsplit_one(SH(d), which == 1); redraw(d); update_props(d); changed(d); return MUI_EventHandlerRC_Eat; }
+    d->drag = which == 1 ? DR_SPLITX : DR_SPLITY; d->drag_px = which == 1 ? x : y;
+    events_set(d, obj, EV_DRAG);
+    return MUI_EventHandlerRC_Eat;
+  }
+  if (d->barx || d->bary) {
+    /* (split) the pane clicked becomes the active one */
+    Sheet *s = SH(d);
+    u8 p = (u8)((d->bary && y > d->bary ? 1 : 0) | (d->barx && x > d->barx ? 2 : 0));
+    if (!d->bary) p |= (u8)(s->apane & 1);
+    if (!d->barx) p |= (u8)(s->apane & 2);
+    if (y < d->hh) p = (u8)((p & 2) | (s->apane & 1));
+    if (x < d->hw) p = (u8)((p & 1) | (s->apane & 2));
+    if (p != s->apane) { s->apane = p; update_props(d); }
+  }
   {
     Sheet *s = SH(d);
     i32 r, c, e;
@@ -1914,10 +2033,10 @@ static void mset(struct Data *d, Object *obj, struct opSet *msg, int init)
       if (d->book && (LONG)t->ti_Data != SH(d)->zoom) { SH(d)->zoom = (u16)t->ti_Data; close_fonts(d); if (!init) { redraw(d); update_props(d); } }
       break;
     case MUIA_Grid_Top:
-      if (d->book) { i32 v = (i32)t->ti_Data + SH(d)->freezer; if (v != SH(d)->top) { SH(d)->top = v; redraw(d); } }
+      if (d->book) { i32 v = (i32)t->ti_Data + (d->bary ? 0 : SH(d)->freezer), *tp = vtop(d); if (v != *tp) { *tp = v; redraw(d); } }
       break;
     case MUIA_Grid_Left:
-      if (d->book) { i32 v = (i32)t->ti_Data + SH(d)->freezec; if (v != SH(d)->left) { SH(d)->left = v; redraw(d); } }
+      if (d->book) { i32 v = (i32)t->ti_Data + (d->barx ? 0 : SH(d)->freezec), *lp = vleft(d); if (v != *lp) { *lp = v; redraw(d); } }
       break;
     case MUIA_Grid_Copied:
       if (t->ti_Data) { d->copy = *(Rect *)t->ti_Data; d->copied = 1; } else d->copied = 0;

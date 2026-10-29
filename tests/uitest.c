@@ -184,6 +184,34 @@ static void ui_groupby(void)
   book_free(b);
 }
 
+#include "../core/splitpane.h"
+static void ui_split(void)
+{
+  Book *b = book_new(), *d;
+  Sheet *s;
+  book_add_sheet(b, "Two", -1);
+  sheet_split(b->sh[0], 200, 120, 3, 1, 40, 12);
+  b->sh[0]->apane = 2;                          /* the top right pane active */
+  sheet_split(b->sh[1], 0, 90, 5, 0, 30, 2);    /* two panes, one above the other */
+  ok("split", sheet_is_split(b->sh[0]) && !strcmp(split_pane_name(b->sh[0]), "topRight") && !strcmp(split_pane_name(b->sh[1]), "bottomLeft"));
+  d = reload(b);
+  ok("split panes saved and loaded", d && sheet_is_split(d->sh[0]) && sheet_is_split(d->sh[1]));
+  if (d) {
+    s = d->sh[0];
+    ok("bars' places", s->splitx == 200 && s->splity == 120);
+    ok("each pane's first cell", s->stop == 3 && s->sleft == 1 && s->top == 40 && s->left == 12 && s->apane == 2);
+    s = d->sh[1];
+    ok("a split one way", s->splitx == 0 && s->splity == 90 && s->stop == 5 && s->top == 30 && s->left == 2 && (s->apane & 1));
+    book_free(d);
+  }
+  b->sh[0]->freezer = 2;
+  ok("frozen panes come first", !sheet_is_split(b->sh[0]));
+  b->sh[0]->freezer = 0;
+  sheet_unsplit(b->sh[0]);
+  ok("unsplit", !sheet_is_split(b->sh[0]) && b->sh[0]->top == 3 && b->sh[0]->left == 1);
+  book_free(b);
+}
+
 static void ui_tests(void)
 {
   ui_funcdesc();
@@ -191,4 +219,5 @@ static void ui_tests(void)
   ui_legacy();
   ui_cellinfo();
   ui_groupby();
+  ui_split();
 }

@@ -306,7 +306,20 @@ static void fn_wrap(char *t, int w)
   }
 }
 static const char *fn_shown[FN_MAXSHOWN + 1]; static int fn_nshown;
-static Object *fn_cat, *fn_list, *fn_text, *fn_find;
+static Object *fn_cat, *fn_list, *fn_line[4], *fn_find;
+/* the description's lines (from a text with line breaks) */
+static void fn_show(const char *t)
+{
+  static char ln[4][160];
+  int k;
+  for (k = 0; k < 4; k++) {
+    size_t n = strcspn(t, "\n");
+    if (n >= sizeof ln[k]) n = sizeof ln[k] - 1;
+    memcpy(ln[k], t, n); ln[k][n] = 0;
+    t += n; if (*t) t++;
+    set(fn_line[k], MUIA_Text_Contents, (ULONG)ln[k]);
+  }
+}
 static int fn_matches(const char *name, const char *find)
 {
   const FuncDesc *fd;
@@ -328,7 +341,7 @@ static void fn_fill(void)
   DoMethod(fn_list, MUIM_List_Insert, (ULONG)fn_shown, fn_nshown, MUIV_List_Insert_Bottom);
   set(fn_list, MUIA_List_Quiet, FALSE);
   set(fn_list, MUIA_List_Active, 0);
-  if (!fn_nshown) set(fn_text, MUIA_Text_Contents, (ULONG)tr("No function matches."));
+  if (!fn_nshown) fn_show(tr("No function matches."));
 }
 static void fn_each(ULONG id)
 {
@@ -343,12 +356,12 @@ static void fn_each(ULONG id)
       char l1[300];
       snprintf(u, sizeof u, "%s(%s)", fd->name, fd->args);
       utf8_to_latin1(u, (u32)strlen(u), l1, sizeof l1);
-      snprintf(t, sizeof t, "\33b%s\33n\n", l1);
+      snprintf(t, sizeof t, "%s\n", l1);           /* (the first line shows bold) */
       utf8_to_latin1(tr(fd->what), (u32)strlen(tr(fd->what)), l1, sizeof l1);
       strncat(t, l1, sizeof t - strlen(t) - 1);
       fn_wrap(t, 58);
-    } else snprintf(t, sizeof t, "\33b%s\33n", fn_shown[a]);
-    set(fn_text, MUIA_Text_Contents, (ULONG)t);
+    } else snprintf(t, sizeof t, "%s", fn_shown[a]);
+    fn_show(t);
   }
 }
 void dlg_insert_function(void)
@@ -364,7 +377,12 @@ void dlg_insert_function(void)
         Child, HGroup, Child, Label1(tr("Search:")), Child, fn_find = str_obj("", 40),
                        Child, Label1(tr("Category:")), Child, fn_cat = cycle_obj(cats, 0), End,
         Child, ListviewObject, MUIA_Listview_List, fn_list = ListObject, InputListFrame, End, MUIA_CycleChain, 1, MUIA_Listview_DoubleClick, TRUE, End,
-        Child, fn_text = TextObject, TextFrame, MUIA_Text_SetMin, FALSE, MUIA_FixHeightTxt, (ULONG)"Wg\nWg\nWg\nWg", End,
+        Child, VGroup, TextFrame, MUIA_Group_Spacing, 0,
+          Child, fn_line[0] = TextObject, MUIA_Text_SetMin, FALSE, MUIA_Text_PreParse, (ULONG)"\33b", End,
+          Child, fn_line[1] = TextObject, MUIA_Text_SetMin, FALSE, End,
+          Child, fn_line[2] = TextObject, MUIA_Text_SetMin, FALSE, End,
+          Child, fn_line[3] = TextObject, MUIA_Text_SetMin, FALSE, End,
+        End,
       End, "Insert");
   if (!w) return;
   set(w, MUIA_Window_Height, MUIV_Window_Height_Visible(70));

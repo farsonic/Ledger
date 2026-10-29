@@ -43,6 +43,7 @@
 #include "../core/xlsx.h"
 #include "../core/template.h"
 #include "../core/xls.h"
+#include "uitab.h"
 #include "datatab.h"
 
 #ifndef MUIA_Window_DisableKeys
@@ -536,6 +537,12 @@ void update_controls(void)
   if (xget(grid, MUIA_Grid_Editing)) { strncpy(t, (const char *)xget(grid, MUIA_Grid_EditText), sizeof t - 1); t[sizeof t - 1] = 0; }
   else grid_edit_text(book, cur_index(), s->cur_r, s->cur_c, t, sizeof t);
   if (!xget(grid, MUIA_Grid_Editing) && datatab_hide_formula(book, cur_index(), s->cur_r, s->cur_c)) t[0] = 0;   /* (a hidden formula) */
+  {
+    /* (uitab.c) a cell a dynamic array spilled into: its formula shown greyed */
+    static int ghost;
+    int g = !xget(grid, MUIA_Grid_Editing) && ui_spill_formula(book, cur_index(), s->cur_r, s->cur_c, t, sizeof t);
+    if (g || g != ghost) { ghost = g; ui_fx_ghost(fxbar, g, t); }
+  }
   if (strcmp(t, fx_shown)) { strcpy(fx_shown, t); SetAttrs(fxbar, MUIA_NoNotify, TRUE, MUIA_String_Contents, (ULONG)t, TAG_DONE); }
   /* the ribbon */
   if (f->bold) on |= RBIT(RB_BOLD);
@@ -1592,7 +1599,10 @@ static int win_new(Book *b, const char *path)
         Child, fxno = QButton("\327"),
         Child, fxok = QButton("OK"),
         Child, fxb = QButton("fx"),
-        Child, fxbar = StringObject, StringFrame, MUIA_String_MaxLen, 2000, MUIA_ShortHelp, (ULONG)tr("Formula bar: the active cell's entry. Click here to change it; Return puts it in the cell."), End,
+        Child, VGroup, InnerSpacing(0, 0), MUIA_Group_PageMode, TRUE,      /* (uitab.c: page 1 a spilled cell's formula, greyed) */
+          Child, fxbar = StringObject, StringFrame, MUIA_String_MaxLen, 2000, MUIA_ShortHelp, (ULONG)tr("Formula bar: the active cell's entry. Click here to change it; Return puts it in the cell."), End,
+          Child, ui_fxghost(),
+        End,
       End,
       Child, HGroup, MUIA_Group_Spacing, 0,
         Child, grid = NewObject(grid_class()->mcc_Class, NULL, MUIA_Grid_Fonts, (ULONG)&fonts, MUIA_FillArea, FALSE, MUIA_CycleChain, 1, TAG_DONE),
@@ -1935,6 +1945,7 @@ int main(int argc, char **argv)
     else if (id == ID_FILETAB || id == ID_BACKSTAGE || id == ID_TEMPLATE || id == ID_RECENT || id == ID_OPTIONS) backstage_command(id);
     else if ((id >= ID_FONTDD && id <= ID_FN_MORE)) ribbon_choice(id);
     else if (id >= ID_TBL_FIRST && id < ID_TBL_LAST) tabletab_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value));
+    else if (id >= ID_UI_FIRST && id < ID_UI_LAST) { if (id <= ID_FN_SUBLAST) insert_function(ribbon_entry(id, (LONG)xget(ribbon, MUIA_Ribbon_Value))); else ui_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value)); }
     else if (id >= ID_X_FIRST && id < ID_X_LAST) chart_command(id);     /* charttab.c */
     else if (id >= ID_LX_FIRST && id < ID_LX_LAST) { if (back_shown && id != ID_LX_REFRESH && id != ID_LX_SCROLLED) backstage_show(0, 0); lx_command(id); }
     else if (id) {
@@ -1964,6 +1975,7 @@ done:
   ticklist_class_free();
   backstage_class_free();
   qbutton_class_free();
+  ui_class_free();
   fonts_free(&fonts);
   theme_free_fonts();
   remove_fonts();
