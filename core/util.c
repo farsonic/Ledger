@@ -1,6 +1,7 @@
 /* util.c - see util.h */
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include "util.h"
@@ -270,3 +271,26 @@ int file_write(const char *path, const void *data, size_t len)
   if (fclose(fp)) ok = 0;
   return ok;
 }
+
+double dmod(double a, double b) { return a - b * floor(a / b); }
+double ipow(double b, int n)
+{
+  double r = 1;
+  int neg = n < 0;
+  if (neg) n = -n;
+  while (n > 0) { if (n & 1) r *= b; b *= b; n >>= 1; }
+  return neg ? 1 / r : r;
+}
+
+/* floor without leaning on the library: whole already past 2^52; else rounded through 2^52 (each
+   step stored as a double, as the 68040 holds more bits in its registers) and stepped down */
+double ledger_floor(double x)
+{
+  volatile double t;
+  if (!(x == x) || x >= 4503599627370496.0 || x <= -4503599627370496.0) return x;
+  if (x >= 0) { t = x + 4503599627370496.0; t = t - 4503599627370496.0; }
+  else { t = x - 4503599627370496.0; t = t + 4503599627370496.0; }
+  if (t > x) t = t - 1;
+  return t == 0 ? 0 * x : t;
+}
+double ledger_ceil(double x) { return -ledger_floor(-x); }

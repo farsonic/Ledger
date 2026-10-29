@@ -1484,7 +1484,7 @@ static void ets_free(EtsFit *f) { free(f->st.s); free(f->err); }
 static double ets_at(const EtsFit *f, double k)        /* k steps after the last point */
 {
   double s = 0;
-  if (f->m > 0) s = f->st.s[(long)fmod(f->n - 1 + k, (double)f->m)];
+  if (f->m > 0) s = f->st.s[(long)dmod(f->n - 1 + k, (double)f->m)];
   return f->st.l + k * f->st.b + s;
 }
 static double ets_forecast(const EtsFit *f, double h)
