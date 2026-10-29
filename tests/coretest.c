@@ -180,6 +180,32 @@ static void formulas(void)
   book_free(b);
 }
 
+/* the engineering, maths, text and web functions of func_eng.c and func_misc.c (array results whole) */
+static void eng_misc_functions(void)
+{
+  Book *b = book_new();
+  ok("MMULT whole", evn(b, "INDEX(MMULT({1,2;3,4},{5,6;7,8}),1,2)") == 22 && evn(b, "ROWS(MMULT({1;2},{3,4}))") == 2 && evn(b, "COLUMNS(MMULT({1;2},{3,4}))") == 2);
+  ok("MINVERSE", near(evn(b, "INDEX(MINVERSE({4,7;2,6}),2,1)"), -0.2) && near(evn(b, "SUMPRODUCT(MMULT({4,7;2,6},MINVERSE({4,7;2,6}))*MUNIT(2))"), 2));
+  ok("MDETERM", near(evn(b, "MDETERM({1,3,8,5;1,3,6,1;1,1,1,0;7,3,10,2})"), 88));
+  ok("number bases", evs(b, "DEC2BIN(-1)", "1111111111") && evs(b, "HEX2OCT(\"FFFFFFFF00\")", "7777777400") && evs(b, "BASE(255,16,4)", "00FF") && evn(b, "DECIMAL(\"zz\",36)") == 1295);
+  ok("bits", evn(b, "BITXOR(BITLSHIFT(1,40),1)") == 1099511627777.0 && evn(b, "BITRSHIFT(1024,3)") == 128);
+  ok("CONVERT prefixes", near(evn(b, "CONVERT(1,\"Mibyte\",\"kbyte\")"), 1048.576) && near(evn(b, "CONVERT(1,\"km^2\",\"m2\")"), 1e6) && near(evn(b, "CONVERT(212,\"F\",\"C\")"), 100));
+  ok("ERF and Bessel", near(evn(b, "ERF(0.5)"), 0.520499877813047) && near(evn(b, "BESSELJ(1,0)"), 0.765197686557967) && near(evn(b, "BESSELY(1,1)"), -0.781212821300289));
+  ok("complex", evs(b, "IMPRODUCT(\"1+2j\",\"3-j\")", "5+5j") && evs(b, "IMSUM(\"1.5\",\"-i\")", "1.5-i") && evs(b, "COMPLEX(0,0)", "0") && evs(b, "IMCONJUGATE(\"i\")", "-i"));
+  ok("ROMAN forms", evs(b, "ROMAN(1999)", "MCMXCIX") && evs(b, "ROMAN(1999,4)", "MIM") && evn(b, "ARABIC(\"MIM\")") == 1999);
+  ok("regex classes and anchors", evn(b, "REGEXTEST(\"2026-10-29\",\"^\\d{4}-\\d\\d-\\d\\d$\")") == 1 && evn(b, "REGEXTEST(\"ab\",\"^(a|ab)$\")") == 1 && evn(b, "REGEXTEST(\"x\",\"[^a-z]\")") == 0);
+  ok("regex quantifiers", evs(b, "REGEXEXTRACT(\"<b>x</b><b>y</b>\",\"<b>.*?</b>\")", "<b>x</b>") && evs(b, "REGEXEXTRACT(\"aaaa\",\"a{2,3}\")", "aaa") && evs(b, "REGEXEXTRACT(\"ab{2}\",\"b\\{2\\}\")", "b{2}"));
+  ok("regex empty loops and words", evs(b, "REGEXREPLACE(\"abc\",\"(x*)*\",\"-\")", "-a-b-c-") && evs(b, "REGEXREPLACE(\"cat catalog\",\"\\bcat\\b\",\"dog\")", "dog catalog"));
+  ok("regex lookahead, case, backref", evs(b, "REGEXEXTRACT(\"price: 30 USD\",\"\\d+(?= USD)\")", "30") && evn(b, "REGEXTEST(\"ABC\",\"abc\",1)") == 1 && evs(b, "REGEXEXTRACT(\"xyzzy\",\"(.)\\1\")", "zz"));
+  ok("regex bad patterns", evn(b, "REGEXTEST(\"a\",\"a)\")") == -1000 - E_VALUE && evn(b, "REGEXTEST(\"a\",\"*a\")") == -1000 - E_VALUE && evn(b, "REGEXTEST(\"a\",\"[a\")") == -1000 - E_VALUE);
+  ok("regex unicode", evs(b, "REGEXEXTRACT(\"na\xc3\xafve\",\"a.v\")", "a\xc3\xafv") && evn(b, "REGEXTEST(\"\xc3\x89t\xc3\xa9\",\"^\xc3\xa9T\xc3\x89$\",1)") == 1);
+  ok("TEXTSPLIT shape", evn(b, "ROWS(TEXTSPLIT(\"a,b;c\",\",\",\";\"))") == 2 && evn(b, "COLUMNS(TEXTSPLIT(\"a1b2c\",{\"1\",\"2\"}))") == 3);
+  ok("TEXTBEFORE/AFTER", evs(b, "TEXTBEFORE(\"a.b.c\",\".\",-1)", "a.b") && evs(b, "TEXTAFTER(\"a.b.c\",\".\",2)", "c"));
+  ok("FILTERXML", evn(b, "SUM(FILTERXML(\"<r><v>1</v><w><v>2</v></w><v>4</v></r>\",\"//v\"))") == 7 && evs(b, "FILTERXML(\"<r><v a='x'>1</v></r>\",\"/r/v/@a\")", "x"));
+  ok("dates", evn(b, "DAYS360(DATE(2026,1,31),DATE(2026,3,31))") == 60 && evn(b, "ISOWEEKNUM(DATE(2027,1,3))") == 53 && evn(b, "WORKDAY.INTL(DATE(2026,10,30),1,\"0000110\")") == evn(b, "DATE(2026,11,1)"));
+  ok("BAHTTEXT, EUROCONVERT", evs(b, "BAHTTEXT(21)", "\xe0\xb8\xa2\xe0\xb8\xb5\xe0\xb9\x88\xe0\xb8\xaa\xe0\xb8\xb4\xe0\xb8\x9a\xe0\xb9\x80\xe0\xb8\xad\xe0\xb9\x87\xe0\xb8\x94\xe0\xb8\x9a\xe0\xb8\xb2\xe0\xb8\x97\xe0\xb8\x96\xe0\xb9\x89\xe0\xb8\xa7\xe0\xb8\x99") && near(evn(b, "EUROCONVERT(1,\"DEM\",\"EUR\")"), 0.51));
+  book_free(b);
+}
 static void functions(void)
 {
   Book *b = book_new();
@@ -794,6 +820,7 @@ int main(void)
   values_dates();
   formulas();
   functions();
+  eng_misc_functions();
   editing();
   formats();
   files();
