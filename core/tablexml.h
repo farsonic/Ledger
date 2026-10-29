@@ -26,8 +26,16 @@ void tablexml_sheet_parts(Book *b, int si, Buf *o);   /* <tableParts> before </w
 int  tablexml_filter_in_table(Sheet *s);              /* the sheet's AutoFilter is a table's (written in the table) */
 void tablexml_parts(Book *b, ZipWriter *w, FileFormulaFn ff);   /* the parts themselves */
 
+/* slicers: the defined names of their caches (<definedName>s), the worksheet's extLst entries */
+int  tablexml_has_names(Book *b);
+void tablexml_names(Book *b, Buf *o);
+int  tablexml_has_sheet_ext(Book *b, int si);
+void tablexml_sheet_ext(Book *b, int si, Buf *o);     /* <ext> elements, inside the sheet's <extLst> */
+
 /* reading: a sheet relationship of type ("table", "pivotTable") to part target */
 void tablexml_read_rel(Book *b, ZipReader *z, const char *type, const char *target, int sheet);
+/* (xlsx_draw.c) the slicer named name read for sheet, handed over to its frame in the drawing */
+struct Slicer *tablexml_slicer_take(int sheet, const char *name);
 /* after every sheet was read: structured references tidied, pivot reports worked out */
 void tablexml_loaded(Book *b);
 

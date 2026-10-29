@@ -16,6 +16,7 @@
 #include "xml.h"
 #include "xlsx_draw.h"
 #include "pagesetup.h"
+#include "splitpane.h"
 #include "comments.h"
 #include "analysis.h"
 #include <stdlib.h>
@@ -420,12 +421,13 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
       if ((v = xml_attr(&x, "showZeros"))) s->showzeros = strcmp(v, "0") && strcmp(v, "false");
       if ((v = xml_attr(&x, "zoomScale"))) { int zz = atoi(v); if (zz >= 10 && zz <= 400) s->zoom = (u16)zz; }
       if ((v = xml_attr(&x, "tabSelected")) && atoi(v)) rd->b->active = sheet;
+      if ((v = xml_attr(&x, "topLeftCell"))) { i32 r, c; if (cell_ref(v, &r, &c)) { s->stop = s->top = r; s->sleft = s->left = c; } }
     } else if (!strcmp(n, "pane")) {
       const char *st = xml_attr(&x, "state"), *v;
       if (st && (!strcmp(st, "frozen") || !strcmp(st, "frozenSplit"))) {
         if ((v = xml_attr(&x, "xSplit"))) { long c = atol(v); if (c > 0 && c < MAXCOL) s->freezec = (i32)c; }
         if ((v = xml_attr(&x, "ySplit"))) { long r = atol(v); if (r > 0 && r < MAXROW) s->freezer = (i32)r; }
-      }
+      } else if (!st || !strcmp(st, "split")) xlsx_split_pane(s, &x);
     } else if (!strcmp(n, "selection")) {
       const char *v = xml_attr(&x, "activeCell");
       i32 r, c;
@@ -1325,9 +1327,11 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   buf_printf(o, "<sheetViews><sheetView workbookViewId=\"0\"%s%s%s%s", si == b->active ? " tabSelected=\"1\"" : "",
              s->gridlines ? "" : " showGridLines=\"0\"", s->headings ? "" : " showRowColHeaders=\"0\"", s->showzeros ? "" : " showZeros=\"0\"");
   if (s->zoom && s->zoom != 100) buf_printf(o, " zoomScale=\"%d\"", s->zoom);
+  if (sheet_is_split(s)) { ref_text(s->splity ? s->stop : s->top, s->splitx ? s->sleft : s->left, 0, 0, ref); buf_printf(o, " topLeftCell=\"%s\"", ref); }
   page_write_view(s, o);
   buf_adds(o, ">");
-  if (s->freezer || s->freezec) {
+  if (!s->freezer && !s->freezec && (s->splitx || s->splity)) xlsx_split_write(s, o);
+  else if (s->freezer || s->freezec) {
     ref_text(s->freezer, s->freezec, 0, 0, ref);
     buf_adds(o, "<pane");
     if (s->freezec) buf_printf(o, " xSplit=\"%ld\"", (long)s->freezec);
@@ -1336,7 +1340,8 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
                s->freezer && s->freezec ? "bottomRight" : s->freezer ? "bottomLeft" : "topRight");
   }
   ref_text(s->cur_r, s->cur_c, 0, 0, ref);
-  buf_printf(o, "<selection activeCell=\"%s\" sqref=\"%s\"/></sheetView></sheetViews>", ref, ref);
+  if (split_pane_name(s)) buf_printf(o, "<selection pane=\"%s\" activeCell=\"%s\" sqref=\"%s\"/></sheetView></sheetViews>", split_pane_name(s), ref, ref);
+  else buf_printf(o, "<selection activeCell=\"%s\" sqref=\"%s\"/></sheetView></sheetViews>", ref, ref);
   buf_printf(o, "<sheetFormatPr defaultRowHeight=\"%g\"", s->defheight * 0.75);
   if (s->defwidth != 64) buf_printf(o, " defaultColWidth=\"%g\"", floor(s->defwidth / 7.0 * 256) / 256);
   outline_xlsx_formatpr(s, o);
@@ -1630,9 +1635,10 @@ u8 *xlsx_save(Book *b, size_t *len)
     buf_printf(&o, "\" sheetId=\"%d\"%s r:id=\"rId%d\"/>", i + 1, b->sh[i]->hidden ? " state=\"hidden\"" : "", i + 1);
   }
   buf_adds(&o, "</sheets>");
-  if (b->nnames || page_has_names(b)) {
+  if (b->nnames || page_has_names(b) || tablexml_has_names(b)) {
     buf_adds(&o, "<definedNames>");
     page_write_names(b, &o);
+    tablexml_names(b, &o);         /* slicers' caches */
     for (i = 0; i < b->nnames; i++) {
       Name *n = &b->names[i];
       Buf ft;
@@ -1649,12 +1655,11 @@ u8 *xlsx_save(Book *b, size_t *len)
     }
     buf_adds(&o, "</definedNames>");
   }
-  buf_adds(&o, "<calcPr calcId=\"191029\"/>");
-  tablexml_workbook(b, &o);
   buf_adds(&o, "<calcPr calcId=\"191029\"");
   page_write_calcpr(b, &o);
   buf_adds(&o, "/>");
   page_write_book_views(b, &o);
+  tablexml_workbook(b, &o);        /* pivot caches, slicer caches (last, as the schema orders them) */
   buf_adds(&o, "</workbook>");
   zip_add(&w, "xl/workbook.xml", o.data, o.len);
   o.len = 0;

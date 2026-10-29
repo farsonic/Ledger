@@ -26,6 +26,8 @@
 #include "datatab.h"
 #include "anatab.h"
 #include "layout.h"
+#include "uitab.h"
+#include "../core/funcdesc.h"
 
 /* ------------------------------------------------------------------ */
 /* the lists */
@@ -96,20 +98,13 @@ static const char *const calcs[] = { "Automatic", "Manual" };
 static const char *const zooms[] = { "50%", "75%", "100%", "125%", "150%", "200%", "Zoom to Selection" };
 static const char *const freezes[] = { "Freeze Panes", "Freeze Top Row", "Freeze First Column", "Unfreeze Panes" };
 /* the function lists (each a category; what is chosen is typed as =NAME( into the cell) */
-static const char *const fn_fin[] = { "FV", "IPMT", "IRR", "NPER", "NPV", "PMT", "PPMT", "PV", "RATE", "SLN" };
-static const char *const fn_logic[] = { "AND", "FALSE", "IF", "IFERROR", "IFNA", "IFS", "NOT", "OR", "SWITCH", "TRUE", "XOR" };
-static const char *const fn_text[] = { "CHAR", "CLEAN", "CODE", "CONCAT", "EXACT", "FIND", "FIXED", "LEFT", "LEN", "LOWER", "MID", "PROPER",
-                                       "REPLACE", "REPT", "RIGHT", "SEARCH", "SUBSTITUTE", "T", "TEXT", "TEXTJOIN", "TRIM", "UPPER", "VALUE" };
-static const char *const fn_date[] = { "DATE", "DATEDIF", "DATEVALUE", "DAY", "DAYS", "EDATE", "EOMONTH", "HOUR", "MINUTE", "MONTH", "NETWORKDAYS",
-                                       "NOW", "SECOND", "TIME", "TIMEVALUE", "TODAY", "WEEKDAY", "WEEKNUM", "WORKDAY", "YEAR", "YEARFRAC" };
-static const char *const fn_lookup[] = { "ADDRESS", "CHOOSE", "COLUMN", "COLUMNS", "HLOOKUP", "INDEX", "INDIRECT", "LOOKUP", "MATCH", "OFFSET",
-                                         "ROW", "ROWS", "TRANSPOSE", "VLOOKUP", "XLOOKUP" };
-static const char *const fn_math[] = { "ABS", "CEILING", "COS", "EVEN", "EXP", "FACT", "FLOOR", "INT", "LN", "LOG", "LOG10", "MOD", "ODD", "PI",
-                                       "POWER", "PRODUCT", "RAND", "RANDBETWEEN", "ROUND", "ROUNDDOWN", "ROUNDUP", "SIGN", "SIN", "SQRT", "SUM",
-                                       "SUMIF", "SUMIFS", "SUMPRODUCT", "TAN", "TRUNC" };
-static const char *const fn_more[] = { "AVERAGE", "AVERAGEIF", "AVERAGEIFS", "COUNT", "COUNTA", "COUNTBLANK", "COUNTIF", "COUNTIFS", "LARGE",
-                                       "MAX", "MAXIFS", "MEDIAN", "MIN", "MINIFS", "MODE", "RANK", "SMALL", "STDEV", "VAR",
-                                       "ISBLANK", "ISERROR", "ISNUMBER", "ISTEXT", "NA" };
+/* (filled from core/funcdesc.c by fn_lists_init: each category's functions in name order) */
+#define FN_MAXPER 200
+static const char *fnl[FC_N][FN_MAXPER];
+/* More Functions: GridCraft's and Excel's sub-lists, each opening its category's functions */
+static const char *const fn_more[] = { "Statistical", "Engineering", "Cube", "Information", "Compatibility", "Web" };
+static const u8 fn_more_cat[] = { FC_STAT, FC_ENG, FC_CUBE, FC_INFO, FC_COMPAT, FC_WEB };
+static const char *const uigroups[] = { "Group", "Regroup", "Ungroup" };
 /* conditional formatting (main.c's cond_choice goes by these numbers) */
 static const char *const condfmts[] = { "Greater Than...", "Less Than...", "Between...", "Equal To...", "Text that Contains...", "Duplicate Values...",
                                         "Top 10 Items...", "Top 10%...", "Bottom 10 Items...", "Bottom 10%...", "Above Average...", "Below Average...",
@@ -130,9 +125,10 @@ static const char *const cellstyles[] = { "Normal", "Good", "Bad", "Neutral", "T
 enum { L_NONE, L_FONTS, L_SIZES, L_COLORS, L_FILLS, L_BORDERS, L_MERGES, L_NUMFMTS, L_INSERTS, L_DELETES, L_FORMATS, L_AUTOSUMS,
        L_FILL, L_CLEARS, L_SORTS, L_FINDS, L_PASTES, L_SYMBOLS, L_TABCOLORS, L_CALCS, L_ZOOMS, L_FREEZES,
        L_FNFIN, L_FNLOGIC, L_FNTEXT, L_FNDATE, L_FNLOOKUP, L_FNMATH, L_FNMORE, L_CELLSTYLES, L_CONDFMTS,
-       L_TSTYLES, L_TOTFN, L_PVSUBTOT, L_PVGRAND, L_PVLAYOUT, L_PVBLANK, L_PVMOVE, L_DVS, L_WHATIFS, L_GROUPS };
+       L_TSTYLES, L_TOTFN, L_PVSUBTOT, L_PVGRAND, L_PVLAYOUT, L_PVBLANK, L_PVMOVE, L_DVS, L_WHATIFS, L_GROUPS,
+       L_FNSTAT, L_FNENG, L_FNCUBE, L_FNINFO, L_FNCOMPAT, L_FNWEB, L_UIGROUPS };
 #define N(a) ((int)(sizeof(a) / sizeof(a[0])))
-static const List lists[] = {
+static List lists[] = {
   { NULL, 0, PL_TEXT, NULL }, { usual_fonts, 10, PL_FONTS, NULL }, { sizes, N(sizes), PL_TEXT, NULL },
   { colornames, N(colornames), PL_COLOR, colorvals }, { fillnames, N(fillnames), PL_COLOR, fillvals }, { borders, N(borders), PL_BORDER, NULL },
   { merges, N(merges), PL_TEXT, NULL }, { numfmts, N(numfmts), PL_TEXT, NULL }, { inserts, N(inserts), PL_TEXT, NULL },
@@ -141,16 +137,31 @@ static const List lists[] = {
   { finds, N(finds), PL_TEXT, NULL }, { pastes, N(pastes), PL_TEXT, NULL }, { symbols, N(symbols), PL_TEXT, NULL },
   { tabcolors, N(tabcolors), PL_COLOR, tabcolorvals }, { calcs, N(calcs), PL_TEXT, NULL }, { zooms, N(zooms), PL_TEXT, NULL },
   { freezes, N(freezes), PL_TEXT, NULL },
-  { fn_fin, N(fn_fin), PL_TEXT, NULL }, { fn_logic, N(fn_logic), PL_TEXT, NULL }, { fn_text, N(fn_text), PL_TEXT, NULL },
-  { fn_date, N(fn_date), PL_TEXT, NULL }, { fn_lookup, N(fn_lookup), PL_TEXT, NULL }, { fn_math, N(fn_math), PL_TEXT, NULL },
+  { fnl[FC_FIN], 0, PL_TEXT, NULL }, { fnl[FC_LOGIC], 0, PL_TEXT, NULL }, { fnl[FC_TEXT], 0, PL_TEXT, NULL },
+  { fnl[FC_DATE], 0, PL_TEXT, NULL }, { fnl[FC_LOOKUP], 0, PL_TEXT, NULL }, { fnl[FC_MATH], 0, PL_TEXT, NULL },
   { fn_more, N(fn_more), PL_TEXT, NULL }, { cellstyles, N(cellstyles), PL_CELLSTYLE, NULL }, { condfmts, N(condfmts), PL_TEXT, NULL },
   { tstyles, N(tstyles), PL_TSTYLE, NULL }, { totfns, N(totfns), PL_TEXT, NULL }, { pvsubtots, N(pvsubtots), PL_TEXT, NULL },
   { pvgrands, N(pvgrands), PL_TEXT, NULL }, { pvlayouts, N(pvlayouts), PL_TEXT, NULL }, { pvblanks, N(pvblanks), PL_TEXT, NULL },
   { pvmoves, N(pvmoves), PL_TEXT, NULL },
   { dvs, N(dvs), PL_TEXT, NULL }, { whatifs, N(whatifs), PL_TEXT, NULL }, { groups, N(groups), PL_TEXT, NULL },
+  { fnl[FC_STAT], 0, PL_TEXT, NULL }, { fnl[FC_ENG], 0, PL_TEXT, NULL }, { fnl[FC_CUBE], 0, PL_TEXT, NULL },
+  { fnl[FC_INFO], 0, PL_TEXT, NULL }, { fnl[FC_COMPAT], 0, PL_TEXT, NULL }, { fnl[FC_WEB], 0, PL_TEXT, NULL },
+  { uigroups, N(uigroups), PL_TEXT, NULL },
 };
+/* the function lists' entries, from the descriptions' categories */
+static void fn_lists_init(void)
+{
+  static const struct { u8 list, cat; } m[] = { { L_FNFIN, FC_FIN }, { L_FNLOGIC, FC_LOGIC }, { L_FNTEXT, FC_TEXT }, { L_FNDATE, FC_DATE },
+    { L_FNLOOKUP, FC_LOOKUP }, { L_FNMATH, FC_MATH }, { L_FNSTAT, FC_STAT }, { L_FNENG, FC_ENG }, { L_FNCUBE, FC_CUBE },
+    { L_FNINFO, FC_INFO }, { L_FNCOMPAT, FC_COMPAT }, { L_FNWEB, FC_WEB } };
+  static int done;
+  int k;
+  if (done) return;
+  done = 1;
+  for (k = 0; k < (int)(sizeof m / sizeof m[0]); k++) lists[m[k].list].n = func_descs_in(m[k].cat, fnl[m[k].cat], FN_MAXPER);
+}
 /* a list by number: Ledger's own here, or (from LXL_FIRST) layout.h's */
-static const List *list_of(int k) { return k >= LXL_FIRST && k < LXL_LAST ? (const List *)(const void *)&lx_lists[k - LXL_FIRST] : &lists[k]; }
+static const List *list_of(int k) { fn_lists_init(); return k >= LXL_FIRST && k < LXL_LAST ? (const List *)(const void *)&lx_lists[k - LXL_FIRST] : &lists[k]; }
 /* each cell style's look: fill, font colour, bold, a line under it (0 none, 1 thin, 2 thick, 3 double
    over a thin top), its size in points (0 as it is) */
 static const struct { ULONG fill, color; u8 bold, line, size; } stylelook[] = {
@@ -303,7 +314,7 @@ static const Item i_textx[] = {
   { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
 };
 static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Illustrations", G_COLS, ix_illus, N(ix_illus) },
-                                { "Charts", G_COLS, ix_charts, N(ix_charts) }, { "Sparklines", G_COLS, ix_spark, N(ix_spark) },
+                                { "Charts", G_COLS, ix_charts, N(ix_charts) }, { "Sparklines", G_COLS, ix_spark, N(ix_spark) }, { "Filters", G_COLS, i_filters, N(i_filters) },
                                 { "Functions", G_COLS, i_fn, N(i_fn) }, { "Links", G_COLS, i_links, N(i_links) }, { "Text", G_COLS, i_textx, N(i_textx) },
                                 { "Names", G_COLS, i_names, N(i_names) }, { "Cell Controls", G_COLS, i_ctl, N(i_ctl) } };
 /* Page Layout: themes, the page setup (Ledger doesn't print, but PDF export, Page Break Preview and
@@ -352,6 +363,7 @@ static const Item p_arrange[] = {
   { K_BUTTON, S_SMALL, IC_BACKWARD, 0, "Send Backward", ID_X_BACKWARD, 0, RBX(RBX_OBJECT), 0, 0, "Send it one step back" },
   { K_BUTTON, S_SMALL, IC_SELPANE, 0, "Selection Pane", ID_X_SELPANE, 0, 0, 0, 0, "The sheet's pictures, shapes and charts by name: select, rename, reorder" },
   { K_DROP, S_SMALL, IC_ALIGNOBJ, LX_ALIGN, "Align", ID_X_ALIGNDD, 0, RBX(RBX_OBJECT), F_NEWCOL, 0, "Line the selected objects up with the first one selected" },
+  { K_DROP, S_SMALL, IC_GROUP, L_UIGROUPS, "Group", ID_UI_GROUPDD, 0, RBX(RBX_OBJECT), 0, 0, "Group the selected objects so they move and size as one; Ungroup takes a group apart, Regroup puts it back" },
   { K_BUTTON, S_SMALL, IC_ROTATE, 0, "Rotate", ID_X_ROTATE, 0, RBX(RBX_SHAPE), 0, 0, "Turn the selected shape a quarter turn" },
 };
 static const Group playout[] = { { "Themes", G_COLS, p_themes, N(p_themes) }, { "Page Setup", G_COLS, p_setup, N(p_setup) },
@@ -367,7 +379,7 @@ static const Item f_lib[] = {
   { K_DROP, S_SMALL, IC_DATE, L_FNDATE, "Date & Time", ID_FN_DATE, 0, 0, 0, 0, "Date and time functions" },
   { K_DROP, S_SMALL, IC_LOOKUP, L_FNLOOKUP, "Lookup & Reference", ID_FN_LOOKUP, 0, 0, 0, 0, "Lookup and reference functions" },
   { K_DROP, S_SMALL, IC_MATHFN, L_FNMATH, "Math & Trig", ID_FN_MATH, 0, 0, 0, 0, "Maths and trigonometry functions" },
-  { K_DROP, S_SMALL, IC_MOREFN, L_FNMORE, "More Functions", ID_FN_MORE, 0, 0, F_NEWCOL, 0, "Statistical and information functions" },
+  { K_DROP, S_SMALL, IC_MOREFN, L_FNMORE, "More Functions", ID_FN_MORE, 0, 0, F_NEWCOL, 0, "Statistical, engineering, cube, information, compatibility and web functions" },
   { K_DROP, S_SMALL, IC_RECENTFN, LXL_RECENT, "Recently Used", ID_LX_RECENTDD, 0, 0, 0, 0, "The functions you used last" },
 };
 static const Item f_names[] = {
@@ -582,9 +594,16 @@ static const Tab tabs[] = {
 };
 #define NTABS N(tabs)
 /* (ledger.h) the label of entry v of the list of the item that returns id */
+/* More Functions' categories: tools of no group, whose lists open from its list */
+static const Item fn_sub[] = {
+  { K_DROP, S_SMALL, 0, L_FNSTAT, "Statistical", ID_FN_STAT, 0, 0, 0, 0, NULL }, { K_DROP, S_SMALL, 0, L_FNENG, "Engineering", ID_FN_ENG, 0, 0, 0, 0, NULL },
+  { K_DROP, S_SMALL, 0, L_FNCUBE, "Cube", ID_FN_CUBE, 0, 0, 0, 0, NULL }, { K_DROP, S_SMALL, 0, L_FNINFO, "Information", ID_FN_INFO, 0, 0, 0, 0, NULL },
+  { K_DROP, S_SMALL, 0, L_FNCOMPAT, "Compatibility", ID_FN_COMPAT, 0, 0, 0, 0, NULL }, { K_DROP, S_SMALL, 0, L_FNWEB, "Web", ID_FN_WEB, 0, 0, 0, 0, NULL } };
 const char *ribbon_entry(ULONG id, LONG v)
 {
   int t, g, i;
+  fn_lists_init();
+  for (i = 0; i < N(fn_sub); i++) if (fn_sub[i].id == id) { const List *l = list_of(fn_sub[i].list); return v >= 0 && v < l->n ? l->labels[v] : NULL; }
   for (t = 0; t < NTABS; t++)
     for (g = 0; g < tabs[t].n; g++)
       for (i = 0; i < tabs[t].groups[g].n; i++) {
@@ -1100,6 +1119,12 @@ static void chosen(Object *obj, struct RData *d, int k, LONG value)
   }
   d->popdirect = NULL;
   if (!it) return;
+  if (it->id == ID_FN_MORE && value >= 0 && value < N(fn_sub)) {
+    /* (uitab) a category of More Functions: its functions' list next */
+    d->defer = &fn_sub[value];
+    DoMethod(_app(obj), MUIM_Application_PushMethod, (ULONG)obj, 2, MUIM_Ribbon_Open, k);
+    return;
+  }
   d->value = value;
   DoMethod(_app(obj), MUIM_Application_ReturnID, (ULONG)it->id);
 }

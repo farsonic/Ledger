@@ -120,7 +120,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Fill Up (Editing) `edit.fillUp`
 - ✅ Fill Left (Editing) `edit.fillLeft`
 - ✅ Series (Editing) `edit.fillSeries`
-- ⬜ Flash Fill (Editing) `edit.flashFill`
+- ✅ Flash Fill (Editing) `edit.flashFill`
 - ✅ Clear All (Editing) `edit.clearAll`
 - ✅ Clear Formats (Editing) `edit.clearFormats`
 - ✅ Clear Contents (Editing) `edit.clearContents`
@@ -143,16 +143,16 @@ New Cell Style keeps the active cell's look under a name in Home > My Styles whi
 ### Insert (10 of 17 by name)
 
 - ✅ PivotTable (Tables) `insert.pivotTable`
-- ⬜ Recommended PivotTables (Tables) `insert.recommendedPivotTables`
+- ✅ Recommended PivotTables (Tables) `insert.recommendedPivotTables`
 - ✅ Table (Tables) `insert.table`
 - ✅ Pictures (Illustrations) `insert.picture`
 - ✅ Shapes (Illustrations) `insert.shape`
 - ✅ Icons (Illustrations) `insert.icons`
 - ✅ Recommended Charts (Charts) `insert.recommendedCharts`
 - ✅ Charts (Charts) `insert.chart`
-- ⬜ PivotChart (Charts) `insert.pivotChart`
+- ✅ PivotChart (Charts) `insert.pivotChart`
 - ✅ Sparklines (Sparklines) `insert.sparkline`
-- ⬜ Slicer (Filters) `insert.slicer`
+- ✅ Slicer (Filters) `insert.slicer`
 - ✅ Link (Links) `insert.link`
 - ✅ Comment (Comments) `review.newComment`
 - ✅ Text Box (Text) `insert.textBox`
@@ -192,10 +192,10 @@ Checkbox makes the selected cells checkboxes, as GridCraft and Excel do: the cel
 - ✅ Send Backward (Arrange) `arrange.sendBackward`
 - ✅ Selection Pane (Arrange) `arrange.selectionPane`
 - ✅ Align (Arrange) `arrange.align`
-- ⬜ Group (Arrange) `arrange.group`
+- ✅ Group (Arrange) `arrange.group`
 - ✅ Rotate (Arrange) `arrange.rotate`
 
-Not done on Page Layout: Effects only matter to charts and shapes (GridCraft keeps just the name), so they are left out here. Group isn't done: GridCraft's only lines the objects up on the first one (Align does that); a real group would need group shapes (xdr:grpSp) on the sheet and in files.
+Not done on Page Layout: Effects only matter to charts and shapes (GridCraft keeps just the name), so they are left out here. Group (with Regroup and Ungroup, also in the Insert menu's Group Objects) makes real group shapes: the objects move, stretch and are deleted together, groups nest, and they are saved and loaded as xdr:grpSp.
 
 ### Formulas (13 of 23 by name)
 
@@ -288,13 +288,13 @@ The Protect group's Unprotect Sheet and Protect Workbook are the data work's. Al
 - ✅ Freeze Top Row (Window) `view.freezeTopRow`
 - ✅ Freeze First Column (Window) `view.freezeFirstColumn`
 - ✅ Unfreeze Panes (Window) `view.unfreezePanes`
-- ⬜ Split (Window) `view.split`
+- ✅ Split (Window) `view.split`
 - ✅ Hide (Window) `view.hideWindow`
 - ✅ Unhide (Window) `view.unhideWindow`
 - ✅ Switch Windows (Window) `view.switchWindows`
 - ➖ Macros (Macros) `view.macros`
 
-Not done on View: Split (panes that scroll on their own; Freeze Panes and New Window cover most of its uses). Custom Views are saved in the file (customWorkbookViews / customSheetViews). Macros: left out, as is scripting.
+Split makes two or four panes that scroll on their own, at the active cell (or the middle); the bars can be dragged, and go when double-clicked, dragged to an edge or Split is pressed again; saved and loaded as Excel does (pane state="split"). Custom Views are saved in the file (customWorkbookViews / customSheetViews). Macros: left out, as is scripting.
 
 ### Automate (0 of 4 by name)
 
@@ -310,7 +310,7 @@ Not done on View: Split (panes that scroll on their own; Freeze Panes and New Wi
 - ✅ Summarize with PivotTable (Tools) `table.summarizePivot`
 - ✅ Remove Duplicates (Tools) `table.removeDuplicates`
 - ✅ Convert to Range (Tools) `table.convertToRange`
-- ⬜ Insert Slicer (Tools) `table.insertSlicer`
+- ✅ Insert Slicer (Tools) `table.insertSlicer`
 - ✅ Header Row (Table Style Options) `table.headerRow`
 - ✅ Total Row (Table Style Options) `table.totalRow`
 - ✅ Banded Rows (Table Style Options) `table.bandedRows`
@@ -341,16 +341,18 @@ Not done on View: Split (panes that scroll on their own; Freeze Panes and New Wi
 - ✅ Field List (Show) `pivot.fieldList`
 - ✅ Refresh (Data) `pivot.refresh`
 - ✅ Change Data Source (Data) `pivot.changeSource`
-- ⬜ Fields, Items & Sets (Calculations) `pivot.calculatedField`
+- ✅ Fields, Items & Sets (Calculations) `pivot.calculatedField`
 - ✅ Add Field (Fields) `pivot.addField`
 - ✅ Remove Field (Fields) `pivot.removeField`
 - ✅ Move Field (Fields) `pivot.moveField`
 - ✅ Value Field Settings (Active Field) `pivot.valueSettings`
 - ✅ Filter (Filter) `pivot.filter`
 - ✅ Sort (Sort) `pivot.sort`
-- ⬜ Group Field (Group) `pivot.group`
-- ⬜ Collapse Field (Active Field) `pivot.collapse`
+- ✅ Group Field (Group) `pivot.group`
+- ✅ Collapse Field (Active Field) `pivot.collapse`
 - ✅ Clear All (Actions) `pivot.delete`
+
+Recommended PivotTables offers GridCraft's suggestions (a category by a number, two categories, a date by quarters, two numbers, a count, an average) with a preview of each report, and puts the one chosen on a new sheet. A PivotChart is a chart bound to its pivot table: its series are the report's inner (or collapsed) items, made again whenever the report is, and saved with Excel's pivotSource. Slicers float over the sheet listing a field's items as buttons: a click filters a table through its AutoFilter or a pivot table through a filter of its own; Multi-Select and Clear Filter sit in the header; Slicer Settings sets the name, caption, columns, order and header; they are saved as Excel's slicer and slicerCache parts. Fields, Items & Sets makes calculated fields (formulas over the other fields' sums); Group Field groups dates by years, quarters, months and days, numbers by intervals, and items by hand (Ungroup takes it away); Expand and Collapse Field and the +/- buttons on outer items hide or show their detail; Show Values As has running total and rank as GridCraft has them. All of it is saved in .xlsx as Excel writes it.
 
 ### PivotTable Design (0 of 4 by name)
 

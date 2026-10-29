@@ -6,6 +6,7 @@
 #define LEDGER_CHARTTAB_H
 
 #include "chartids.h"
+#include "uitab.h"
 
 void chart_command(ULONG id);
 /* the ribbon's extra states (contextual tabs, tools, sparkline options) for MUIP_Ribbon_State.ext */
@@ -50,6 +51,7 @@ ULONG chart_ribbon_state(void);
     XS("Style 4: shaded plot area", ID_X_STYLE1 + 3), XS("Style 5: dark", ID_X_STYLE1 + 4), \
   XBAR, \
   XI("Edit Shape Text...", ID_X_EDITTEXT), XI("Bring Forward", ID_X_FORWARD), XI("Send Backward", ID_X_BACKWARD), XI("Selection Pane...", ID_X_SELPANE), \
+  XP("Group Objects"), XS("Group", ID_UI_GROUP), XS("Regroup", ID_UI_REGROUP), XS("Ungroup", ID_UI_UNGROUP), \
   XP("Align"), XS("Left", ID_X_ALIGN0), XS("Centre", ID_X_ALIGN0 + 1), XS("Right", ID_X_ALIGN0 + 2), XS("Top", ID_X_ALIGN0 + 3), XS("Middle", ID_X_ALIGN0 + 4), \
     XS("Bottom", ID_X_ALIGN0 + 5), \
   XI("Rotate", ID_X_ROTATE), XI("Delete Object", ID_X_DELOBJ), XI("Sheet Background...", ID_X_BACKGROUND), \

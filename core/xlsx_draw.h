@@ -11,6 +11,8 @@
 #include "book.h"
 #include "zip.h"
 
+/* the workbook's file name ("Book1.xlsx") a PivotChart's link names; "" for Book1.xlsx */
+extern char xd_book_name[128];
 /* saving */
 void xd_content_types(Book *b, Buf *o);          /* the parts' content types */
 int  xd_has_drawing(Book *b, int si);            /* sheet si has objects (a drawing part) */

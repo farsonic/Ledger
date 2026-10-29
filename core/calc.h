@@ -18,6 +18,9 @@ typedef struct {
                                      dynamic arrays, where a range meets the formula's row/column) */
   Env *env;                       /* the LET and LAMBDA names in scope */
   u8 *arrayish;                   /* set to 1 when the evaluation worked on arrays (may be NULL) */
+  /* (legacy formulas) the tokens of amask_f inside arguments evaluated as arrays (SUMPRODUCT's,
+     MMULT's...), where ranges don't meet the formula's row; tok: the token being worked out */
+  const u8 *amask; const void *amask_f, *cur_f; int tok;
 } Ctx;
 
 /* a function: args are as evaluated (references stay references, missing arguments are V_EMPTY

@@ -187,6 +187,10 @@ typedef struct {
   i32 cur_r, cur_c;               /* where the cursor was, and the selection */
   Rect sel;
   i32 top, left;                  /* the scroll position when last shown */
+  /* View > Split: the bars' places, pixels at 100% from the cells' top left (0 none; frozen panes
+     take precedence), the top and left panes' own scroll position, the active pane (bit 0 the
+     bottom one, bit 1 the right one) */
+  i32 splitx, splity, stop, sleft; u8 apane;
   u16 zoom;                       /* per cent */
   /* the Data tab's tools (data.h): validation rules, scenarios, the outline's summary side, protection */
   struct DVRule *dvs; int ndvs;
@@ -226,6 +230,7 @@ typedef struct {
   u16 bookpwhash;                 /* its password's legacy hash (0 none) */
   char bookkey[144];              /* or a newer file's password check (as Sheet.protkey) */
   struct LayoutBook *lx;          /* more properties, the theme, calculation options (pagesetup.h), NULL: defaults */
+  char path[256];                 /* the file it was opened from or last saved to (UTF-8; "" a new one): CELL("filename") */
 } Book;
 
 Book  *book_new(void);                    /* one empty sheet, "Sheet1" */

@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 L=../..
 W=${TMPDIR:-/tmp}/ledger-functest
 rm -rf "$W" && mkdir -p "$W"
-CORE="core/util.c core/zip.c core/xml.c core/book.c core/formula.c core/calc.c core/func.c core/func_stat.c core/func_eng.c core/func_fin.c core/func_misc.c core/func_array.c core/numfmt.c core/xlsx.c core/ops.c core/cond.c core/template.c core/fonts.c core/ttraster.c"
+CORE=$(sed -n 's/^CORE="\(.*\)"$/\1/p' $L/build.sh)
 (cd $L && cc -std=c99 -D_DEFAULT_SOURCE -O1 -I. $CORE tools/functest/harness.c -o "$W/harness" -lm)
 python3 gen.py . "$W/ft.xlsx" "$W/meta.json"
 "$W/harness" "$W/ft.xlsx" > "$W/ledger.tsv"

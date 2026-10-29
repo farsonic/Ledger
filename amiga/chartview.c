@@ -18,12 +18,14 @@
 #include <proto/layers.h>
 #include <proto/muimaster.h>
 #include <clib/alib_protos.h>
+#include "pivot2.h"
+#include "../core/slicer.h"
 #include "chartview.h"
 #include "chartids.h"
 #include "theme.h"
 #include "../core/image.h"
 
-#define MAXSEL 32
+#define MAXSEL 64
 #define NCC 16                   /* charts laid out and kept */
 #define NPC 6                    /* pictures decoded and kept */
 enum { DG_NONE, DG_MOVE, DG_SIZE, DG_INK, DG_ERASE, DG_LASSO, DG_PLACE };
@@ -421,6 +423,38 @@ static void sel_check(ObjView *ov, GridView *gv)
   if (ov->last_ink >= n) ov->last_ink = -1;
 }
 static int is_sel(ObjView *ov, int i) { int k; for (k = 0; k < ov->nsel; k++) if (ov->sel[k] == i) return 1; return 0; }
+/* the group the selection is (all of one group's objects and nothing else), 0 if it isn't one */
+static u32 sel_group(ObjView *ov, GridView *gv)
+{
+  Sheet *s = gv->book->sh[gv->sheet];
+  u32 g;
+  int k, mem[MAXSEL];
+  if (ov->nsel < 1 || !(g = drw_top_group(s, ov->sel[0]))) return 0;
+  for (k = 1; k < ov->nsel; k++) if (drw_top_group(s, ov->sel[k]) != g) return 0;
+  return drw_group_members(s, g, mem, MAXSEL) == ov->nsel ? g : 0;
+}
+/* a group's box on the screen */
+static void group_box(GridView *gv, u32 g, LONG *x0, LONG *y0, LONG *x1, LONG *y1)
+{
+  Sheet *s = gv->book->sh[gv->sheet];
+  int k, mem[MAXSEL], n = drw_group_members(s, g, mem, MAXSEL);
+  for (k = 0; k < n; k++) {
+    LONG a0, b0, a1, b1;
+    obj_box(gv, drw_obj(s, mem[k]), &a0, &b0, &a1, &b1);
+    if (!k || a0 < *x0) *x0 = a0;
+    if (!k || b0 < *y0) *y0 = b0;
+    if (!k || a1 > *x1) *x1 = a1;
+    if (!k || b1 > *y1) *y1 = b1;
+  }
+}
+/* object i's unit (it, or its group's objects) added to the selection, i first if first */
+static void sel_unit(ObjView *ov, GridView *gv, int i, int add)
+{
+  int mem[MAXSEL], n = drw_unit(gv->book->sh[gv->sheet], i, mem, MAXSEL), k;
+  if (!add) ov->nsel = 0;
+  if (!add && n) { ov->sel[ov->nsel++] = i; }
+  for (k = 0; k < n && ov->nsel < MAXSEL; k++) if (!is_sel(ov, mem[k])) ov->sel[ov->nsel++] = mem[k];
+}
 static LONG gpen(void *ctx, ULONG rgb)
 {
   GridView *gv = (GridView *)ctx;
@@ -596,6 +630,30 @@ void ov_draw(ObjView *ov, GridView *gv)
       if (x1 - x0 >= 20 && y1 - y0 >= 20) ov_paint(rp, chart_prims(ov, gv, o->chart, (int)(x1 - x0), (int)(y1 - y0)), gv->ox + x0, gv->oy + y0, gpen, gv);
     } else if (o->kind == OB_PICTURE) draw_picture(ov, gv, o, x0, y0, x1, y1);
     else if (o->kind == OB_SHAPE) ov_shape(rp, o, gv->ox + x0, gv->oy + y0, gv->ox + x1, gv->oy + y1, gv->zoom, gpen, gv);
+    else if (o->kind == OB_SLICER) pivot2_draw_slicer(gv, i, x0, y0, x1, y1);    /* (pivot2.c) */
+  }
+  /* a group: its box with handles, its objects outlined */
+  if (sel_group(ov, gv)) {
+    LONG x0, y0, x1, y1, hx[8], hy[8], acc = tpen(T_ACCENT), wh = gpen(gv, 0xFFFFFF);
+    int k;
+    static UWORD dots = 0xCCCC;
+    SetAPen(rp, acc); SetDrPt(rp, dots);
+    for (i = 0; i < ov->nsel; i++) {
+      DObj *o = drw_obj(s, ov->sel[i]);
+      if (!o) continue;
+      obj_box(gv, o, &x0, &y0, &x1, &y1);
+      x0 += gv->ox; x1 += gv->ox; y0 += gv->oy; y1 += gv->oy;
+      Move(rp, x0, y0); Draw(rp, x1, y0); Draw(rp, x1, y1); Draw(rp, x0, y1); Draw(rp, x0, y0);
+    }
+    SetDrPt(rp, 0xFFFF);
+    group_box(gv, sel_group(ov, gv), &x0, &y0, &x1, &y1);
+    x0 += gv->ox; x1 += gv->ox; y0 += gv->oy; y1 += gv->oy;
+    Move(rp, x0 - 1, y0 - 1); Draw(rp, x1 + 1, y0 - 1); Draw(rp, x1 + 1, y1 + 1); Draw(rp, x0 - 1, y1 + 1); Draw(rp, x0 - 1, y0 - 1);
+    hx[0] = x0; hy[0] = y0; hx[1] = (x0 + x1) / 2; hy[1] = y0; hx[2] = x1; hy[2] = y0; hx[3] = x1; hy[3] = (y0 + y1) / 2;
+    hx[4] = x1; hy[4] = y1; hx[5] = (x0 + x1) / 2; hy[5] = y1; hx[6] = x0; hy[6] = y1; hx[7] = x0; hy[7] = (y0 + y1) / 2;
+    for (k = 0; k < 8; k++) handle_box(rp, hx[k], hy[k], wh, acc);
+    if (rg) { InstallClipRegion(rp->Layer, old); DisposeRegion(rg); }
+    return;
   }
   /* the selection: an outline and handles; a chart's selected part boxed */
   for (i = 0; i < ov->nsel; i++) {
@@ -687,6 +745,14 @@ static int handle_at(ObjView *ov, GridView *gv, LONG x, LONG y)
   DObj *o;
   LONG x0, y0, x1, y1, hx[8], hy[8];
   int k, n;
+  u32 g = sel_group(ov, gv);
+  if (g) {
+    group_box(gv, g, &x0, &y0, &x1, &y1);
+    hx[0] = x0; hy[0] = y0; hx[1] = (x0 + x1) / 2; hy[1] = y0; hx[2] = x1; hy[2] = y0; hx[3] = x1; hy[3] = (y0 + y1) / 2;
+    hx[4] = x1; hy[4] = y1; hx[5] = (x0 + x1) / 2; hy[5] = y1; hx[6] = x0; hy[6] = y1; hx[7] = x0; hy[7] = (y0 + y1) / 2;
+    for (k = 0; k < 8; k++) if (x >= hx[k] - 4 && x <= hx[k] + 4 && y >= hy[k] - 4 && y <= hy[k] + 4) return k;
+    return -1;
+  }
   if (ov->nsel != 1 || !(o = drw_obj(SH(gv), ov->sel[0]))) return -1;
   obj_box(gv, o, &x0, &y0, &x1, &y1);
   n = handles(o, x0, y0, x1, y1, hx, hy);
@@ -706,7 +772,7 @@ static void xor_box(ObjView *ov, GridView *gv)
     LONG dx = ov->cx - ov->sx, dy = ov->cy - ov->sy;
     if (ov->drag == DG_MOVE) { x0 += dx; x1 += dx; y0 += dy; y1 += dy; }
     else {
-      DObj *o = drw_obj(SH(gv), ov->sel[0]);
+      DObj *o = sel_group(ov, gv) ? NULL : drw_obj(SH(gv), ov->sel[0]);
       if (o && o->kind == OB_SHAPE && (o->shape == SK_LINE || o->shape == SK_ARROW)) {
         /* a line: its dragged end */
         LONG ax = o->flipx ? x1 : x0, ay = o->flipy ? y1 : y0, bx = o->flipx ? x0 : x1, by = o->flipy ? y0 : y1;
@@ -751,6 +817,24 @@ static void drag_done(ObjView *ov, GridView *gv)
   LONG dx = ov->cx - ov->sx, dy = ov->cy - ov->sy;
   int d = ov->drag;
   ov->drag = DG_NONE;
+  if (d == DG_SIZE && sel_group(ov, gv)) {
+    /* a group stretched: its objects with it */
+    u32 g = sel_group(ov, gv);
+    i32 x0, y0, x1, y1, ddx = (i32)(dx * 100 / gv->zoom), ddy = (i32)(dy * 100 / gv->zoom);
+    if (!dx && !dy) return;
+    drw_group_box(s, g, &x0, &y0, &x1, &y1);
+    if (ov->handle == 0 || ov->handle == 6 || ov->handle == 7) x0 += ddx;
+    if (ov->handle >= 2 && ov->handle <= 4) x1 += ddx;
+    if (ov->handle <= 2) y0 += ddy;
+    if (ov->handle >= 4 && ov->handle <= 6) y1 += ddy;
+    if (x1 < x0 + 4) x1 = x0 + 4;
+    if (y1 < y0 + 4) y1 = y0 + 4;
+    drw_begin(gv->book, gv->sheet);
+    drw_group_place(s, g, x0, y0, x1, y1);
+    drw_end(gv->book);
+    changed(gv);
+    return;
+  }
   if (d == DG_MOVE || d == DG_SIZE) {
     int k;
     if (!dx && !dy) return;
@@ -833,7 +917,7 @@ static void drag_done(ObjView *ov, GridView *gv)
     for (i = 0; i < drw_count(s) && ov->nsel < MAXSEL; i++) {
       LONG a0, b0, a1, b1;
       obj_box(gv, drw_obj(s, i), &a0, &b0, &a1, &b1);
-      if (a0 >= x0 && a1 <= x1 && b0 >= y0 && b1 <= y1) ov->sel[ov->nsel++] = i;
+      if (a0 >= x0 && a1 <= x1 && b0 >= y0 && b1 <= y1 && !is_sel(ov, i)) sel_unit(ov, gv, i, 1);
     }
     ov->elem = CE_CHART;
     gv->redraw(gv->g);
@@ -948,8 +1032,14 @@ int ov_mouse(ObjView *ov, GridView *gv, struct IntuiMessage *im, LONG x, LONG y)
     }
     if (h < 0) {
       DObj *o = drw_obj(SH(gv), i);
-      if (shift && !is_sel(ov, i) && ov->nsel < MAXSEL) ov->sel[ov->nsel++] = i;
-      else if (!is_sel(ov, i)) { ov->nsel = 1; ov->sel[0] = i; ov->elem = CE_CHART; }
+      if (o->kind == OB_SLICER) {
+        /* a slicer's buttons filter (pivot2.c); its header and frame select and move it */
+        LONG x0, y0, x1, y1;
+        obj_box(gv, o, &x0, &y0, &x1, &y1);
+        if (pivot2_slicer_click(gv, i, x - x0, y - y0, x1 - x0, y1 - y0, shift)) { changed(gv); gv->redraw(gv->g); return 1; }
+      }
+      if (shift && !is_sel(ov, i) && ov->nsel < MAXSEL) sel_unit(ov, gv, i, 1);
+      else if (!is_sel(ov, i)) { sel_unit(ov, gv, i, 0); ov->elem = CE_CHART; }
       else if (ov->nsel > 1 && !shift) { int k; for (k = 0; k < ov->nsel && ov->sel[k] != i; k++) ; ov->sel[k] = ov->sel[0]; ov->sel[0] = i; }
       /* a click inside a selected chart picks out the part under it */
       if (o->kind == OB_CHART && o->chart && ov->nsel == 1) {
@@ -972,7 +1062,8 @@ int ov_mouse(ObjView *ov, GridView *gv, struct IntuiMessage *im, LONG x, LONG y)
     /* drag it (or its handle) */
     {
       DObj *o = drw_obj(SH(gv), ov->sel[0]);
-      obj_box(gv, o, &ov->bx0, &ov->by0, &ov->bx1, &ov->by1);
+      if (sel_group(ov, gv)) group_box(gv, sel_group(ov, gv), &ov->bx0, &ov->by0, &ov->bx1, &ov->by1);
+      else obj_box(gv, o, &ov->bx0, &ov->by0, &ov->bx1, &ov->by1);
       ov->drag = h >= 0 ? DG_SIZE : DG_MOVE; ov->handle = h;
       ov->sx = ov->cx = x; ov->sy = ov->cy = y; ov->xor_on = 0;
     }
@@ -999,7 +1090,11 @@ int ov_key(ObjView *ov, GridView *gv, UWORD code, UWORD q)
     drw_begin(gv->book, gv->sheet);
     /* highest first, so the others keep their numbers */
     for (k = 0; k < ov->nsel; k++) for (j = k + 1; j < ov->nsel; j++) if (ov->sel[j] > ov->sel[k]) { int t = ov->sel[j]; ov->sel[j] = ov->sel[k]; ov->sel[k] = t; }
-    for (k = 0; k < ov->nsel; k++) drw_remove(s, ov->sel[k]);
+    for (k = 0; k < ov->nsel; k++) {
+      DObj *o = drw_obj(s, ov->sel[k]);
+      if (o && o->kind == OB_SLICER) book_slicer_delete(gv->book, gv->sheet, ov->sel[k]);   /* (its filter goes too) */
+      else drw_remove(s, ov->sel[k]);
+    }
     drw_end(gv->book);
     ov->nsel = 0; ov->elem = CE_CHART; ov->last_ink = -1;
     changed(gv); selmoved(gv); gv->redraw(gv->g);
@@ -1061,3 +1156,10 @@ int ov_tool_now(ObjView *ov, ULONG *color, int *width)
   return ov->tool;
 }
 int ov_last_ink(ObjView *ov) { return ov ? ov->last_ink : -1; }
+void ov_select_list(ObjView *ov, const int *list, int n)
+{
+  int k;
+  if (!ov) return;
+  for (k = ov->nsel = 0; k < n && k < MAXSEL; k++) ov->sel[ov->nsel++] = list[k];
+  ov->elem = CE_CHART;
+}
