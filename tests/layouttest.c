@@ -3,6 +3,8 @@
  * formula auditing tools (included by coretest.c, which supplies ok() and the helpers).
  */
 #include "../core/pagesetup.h"
+#include "../core/pdfout.h"
+#include "../core/fonts.h"
 
 static Book *roundtrip(Book *b)
 {
@@ -13,6 +15,8 @@ static Book *roundtrip(Book *b)
   free(x);
   return d;
 }
+static void pct_fmt(Style *st, Font *f, const void *arg) { (void)f; (void)arg; st->numfmt = 10; st->border[B_BOTTOM] = BS_THIN; st->fill = FILL_ON | 0xDDEBF7; }
+static void apply_test_format(Book *b, Rect a) { book_restyle(b, 0, a, pct_fmt, NULL); }
 static void pagesetup_tests(void)
 {
   Book *b = book_new(), *d;
@@ -126,7 +130,52 @@ static void pagesetup_tests(void)
   }
   book_free(b);
 }
+/* a small formatted workbook as PDF; LEDGER_PDF=path keeps it for looking at */
+static void pdf_tests(void)
+{
+  static FontSet fs;
+  Book *b = book_new();
+  PdfOptions o;
+  PageSetup *p;
+  u8 *pdf;
+  size_t n = 0;
+  i32 r;
+  Rect a;
+  const char *dir = getenv("LEDGER_FONTS") ? getenv("LEDGER_FONTS") : "/home/user/quill/fonts";
+  if (!fonts_init(&fs, dir)) { printf("   (no fonts in %s: PDF tests skipped)\n", dir); book_free(b); return; }
+  book_input(b, 0, 0, 0, "Quarterly report", NULL);
+  book_input(b, 0, 1, 0, "Item", NULL); book_input(b, 0, 1, 1, "Amount", NULL); book_input(b, 0, 1, 2, "Share", NULL);
+  for (r = 2; r < 80; r++) {
+    char t[32];
+    sprintf(t, "Line %ld", (long)r - 1); book_input(b, 0, r, 0, t, NULL);
+    sprintf(t, "%ld.5", (long)(r * 37 % 101)); book_input(b, 0, r, 1, t, NULL);
+    sprintf(t, "=B%ld/SUM($B$3:$B$80)", (long)r + 1); book_input(b, 0, r, 2, t, NULL);
+  }
+  a.r1 = 2; a.r2 = 79; a.c1 = 2; a.c2 = 2;
+  apply_test_format(b, a);
+  p = page_get(b->sh[0]);
+  page_set_hf(p, HF_HEADER, "&L&A&C&\"-,Bold\"Quarterly &P of &N&R&D");
+  page_set_hf(p, HF_FOOTER, "&CPage &P");
+  p->gridlines = 1; p->headings = 1; p->trow1 = 1; p->trow2 = 1;
+  memset(&o, 0, sizeof o);
+  o.file = "Report.xlsx"; o.now = 46322.5;
+  ok("pdf: page count", pdf_count_pages(b, &o) == 2);
+  pdf = pdf_book(b, &fs, &o, &n);
+  ok("pdf: made", pdf && n > 1000 && !memcmp(pdf, "%PDF-1.4", 8));
+  ok("pdf: two pages", pdf && strstr((char *)pdf, "/Count 2>>"));
+  ok("pdf: a font embedded", pdf && strstr((char *)pdf, "/FontFile2"));
+  if (pdf && getenv("LEDGER_PDF")) file_write(getenv("LEDGER_PDF"), pdf, n);
+  if (getenv("LEDGER_XLSX")) { size_t xl; u8 *x = xlsx_save(b, &xl); if (x) file_write(getenv("LEDGER_XLSX"), x, xl); free(x); }
+  free(pdf);
+  o.what = PDF_SELECTION;
+  b->sh[0]->sel.r1 = 0; b->sh[0]->sel.r2 = 9; b->sh[0]->sel.c1 = 0; b->sh[0]->sel.c2 = 1;
+  ok("pdf: selection is one page", pdf_count_pages(b, &o) == 1);
+  ok("pdf: the sheet's own setup untouched", p->area.r1 < 0 && b->sh[0]->page == p);
+  book_free(b);
+  fonts_free(&fs);
+}
 static void layout_tests(void)
 {
   pagesetup_tests();
+  pdf_tests();
 }
