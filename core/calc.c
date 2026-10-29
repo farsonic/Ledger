@@ -8,6 +8,7 @@
  * further passes, so the C stack stays small on the Amiga.
  */
 #include "calc.h"
+#include "table.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -544,7 +545,7 @@ static Value eval_name(Ctx *cx, const char *name)
       if (cx->b->names[i].sheet == cx->sheet) { found = i; break; }
       if (cx->b->names[i].sheet == SHEET_SELF) found = i;
     }
-  if (found < 0 || !cx->b->names[found].f) return val_err(E_NAME);
+  if (found < 0 || !cx->b->names[found].f) { Value tv; return table_name_value(cx->b, name, &tv) ? tv : val_err(E_NAME); }
   if (cx->depth > MAXCALL) return val_err(E_CALC);
   {
     Ctx sub = *cx;
@@ -580,6 +581,7 @@ static Value eval_f(Ctx *cx, const Formula *f)
       if (v.sheet >= cx->b->nsh) v = val_err(E_REF);
       break;
     case T_NAME: v = eval_name(cx, t->s); break;
+    case T_TABLE: v = table_ref_value(cx->b, cx->sheet, cx->row, cx->col, t->s ? t->s : ""); break;
     case T_NEG: case T_POS: case T_PCT:
       if (sp < 1) goto bad;
       v = unop(cx, t->op, &st[sp - 1]);

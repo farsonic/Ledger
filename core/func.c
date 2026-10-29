@@ -1916,6 +1916,8 @@ static const FuncDef core_defs[] = {
    the core's into one table in name order the first time a function is looked up */
 extern const FuncDef func_stat_defs[], func_eng_defs[], func_fin_defs[], func_misc_defs[], func_array_defs[];
 extern const int func_stat_count, func_eng_count, func_fin_count, func_misc_count, func_array_count;
+extern const FuncDef table_func_defs[];
+extern const int table_func_count;
 #define MAXFUNCS 640
 static FuncDef merged[MAXFUNCS];
 const FuncDef *func_table = merged;
@@ -1934,6 +1936,7 @@ void func_init(void)
 {
   if (func_count) return;
   add_defs(core_defs, (int)(sizeof core_defs / sizeof core_defs[0]));
+  add_defs(table_func_defs, table_func_count);   /* (table.c: SUBTOTAL for totals rows, unless a later table has its own) */
   add_defs(func_stat_defs, func_stat_count);
   add_defs(func_eng_defs, func_eng_count);
   add_defs(func_fin_defs, func_fin_count);

@@ -65,7 +65,8 @@ int    serial_weekday(double serial);      /* 0 Sunday .. 6 Saturday */
 enum {
   T_END, T_NUM, T_STR, T_BOOL, T_ERR, T_REF, T_AREA, T_NAME, T_FUNC, T_MISSING, T_PAREN, T_ARRAY,
   T_ADD, T_SUB, T_MUL, T_DIV, T_POW, T_CAT, T_EQ, T_NE, T_LT, T_GT, T_LE, T_GE,
-  T_NEG, T_POS, T_PCT, T_RANGE, T_UNION, T_ISECT
+  T_NEG, T_POS, T_PCT, T_RANGE, T_UNION, T_ISECT,
+  T_TABLE                         /* a structured reference (table.c): s is its text, "Table1[Col]", "[@Col]" */
 };
 /* reference flags: which coordinates have a $, and whole rows/columns (A:A, 1:1) */
 enum { RF_ABSR1 = 1, RF_ABSC1 = 2, RF_ABSR2 = 4, RF_ABSC2 = 8, RF_COLS = 16, RF_ROWS = 32, RF_SHEET = 64 };
@@ -132,6 +133,7 @@ typedef struct { i32 r, c; char *author, *text; } Note;
 /* a hyperlink on a cell: a web or mail address, or a place in the workbook ("#Sheet2!A1"), and its tip */
 typedef struct { i32 r, c; char *target, *tip; } Link;
 typedef struct CondCache CondCache;
+struct LTable; struct LPivot;    /* tables (table.h) and pivot tables (pivot.h) */
 typedef struct {
   u8 type, op, stop;              /* CF_, CO_ (CF_CELL), stop if true */
   u8 bottom, percent;             /* CF_TOP: the bottom ones, rank is a percentage */
@@ -160,6 +162,8 @@ typedef struct {
   CondRule *cfs; int ncfs;        /* conditional formatting, first rule first */
   Note *notes; int nnotes;        /* notes on cells, in no order */
   Link *links; int nlinks;        /* hyperlinks on cells, in no order */
+  struct LTable *tables; int ntables;   /* tables (Format as Table), table.h */
+  struct LPivot *pivots; int npivots;   /* pivot tables whose report is on this sheet, pivot.h */
   u8 hidden, gridlines, headings, showzeros, rtl;
   i32 cur_r, cur_c;               /* where the cursor was, and the selection */
   Rect sel;
@@ -221,6 +225,7 @@ int    sheet_merge_at(Sheet *s, i32 r, i32 c, Rect *m);     /* the merged area h
 void   book_begin(Book *b);               /* group the following changes into one undo step */
 void   book_end(Book *b);
 void   book_note_sheet(Book *b, int sheet);   /* (inside a step) the whole sheet noted for undo before it changes */
+void   book_note_book(Book *b);               /* (inside a step) every sheet noted for undo (formulas everywhere change) */
 /* what the user typed into a cell: a formula ("=..."), a number, date, percentage, TRUE/FALSE, an
    error, or text ("'..." forces text). An empty string clears the value (keeping the format).
    Typing a date or percentage into a General cell gives it a matching number format, as in Excel.
