@@ -919,6 +919,8 @@ static void dynarrays(void)
   put(b, "M1", "=SUM(L1#)");
   put(b, "N1", "=LET(x,{1,2,3},SUM(x*x))");
   put(b, "N2", "=SUM(IF(L1:L3>2,1,0))");
+  book_define_name(b, "TIMES", "LAMBDA(a,b,a*b)", SHEET_SELF);
+  put(b, "N3", "=TIMES(3,4)");
   data = xlsx_save(b, &n);
   c = data ? xlsx_load(data, n, err, sizeof err) : NULL;
   ok("xlsx: dynamic array loaded back", c && num_at(c, "L3") == 6 && num_at(c, "M1") == 12 && spills(c, "L2", "L1:L3") && num_at(c, "N1") == 14 && num_at(c, "N2") == 2);
@@ -927,6 +929,7 @@ static void dynarrays(void)
     Cell *x = sheet_cell(c->sh[0], 1, 11);
     ok("xlsx: spilled cells come back as spilled", x && x->spill && !x->f);
     ok("xlsx: formulas keep their text", text_at(c, "M1", "=SUM(L1#)") && text_at(c, "N1", "=LET(x,{1,2,3},SUM(x*x))"));
+    ok("xlsx: a named LAMBDA", c->nnames == 1 && !strcmp(c->names[0].formula_text, "LAMBDA(a,b,a*b)") && num_at(c, "N3") == 12);
     book_free(c);
   }
   free(data);

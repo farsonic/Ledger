@@ -898,6 +898,14 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
     int pos;
     const char *t = b->names[i].formula_text;
     if (t) b->names[i].f = formula_parse(b, b->names[i].sheet == SHEET_SELF ? 0 : b->names[i].sheet, t[0] == '=' ? t + 1 : t, &pos);
+    if (b->names[i].f && strstr(t, "_xl")) {
+      /* shown without the file's prefixes (_xlfn.LAMBDA(_xlpm.x,...) as LAMBDA(x,...)) */
+      Buf nt;
+      buf_init(&nt);
+      formula_text(b, b->names[i].sheet == SHEET_SELF ? 0 : b->names[i].sheet, b->names[i].f, &nt);
+      if (nt.data) { free(b->names[i].formula_text); b->names[i].formula_text = buf_take(&nt); }
+      else buf_free(&nt);
+    }
   }
   free(names);
   for (i = 0; i < nents && i < b->nsh; i++) {
