@@ -5,6 +5,7 @@
 #include "../core/pagesetup.h"
 #include "../core/pdfout.h"
 #include "../core/fonts.h"
+#include "../core/spell.h"
 
 static Book *roundtrip(Book *b)
 {
@@ -174,8 +175,48 @@ static void pdf_tests(void)
   book_free(b);
   fonts_free(&fs);
 }
+static void spell_tests(void)
+{
+  static const char words[] = "apple\nbanana\nreport\nquarterly\nthe\nthis\nspelling\nsales\nsale\nsalesman\nsalesmen\nof\n";
+  Spell sp;
+  Book *b = book_new();
+  int sh = 0, n;
+  i32 r = 0, c = 0;
+  u32 off = 0, ws, we;
+  char *sug[10];
+  ok("spell: list loads", spell_load_mem(&sp, words, sizeof words - 1) && sp.n == 12);
+  book_input(b, 0, 0, 0, "Quarterly report", NULL);
+  book_input(b, 0, 0, 1, "=\"speling\"", NULL);          /* a formula: left alone */
+  book_input(b, 0, 2, 0, "the speling of thiss", NULL);
+  book_input(b, 0, 3, 0, "42", NULL);
+  book_add_sheet(b, "Two", -1);
+  book_input(b, 1, 0, 0, "banana apel", NULL);
+  ok("spell: first mistake", spell_next_cell(&sp, b, 1, &sh, &r, &c, &off, &ws, &we) && sh == 0 && r == 2 && c == 0 && ws == 4 && we == 11);
+  n = spell_suggest(&sp, "speling", 7, sug, 10);
+  ok("spell: suggestion", n >= 1 && !strcmp(sug[0], "spelling"));
+  while (n > 0) free(sug[--n]);
+  ok("spell: next in the cell", spell_next_cell(&sp, b, 1, &sh, &r, &c, &off, &ws, &we) && r == 2 && ws == 15);
+  ok("spell: on to the next sheet", spell_next_cell(&sp, b, 1, &sh, &r, &c, &off, &ws, &we) && sh == 1 && ws == 7);
+  ok("spell: wraps back round", spell_next_cell(&sp, b, 1, &sh, &r, &c, &off, &ws, &we) && sh == 0 && r == 2 && ws == 4);
+  spell_add(&sp, "thiss", 5);
+  ok("spell: change all", spell_change_all(b, 1, 0, "speling", "spelling") == 1);
+  sh = 0; r = 0; c = 0; off = 0;
+  n = spell_next_cell(&sp, b, 1, &sh, &r, &c, &off, &ws, &we);
+  if (!(n && sh == 1)) printf("   got %d sheet %d r %ld c %ld ws %lu\n", n, sh, (long)r, (long)c, (unsigned long)ws);
+  ok("spell: only the other sheet's left", n && sh == 1);
+  sh = 0; r = 0; c = 0; off = 0;
+  ok("spell: one sheet only", !spell_next_cell(&sp, b, 0, &sh, &r, &c, &off, &ws, &we));
+  ok("spell: change one", spell_change(b, 1, 0, 0, 7, 11, "apple") && !strcmp(cell_value(b, 1, 0, 0)->s, "banana apple"));
+  ok("spell: formula untouched", sheet_cell(b->sh[0], 0, 1)->f != NULL);
+  n = spell_related(&sp, "sales", sug, 10);
+  ok("thesaurus: related words", n >= 2 && !strcmp(sug[0], "sale"));
+  while (n > 0) free(sug[--n]);
+  spell_free(&sp);
+  book_free(b);
+}
 static void layout_tests(void)
 {
+  spell_tests();
   pagesetup_tests();
   pdf_tests();
 }
