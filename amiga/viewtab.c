@@ -15,6 +15,7 @@
 double ledger_now(void);
 
 static int ruler_on = 1;
+static GridGeom lastg;                   /* the grid's last drawing (for dragging the breaks) */
 static int sync_on, side_on, side_other = -1;
 
 /* ------------------------------------------------------------------ the pages, cached between draws */
@@ -264,13 +265,13 @@ static void draw_layout(struct RastPort *rp, const GridGeom *g, const Pages *p)
 void vt_draw(struct RastPort *rp, const GridGeom *g)
 {
   int v = view_of(g->book, g->sheet);
+  lastg = *g;
   const Pages *p;
   if (v == PV_NORMAL || !(p = pages_of(g->book, g->sheet))) { nblines = 0; return; }
   if (v == PV_BREAKS) draw_breaks(rp, g, p);
   else draw_layout(rp, g, p);
 }
 /* the row (or column) edge nearest a pixel, from the grid's last drawing */
-static GridGeom lastg;
 static i32 nearest_edge(int rows, LONG px)
 {
   int i, n = rows ? lastg.nvr : lastg.nvc, best = 0;

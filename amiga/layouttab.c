@@ -1050,7 +1050,9 @@ int lx_ribbon_choice(ULONG id, LONG v)
 }
 int lx_bit(int b)
 {
-  Sheet *s = cur_sheet();
+  Sheet *s;
+  if (!book) return 0;                       /* (a window drawn before its workbook is in) */
+  s = cur_sheet();
   switch (b) {
   case LXB_PRINTGRID: return page_of(s)->gridlines;
   case LXB_PRINTHEAD: return page_of(s)->headings;
