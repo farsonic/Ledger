@@ -298,10 +298,10 @@ Split makes two or four panes that scroll on their own, at the active cell (or t
 
 ### Automate (0 of 4 by name)
 
-- ⬜ New Script (Scripting Tools) `automate.newScript`
-- ⬜ All Scripts (Scripting Tools) `automate.allScripts`
-- ⬜ Record Actions (Scripting Tools) `automate.recordActions`
-- ⬜ Trust Scripts (Scripting Tools) `automate.trustScripts`
+- ➖ New Script (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.newScript`
+- ➖ All Scripts (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.allScripts`
+- ➖ Record Actions (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.recordActions`
+- ➖ Trust Scripts (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.trustScripts`
 
 ### Table Design (2 of 13 by name)
 
