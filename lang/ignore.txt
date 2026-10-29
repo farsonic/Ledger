@@ -1,0 +1,122 @@
+# lang/ignore.txt - string literals in amiga/ that are not the interface's words, so tools/langcheck.py
+# doesn't ask for their translations. One per line, exactly as the C source has it (UTF-8, C escapes).
+# Lines starting "# " are notes.
+#
+# ---- names: the program, its versions, languages (each in itself), font families, themes
+Ledger
+Ledger 0.2.1
+Ledger 0.2.2
+$VER: Ledger 0.2.2 (28.10.2026) a spreadsheet for the Amiga (MUI)
+%s%s - Ledger
+English
+Deutsch
+Français
+Español
+Italiano
+english
+deutsch
+français
+español
+italiano
+en
+de
+fr
+es
+it
+Calibri
+Calibri Light
+Cambria
+Arial
+Times New Roman
+Courier New
+Carlito
+Caladea
+Liberation Sans
+Liberation Serif
+Liberation Mono
+QuillSans
+QuillSansC
+QuillSerif
+QuillSerifC
+QuillMono
+QuillSerifB
+QuillSerifI
+QuillSerifBI
+QuillSansB
+QuillSansI
+QuillSansBI
+QuillMonoB
+QuillMonoI
+QuillMonoBI
+QuillSansCB
+QuillSansCI
+QuillSansCBI
+QuillSerifCB
+QuillSerifCI
+QuillSerifCBI
+Office
+Office: Calibri Light / Calibri
+Office 2007: Cambria / Calibri
+Liberation Serif / Liberation Sans
+Carlito / Caladea
+# ---- number format codes (shown as codes, the same in every language)
+#,##0;[Red]-#,##0
+d-mmm-yy
+d mmmm yyyy
+dddd
+mmm-yy
+h:mm AM/PM
+[h]:mm
+d/mm/yyyy h:mm
+"Total: "0.00
+# ---- file patterns, MUI list formats, assembler, gadget samples
+#?.(png|jpg|jpeg)
+#?.(csv|txt|tsv|prn)
+#?.(html|htm)
+#?.(xlsx|xls|ods|csv|txt|tsv)
+#?.(csv|txt|tsv)
+BAR,BAR,BAR,BAR P=\33r,
+\tjsr\t-30(a6)
+nnnnnnnnnn
+0123456789ABCDEFabcdef
+0123456789.eE-
+FONTS:
+aatext
+BI
+IF
+fx
+# ---- the sample header/footer's made-up workbook (Page Setup's preview)
+Sheet1
+Work:
+# ---- font loading trace (FTRACE / the debug log)
+font: %s\n
+can't open
+can't read
+not a font file:
+font: AAText %s\n
+is running
+isn't running
+font: %s for AAText: %s\n
+not written
+font: %s: %d sizes (id %x)\n
+no sizes in
+not a font:
+font: loaded %s: %u high, %u-%u\n
+font: %s: file %ld ticks, glyphs %ld ticks\n
+font: made %s at %ld/64 pixels: %ld high\n
+font: %s through diskfont is %ld wide, not %ld\n
+font: %s %u through diskfont.library\n
+# ---- icon drawings with letters in them (theme.c)
+ci B abc cg L 5 12 8 15 L 8 15 14 8
+ci R 2 1 13 15 cr F 1 7 14 12 cw B PDF
+ca I fx
+# ---- names given to drawing objects (kept in the workbook, as Excel's own files have them)
+Ink %lu
+Straight Arrow Connector
+TextBox
+Graphic
+Ink
+Icon: %s %lu
+# ---- (more drawing object names)
+Straight Connector
+Pivot
