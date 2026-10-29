@@ -20,6 +20,7 @@
 #include "lang.h"
 #include "ids.h"
 #include "../core/calc.h"
+#include "../core/funcdesc.h"
 #include "../core/cond.h"
 
 #undef Label
@@ -284,114 +285,91 @@ int dlg_number_format(char *code, int cap)
 }
 
 /* ------------------------------------------------------------------ Insert Function */
-/* each function's arguments and what it does (the commonest; the rest show their name alone) */
-static const struct { const char *name, *args, *what; u8 cat; } fdesc[] = {
-  { "ABS", "number", "The number without its sign.", 6 }, { "ADDRESS", "row, column, [abs], [a1], [sheet]", "A cell's address as text.", 5 },
-  { "AND", "logical1, ...", "TRUE if every argument is TRUE.", 2 }, { "AVERAGE", "number1, ...", "The average (mean) of the numbers.", 7 },
-  { "AVERAGEIF", "range, criteria, [average_range]", "The average of the cells that meet a condition.", 7 },
-  { "AVERAGEIFS", "average_range, range1, criteria1, ...", "The average of the cells that meet several conditions.", 7 },
-  { "CEILING", "number, significance", "Rounds up to a multiple of significance.", 6 }, { "CHAR", "number", "The character with that code.", 3 },
-  { "CHOOSE", "index, value1, ...", "The value in the list at the index.", 5 }, { "CLEAN", "text", "Text without unprintable characters.", 3 },
-  { "CODE", "text", "The code of the first character.", 3 }, { "COLUMN", "[reference]", "The column number of a reference.", 5 },
-  { "COLUMNS", "array", "How many columns a range has.", 5 }, { "CONCAT", "text1, ...", "Joins texts together.", 3 },
-  { "COUNT", "value1, ...", "How many numbers there are.", 7 }, { "COUNTA", "value1, ...", "How many cells aren't empty.", 7 },
-  { "COUNTBLANK", "range", "How many cells are empty.", 7 }, { "COUNTIF", "range, criteria", "How many cells meet a condition.", 7 },
-  { "COUNTIFS", "range1, criteria1, ...", "How many cells meet several conditions.", 7 },
-  { "DATE", "year, month, day", "The date from its year, month and day.", 4 }, { "DATEDIF", "start, end, unit", "Years (\"Y\"), months (\"M\") or days (\"D\") between two dates.", 4 },
-  { "DATEVALUE", "date_text", "The date written in text as a date.", 4 }, { "DAY", "date", "The day of the month (1-31).", 4 },
-  { "DAYS", "end, start", "Days between two dates.", 4 }, { "EDATE", "start, months", "The date months before or after.", 4 },
-  { "EOMONTH", "start, months", "The last day of the month months away.", 4 }, { "EXACT", "text1, text2", "TRUE if two texts are the same, case and all.", 3 },
-  { "FIND", "find, within, [start]", "Where one text starts in another (case matters).", 3 }, { "FV", "rate, nper, pmt, [pv], [type]", "The future value of an investment.", 1 },
-  { "HLOOKUP", "value, table, row, [approx]", "Looks across the top row and returns a value from a row below.", 5 },
-  { "HOUR", "time", "The hour (0-23).", 4 }, { "IF", "test, value_if_true, [value_if_false]", "One value if the test is TRUE, another if not.", 2 },
-  { "IFERROR", "value, value_if_error", "The value, or another if it is an error.", 2 }, { "IFS", "test1, value1, ...", "The value of the first test that is TRUE.", 2 },
-  { "INDEX", "array, row, [column]", "The value at a row and column of a range.", 5 }, { "INDIRECT", "ref_text, [a1]", "The reference written in text.", 5 },
-  { "INT", "number", "Rounds down to a whole number.", 6 }, { "IPMT", "rate, per, nper, pv", "The interest part of a loan payment.", 1 },
-  { "IRR", "values, [guess]", "The internal rate of return of cash flows.", 1 }, { "ISBLANK", "value", "TRUE if the cell is empty.", 8 },
-  { "ISERROR", "value", "TRUE if the value is an error.", 8 }, { "ISNUMBER", "value", "TRUE if the value is a number.", 8 },
-  { "ISTEXT", "value", "TRUE if the value is text.", 8 }, { "LARGE", "array, k", "The k-th largest number.", 7 },
-  { "LEFT", "text, [chars]", "The first characters of a text.", 3 }, { "LEN", "text", "How many characters a text has.", 3 },
-  { "LOOKUP", "value, lookup, [result]", "Looks a value up in one range, returns from another.", 5 }, { "LOWER", "text", "Text in lower case.", 3 },
-  { "MATCH", "value, range, [type]", "Where a value is in a range.", 5 }, { "MAX", "number1, ...", "The largest number.", 7 },
-  { "MAXIFS", "max_range, range1, criteria1, ...", "The largest number that meets conditions.", 7 }, { "MEDIAN", "number1, ...", "The middle number.", 7 },
-  { "MID", "text, start, chars", "Characters from the middle of a text.", 3 }, { "MIN", "number1, ...", "The smallest number.", 7 },
-  { "MINIFS", "min_range, range1, criteria1, ...", "The smallest number that meets conditions.", 7 }, { "MINUTE", "time", "The minute (0-59).", 4 },
-  { "MOD", "number, divisor", "The remainder after dividing.", 6 }, { "MONTH", "date", "The month (1-12).", 4 },
-  { "NETWORKDAYS", "start, end, [holidays]", "Working days between two dates.", 4 }, { "NOT", "logical", "TRUE for FALSE, FALSE for TRUE.", 2 },
-  { "NOW", "", "The date and time now.", 4 }, { "NPER", "rate, pmt, pv", "How many payments pay off a loan.", 1 },
-  { "NPV", "rate, value1, ...", "The net present value of cash flows.", 1 }, { "OFFSET", "reference, rows, cols, [height], [width]", "A range so many rows and columns away.", 5 },
-  { "OR", "logical1, ...", "TRUE if any argument is TRUE.", 2 }, { "PI", "", "3.14159265358979.", 6 },
-  { "PMT", "rate, nper, pv, [fv], [type]", "The payment on a loan.", 1 }, { "POWER", "number, power", "A number raised to a power.", 6 },
-  { "PPMT", "rate, per, nper, pv", "The principal part of a loan payment.", 1 }, { "PRODUCT", "number1, ...", "The numbers multiplied together.", 6 },
-  { "PROPER", "text", "Text With Each Word Capitalised.", 3 }, { "PV", "rate, nper, pmt, [fv], [type]", "The present value of an investment.", 1 },
-  { "RAND", "", "A random number from 0 to 1.", 6 }, { "RANDBETWEEN", "bottom, top", "A random whole number between two.", 6 },
-  { "RANK", "number, ref, [order]", "A number's place in a list.", 7 }, { "RATE", "nper, pmt, pv", "The interest rate per period.", 1 },
-  { "REPLACE", "text, start, chars, new", "Replaces part of a text.", 3 }, { "REPT", "text, times", "Text repeated.", 3 },
-  { "RIGHT", "text, [chars]", "The last characters of a text.", 3 }, { "ROUND", "number, digits", "Rounds to so many digits.", 6 },
-  { "ROUNDDOWN", "number, digits", "Rounds towards zero.", 6 }, { "ROUNDUP", "number, digits", "Rounds away from zero.", 6 },
-  { "ROW", "[reference]", "The row number of a reference.", 5 }, { "ROWS", "array", "How many rows a range has.", 5 },
-  { "SEARCH", "find, within, [start]", "Where one text starts in another (any case, wildcards).", 3 }, { "SECOND", "time", "The second (0-59).", 4 },
-  { "SLN", "cost, salvage, life", "Straight-line depreciation for one period.", 1 }, { "SMALL", "array, k", "The k-th smallest number.", 7 },
-  { "SQRT", "number", "The square root.", 6 }, { "STDEV", "number1, ...", "Standard deviation of a sample.", 7 },
-  { "SUBSTITUTE", "text, old, new, [instance]", "Replaces old text with new.", 3 }, { "SUM", "number1, ...", "Adds the numbers up.", 6 },
-  { "SUMIF", "range, criteria, [sum_range]", "Adds the cells that meet a condition.", 6 }, { "SUMIFS", "sum_range, range1, criteria1, ...", "Adds the cells that meet several conditions.", 6 },
-  { "SUMPRODUCT", "array1, array2, ...", "Multiplies ranges together and adds the products.", 6 }, { "SWITCH", "value, match1, result1, ...", "The result for the first match.", 2 },
-  { "TEXT", "value, format", "A number as text in a number format.", 3 }, { "TEXTJOIN", "delimiter, ignore_empty, text1, ...", "Joins texts with a delimiter between.", 3 },
-  { "TIME", "hour, minute, second", "The time from its parts.", 4 }, { "TODAY", "", "Today's date.", 4 },
-  { "TRANSPOSE", "array", "A range turned on its side.", 5 }, { "TRIM", "text", "Text without extra spaces.", 3 },
-  { "TRUNC", "number, [digits]", "Cuts off the decimals.", 6 }, { "UPPER", "text", "Text in upper case.", 3 },
-  { "VALUE", "text", "The number written in text.", 3 }, { "VAR", "number1, ...", "Variance of a sample.", 7 },
-  { "VLOOKUP", "value, table, column, [approx]", "Looks down the first column and returns a value from a column to the right.", 5 },
-  { "WEEKDAY", "date, [type]", "The day of the week (1 Sunday ... 7 Saturday).", 4 }, { "WEEKNUM", "date, [type]", "The week of the year.", 4 },
-  { "WORKDAY", "start, days, [holidays]", "The date so many working days away.", 4 },
-  { "XLOOKUP", "value, lookup, return, [if_not_found], [match], [search]", "Looks a value up and returns from another range; finds exact matches by default.", 5 },
-  { "XOR", "logical1, ...", "TRUE if an odd number of arguments are TRUE.", 2 }, { "YEAR", "date", "The year.", 4 },
-  { "YEARFRAC", "start, end, [basis]", "The fraction of a year between two dates.", 4 },
-};
-#define NFDESC ((int)(sizeof fdesc / sizeof fdesc[0]))
-static const char *const fn_cats[] = { "All", "Financial", "Logical", "Text", "Date & Time", "Lookup & Reference", "Math & Trig", "Statistical", "Information", NULL };
-static const char *fn_shown[700]; static int fn_nshown;
-static Object *fn_cat, *fn_list, *fn_text;
-static int fn_desc(const char *name) { int i; for (i = 0; i < NFDESC; i++) if (!strcmp(fdesc[i].name, name)) return i; return -1; }
+/* each function's arguments, what it does and its category: core/funcdesc.c. The list shows the
+   category's functions (All: every one in func_table), or those whose name or description has the
+   text typed in Search */
+#define FN_MAXSHOWN 900
+static int strstr_nocase(const char *s, const char *f)
+{
+  size_t n = strlen(f);
+  for (; *s; s++) { size_t i; for (i = 0; i < n && s[i] && ToUpper((UBYTE)s[i]) == ToUpper((UBYTE)f[i]); i++) ; if (i == n) return 1; }
+  return 0;
+}
+/* text broken into lines of at most w characters at its spaces (in place) */
+static void fn_wrap(char *t, int w)
+{
+  char *line = t, *sp = NULL, *p;
+  for (p = t; *p; p++) {
+    if (*p == '\n') { line = p + 1; sp = NULL; continue; }
+    if (*p == ' ') sp = p;
+    if (p - line >= w && sp) { *sp = '\n'; line = sp + 1; sp = NULL; }
+  }
+}
+static const char *fn_shown[FN_MAXSHOWN + 1]; static int fn_nshown;
+static Object *fn_cat, *fn_list, *fn_text, *fn_find;
+static int fn_matches(const char *name, const char *find)
+{
+  const FuncDesc *fd;
+  if (!*find) return 1;
+  if (strstr_nocase(name, find)) return 1;
+  fd = func_desc(name);
+  return fd && strstr_nocase(fd->what, find);
+}
 static void fn_fill(void)
 {
   int cat = (int)xget(fn_cat, MUIA_Cycle_Active), i;
+  const char *find = fn_find ? sget(fn_find) : "";
   fn_nshown = 0;
-  if (cat == 0) { func_init(); for (i = 0; i < func_count && fn_nshown < 699; i++) fn_shown[fn_nshown++] = func_table[i].name; }
-  else for (i = 0; i < NFDESC && fn_nshown < 699; i++) if (fdesc[i].cat == cat) fn_shown[fn_nshown++] = fdesc[i].name;
+  if (cat == FC_ALL) { func_init(); for (i = 0; i < func_count && fn_nshown < FN_MAXSHOWN; i++) if (fn_matches(func_table[i].name, find)) fn_shown[fn_nshown++] = func_table[i].name; }
+  else for (i = 0; i < func_ndescs && fn_nshown < FN_MAXSHOWN; i++) if (func_descs[i].cat == cat && fn_matches(func_descs[i].name, find)) fn_shown[fn_nshown++] = func_descs[i].name;
   fn_shown[fn_nshown] = NULL;
+  set(fn_list, MUIA_List_Quiet, TRUE);
   DoMethod(fn_list, MUIM_List_Clear);
   DoMethod(fn_list, MUIM_List_Insert, (ULONG)fn_shown, fn_nshown, MUIV_List_Insert_Bottom);
+  set(fn_list, MUIA_List_Quiet, FALSE);
   set(fn_list, MUIA_List_Active, 0);
+  if (!fn_nshown) set(fn_text, MUIA_Text_Contents, (ULONG)tr("No function matches."));
 }
 static void fn_each(ULONG id)
 {
-  if (id == ID_FUNCCAT) fn_fill();
+  if (id == ID_FUNCCAT || id == ID_FUNCGO) fn_fill();
   else if (id == ID_FUNCPICK) {
     LONG a = (LONG)xget(fn_list, MUIA_List_Active);
-    static char t[300];
-    int k;
+    static char t[400];
+    char u[360];
+    const FuncDesc *fd;
     if (a < 0 || a >= fn_nshown) return;
-    k = fn_desc(fn_shown[a]);
-    if (k >= 0) snprintf(t, sizeof t, "\33b%s(%s)\33n\n%s", fdesc[k].name, fdesc[k].args, tr(fdesc[k].what));
-    else snprintf(t, sizeof t, "\33b%s\33n", fn_shown[a]);
+    if ((fd = func_desc(fn_shown[a]))) {
+      char l1[300];
+      snprintf(u, sizeof u, "%s(%s)", fd->name, fd->args);
+      utf8_to_latin1(u, (u32)strlen(u), l1, sizeof l1);
+      snprintf(t, sizeof t, "\33b%s\33n\n", l1);
+      utf8_to_latin1(tr(fd->what), (u32)strlen(tr(fd->what)), l1, sizeof l1);
+      strncat(t, l1, sizeof t - strlen(t) - 1);
+      fn_wrap(t, 58);
+    } else snprintf(t, sizeof t, "\33b%s\33n", fn_shown[a]);
     set(fn_text, MUIA_Text_Contents, (ULONG)t);
   }
 }
 void dlg_insert_function(void)
 {
   static const ULONG ends[] = { ID_DLGOK, 0 };
-  static const char *cats[12];
+  static const char *cats[FC_N + 1], *names[FC_N + 1];
   Object *w;
-  trl(fn_cats, cats);
+  int i;
+  for (i = 0; i < FC_N; i++) names[i] = func_cat_names[i];
+  names[FC_N] = NULL;
+  trl(names, cats);
   w = dialog_window("Insert Function", VGroup,
-        Child, HGroup, Child, Label1(tr("Category:")), Child, fn_cat = cycle_obj(cats, 0), End,
+        Child, HGroup, Child, Label1(tr("Search:")), Child, fn_find = str_obj("", 40),
+                       Child, Label1(tr("Category:")), Child, fn_cat = cycle_obj(cats, 0), End,
         Child, ListviewObject, MUIA_Listview_List, fn_list = ListObject, InputListFrame, End, MUIA_CycleChain, 1, MUIA_Listview_DoubleClick, TRUE, End,
-        Child, fn_text = TextObject, TextFrame, MUIA_Text_SetMin, FALSE, MUIA_FixHeightTxt, (ULONG)"Wg\nWg\nWg\n", End,
+        Child, fn_text = TextObject, TextFrame, MUIA_Text_SetMin, FALSE, MUIA_FixHeightTxt, (ULONG)"Wg\nWg\nWg\nWg", End,
       End, "Insert");
   if (!w) return;
-  set(w, MUIA_Window_Height, MUIV_Window_Height_Visible(60));
-  set(w, MUIA_Window_Width, MUIV_Window_Width_Visible(45));
+  set(w, MUIA_Window_Height, MUIV_Window_Height_Visible(70));
+  set(w, MUIA_Window_Width, MUIV_Window_Width_Visible(66));
+  DoMethod(fn_find, MUIM_Notify, MUIA_String_Contents, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_FUNCGO);
   DoMethod(fn_cat, MUIM_Notify, MUIA_Cycle_Active, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_FUNCCAT);
   DoMethod(fn_list, MUIM_Notify, MUIA_List_Active, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_FUNCPICK);
   DoMethod(fn_list, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLGOK);

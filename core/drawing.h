@@ -48,7 +48,13 @@ typedef struct {
   u32 tcolor;                      /* text colour, FILL_ON | rgb (0: automatic) */
   Blob *pic; u8 pictype;           /* OB_PICTURE: the file (PNG or JPEG) */
   Chart *chart;                    /* OB_CHART */
+  u32 group;                       /* the innermost group (DGroup.id) it is in, 0 none */
 } DObj;
+
+/* a group of objects (Page Layout > Arrange > Group; a grpSp in the file): its members are the
+   objects whose group is it or one of the groups inside it, kept together in the stacking order.
+   Groups nest through parent (0: a top-level group) */
+typedef struct { u32 id, parent; char name[48]; } DGroup;
 
 /* Ledger's own icons for Insert > Icons (SK_ICON shapes): drawn on a 16 x 16 grid by commands
    L x0 y0 x1 y1 (line), R (box), F (filled box), O cx cy r (circle), E (disc), P n x y... (lines
@@ -117,6 +123,7 @@ typedef struct Drawing {
   SparkGroup *g; int ng;
   u32 nextid;
   Blob *bg; u8 bgtype;             /* Page Layout > Background: a picture tiled behind the cells (PIC_), or NULL */
+  DGroup *grp; int ngrp;           /* (drwgroup.c) the groups */
 } Drawing;
 
 /* ------------------------------------------------------------------ a sheet's drawing */
@@ -147,6 +154,27 @@ void  dobj_place(Sheet *s, DObj *o, i32 x0, i32 y0, i32 x1, i32 y1);          /*
 void  drw_begin(Book *b, int sheet);
 void  drw_end(Book *b);
 void  book_note_all(Book *b);              /* (book.c, inside a step) every sheet noted for undo: objects moved between sheets */
+
+/* ------------------------------------------------------------------ groups (drwgroup.c) */
+DGroup *drw_group_find(Sheet *s, u32 id);            /* NULL if there is none */
+u32   drw_top_group(Sheet *s, int i);               /* the outermost group object i is in, 0 none */
+int   drw_in_group(Sheet *s, int i, u32 gid);       /* object i is in group gid (at any depth) */
+int   drw_group_depth(Sheet *s, u32 gid);           /* 1 a top-level group, 2 one inside it... */
+/* the objects in group gid (at any depth), bottom first, at most max; how many */
+int   drw_group_members(Sheet *s, u32 gid, int *out, int max);
+/* what selecting object i selects: its outermost group's members, or i alone; how many */
+int   drw_unit(Sheet *s, int i, int *out, int max);
+/* the objects (and the groups they are in) of sel made one new group, kept together in the stacking
+   order where the topmost of them was; its id, 0 if they are fewer than two objects or groups */
+u32   drw_group(Sheet *s, const int *sel, int n);
+/* group gid taken apart one level: its objects and groups belong to its parent; 0 if no such group */
+int   drw_ungroup(Sheet *s, u32 gid);
+void  drw_group_box(Sheet *s, u32 gid, i32 *x0, i32 *y0, i32 *x1, i32 *y1);   /* round its members, at 100% */
+/* group gid's members moved and stretched so that its box is this one */
+void  drw_group_place(Sheet *s, u32 gid, i32 x0, i32 y0, i32 x1, i32 y1);
+void  drw_group_prune(Sheet *s);                    /* groups left without members taken away */
+DGroup *drw_group_add(Sheet *s, u32 parent);       /* (loading) an empty new group; NULL out of memory */
+int   drw_groups_copy(Drawing *dst, const Drawing *src);   /* 0 out of memory */
 
 /* ------------------------------------------------------------------ drawing primitives */
 enum { PR_RECT, PR_LINE, PR_POLY, PR_ELLIPSE, PR_TEXT };
