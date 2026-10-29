@@ -194,7 +194,7 @@ static Value f_map(Ctx *cx, Value *a, int n)
   const Value *fn = &a[n - 1];
   i32 rows = 1, cols = 1, r, c;
   int i, k;
-  Value v;
+  Value v, *args;
   if (!calc_is_lambda(fn)) return fn->t == V_ERR ? val_err(fn->e) : val_err(E_VALUE);
   if (n < 2) return val_err(E_VALUE);
   for (i = 0; i < n - 1; i++) {
@@ -205,13 +205,14 @@ static Value f_map(Ctx *cx, Value *a, int n)
   }
   v = arr_value(rows, cols);
   if (v.t != V_ARR) return v;
+  if (!(args = (Value *)malloc((size_t)n * sizeof(Value)))) { val_free(&v); return val_err(E_NUM); }
   for (r = 0; r < rows; r++)
     for (c = 0; c < cols; c++) {
-      Value args[254];
       for (k = 0; k < n - 1; k++) args[k] = element(cx, &a[k], r, c);
       *EL(v.a, r, c) = one_value(cx, calc_call(cx, fn, args, n - 1));
       for (k = 0; k < n - 1; k++) val_free(&args[k]);
     }
+  free(args);
   return v;
 }
 /* REDUCE and SCAN: the accumulator carried through the elements, row by row */
@@ -495,10 +496,11 @@ static Value f_choosecols(Ctx *cx, Value *a, int n) { return choose_rc(cx, a, n,
 /* VSTACK and HSTACK: the arrays one after another, the short ones padded with #N/A */
 static Value stack(Ctx *cx, Value *a, int n, int horiz)
 {
-  Arr *parts[255], *d;
-  int i, err, rows = 0, cols = 0, at = 0, r, c;
+  Arr **parts = (Arr **)malloc((size_t)n * sizeof(Arr *)), *d;
+  int i, err = E_NUM, rows = 0, cols = 0, at = 0, r, c;
+  if (!parts) return val_err(E_NUM);
   for (i = 0; i < n; i++) {
-    if (!(parts[i] = IS_MISSING(&a[i]) ? arr_new(1, 1) : to_array(cx, &a[i], &err))) { while (i-- > 0) arr_free(parts[i]); return val_err(err); }
+    if (!(parts[i] = IS_MISSING(&a[i]) ? arr_new(1, 1) : to_array(cx, &a[i], &err))) { while (i-- > 0) arr_free(parts[i]); free(parts); return val_err(err); }
     if (horiz) { cols += parts[i]->cols; if (parts[i]->rows > rows) rows = parts[i]->rows; }
     else { rows += parts[i]->rows; if (parts[i]->cols > cols) cols = parts[i]->cols; }
   }
@@ -513,6 +515,7 @@ static Value stack(Ctx *cx, Value *a, int n, int horiz)
     at += horiz ? p->cols : p->rows;
     arr_free(p);
   }
+  free(parts);
   return d ? arr_take(d) : val_err(E_NUM);
 }
 static Value f_vstack(Ctx *cx, Value *a, int n) { return stack(cx, a, n, 0); }
