@@ -199,7 +199,6 @@ static Value f_map(Ctx *cx, Value *a, int n)
   if (n < 2) return val_err(E_VALUE);
   for (i = 0; i < n - 1; i++) {
     i32 rr, cc;
-    if (a[i].t == V_ERR && 0) return val_err(a[i].e);
     arg_shape(&a[i], &rr, &cc);
     if (rr > rows) rows = rr;
     if (cc > cols) cols = cc;
@@ -645,9 +644,9 @@ static Value f_xlookup(Ctx *cx, Value *a, int n)
   if (!(vec = get_arr(cx, &a[1], &err))) { val_free(&x); return val_err(err); }
   lr = vec->rows; lc = vec->cols;
   if (lr != 1 && lc != 1) { arr_free(vec); val_free(&x); return val_err(E_VALUE); }
-  vertical = lc == 1 && !(lr == 1 && 0);
   arg_shape(&a[2], &rr, &rc);
-  if (lr == 1 && lc == 1) vertical = rr >= 1 && rc == 1 ? 1 : (rr == 1 ? 0 : 1);
+  /* a column looks down, a row across; a single cell goes by the result's shape */
+  vertical = lc == 1 && (lr > 1 || rc == 1 || rr != 1);
   if ((vertical && rr != lr) || (!vertical && rc != lc)) { arr_free(vec); val_free(&x); return val_err(E_VALUE); }
   pos = xsearch(&x, vec, mm, sm);
   arr_free(vec); val_free(&x);
@@ -873,10 +872,8 @@ static Value f_subtotal(Ctx *cx, Value *a, int n)
 {
   double fn;
   int e, i, skip = SK_NESTED | SK_FILTERED;
-  static const int map[12] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
   static const char *const names[12] = { "", "AVERAGE", "COUNT", "COUNTA", "MAX", "MIN", "PRODUCT", "STDEV", "STDEVP", "SUM", "VAR", "VARP" };
   Value *vals, v;
-  (void)map;
   if ((e = arg_num(cx, &a[0], &fn))) return val_err(e);
   fn = floor(fn);
   if (fn > 100) { fn -= 100; skip |= SK_HIDDEN; }

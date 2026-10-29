@@ -1019,8 +1019,9 @@ static Value lift(Ctx *cx, const FuncDef *fd, const char *mask, Value *args, int
   int i;
   Value out, *tmp;
   u8 *own;
+  /* once mapping, every range or array where a single value goes takes part (array context) */
   for (i = 0; i < argc; i++)
-    if (mask_at(mask, i) == 's' && liftable(cx, &args[i])) {
+    if (mask_at(mask, i) == 's' && is_multi(&args[i])) {
       i32 ar, ac;
       arg_shape(&args[i], &ar, &ac);
       if (ar > rows) rows = ar;
@@ -1038,7 +1039,7 @@ static Value lift(Ctx *cx, const FuncDef *fd, const char *mask, Value *args, int
       for (i = 0; i < argc; i++) {
         own[i] = 0;
         tmp[i] = args[i];
-        if (mask_at(mask, i) == 's' && liftable(cx, &args[i])) {
+        if (mask_at(mask, i) == 's' && is_multi(&args[i])) {
           i32 ar, ac, rr, cc;
           arg_shape(&args[i], &ar, &ac);
           rr = ar == 1 ? 0 : r; cc = ac == 1 ? 0 : c;

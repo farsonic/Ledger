@@ -897,6 +897,18 @@ static void draw_marks(struct Data *d, struct RastPort *rp)
   /* frozen panes: a darker line after the frozen rows and columns */
   if (s->freezer && d->nfr) hline(rp, d->hw, d->w - 1, d->vy[d->nfr] - 1, d->pen_frozen);
   if (s->freezec && d->nfcol) vline(rp, d->vx[d->nfcol] - 1, d->hh, d->h - 1, d->pen_frozen);
+  {
+    /* the active cell in a dynamic array's spill range: a thin line round the range (dashed where
+       it would go when something is in its way: #SPILL!) */
+    Rect sp;
+    int blocked = 0;
+    if (book_spill_range(d->book, SI(d), s->cur_r, s->cur_c, &sp, &blocked) && rect_px(d, &sp, &x0, &y0, &x1, &y1)) {
+      SetAPen(rp, d->pen_accent);
+      if (blocked) SetDrPt(rp, 0xCCCC);
+      Move(rp, x0, y0); Draw(rp, x1 - 1, y0); Draw(rp, x1 - 1, y1 - 1); Draw(rp, x0, y1 - 1); Draw(rp, x0, y0);
+      SetDrPt(rp, 0xFFFF);
+    }
+  }
   if (rect_px(d, &sel, &x0, &y0, &x1, &y1) && x0 < d->w && y0 < d->h) {
     Rect act;
     LONG ax0, ay0, ax1, ay1;

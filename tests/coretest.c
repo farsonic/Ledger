@@ -889,6 +889,9 @@ static void dynarrays(void)
   ok("INDEX of a union", evn(b, "AREAS((A1:B2,C3))") == 2);
   ok("RANDARRAY", evn(b, "ROWS(RANDARRAY(3,2))") == 3 && evn(b, "AND(RANDARRAY(5,1,1,3,TRUE)>=1)") == 1);
   ok("SHEET and SHEETS", evn(b, "SHEET()") == 1 && evn(b, "SHEETS()") == 1);
+  put(b, "A1", "1"); put(b, "A2", "2"); put(b, "B1", "a"); put(b, "B2", "b");
+  ok("VLOOKUP over CHOOSE({1,2},...)", evs(b, "VLOOKUP(\"b\",CHOOSE({1,2},B1:B2,A1:A2),2,FALSE)", "2"));
+  ok("array constants map in old formulas too", evn(b, "SUM(LEN({\"a\",\"bb\"}))") == 3);
   book_free(b);
 
   /* sheets for SUBTOTAL, AGGREGATE, CELL, FORMULATEXT, TRIMRANGE */
@@ -926,6 +929,33 @@ static void dynarrays(void)
     ok("xlsx: formulas keep their text", text_at(c, "M1", "=SUM(L1#)") && text_at(c, "N1", "=LET(x,{1,2,3},SUM(x*x))"));
     book_free(c);
   }
+  free(data);
+  book_free(b);
+
+  /* order: a formula before the spill it reads, a spill sized by another, merges, {=...} */
+  b = book_new();
+  put(b, "A1", "=SUM(B2:B4)");
+  put(b, "B1", "=SEQUENCE(4)");
+  ok("spill read before its formula", num_at(b, "A1") == 9);
+  put(b, "C1", "=SEQUENCE(ROWS(B1#),2)");
+  ok("spill sized by a spill", num_at(b, "D4") == 8 && spills(b, "C1", "C1:D4"));
+  put(b, "B1", "=SEQUENCE(2)");
+  ok("both shrink", num_at(b, "A1") == 2 && spills(b, "C1", "C1:D2") && sheet_cell(b->sh[0], 3, 3) == NULL);
+  book_merge(b, 0, (Rect){ 10, 0, 10, 1 }, 1);
+  put(b, "A10", "=SEQUENCE(2)");
+  ok("a merge in the way is #SPILL!", is_err(b, "A10", E_SPILL) && spills(b, "A10", "A10:A11"));
+  {
+    int pos;
+    Formula *f = formula_parse(b, 0, "B1:B2*10", &pos);
+    f->cse = 1; f->arows = 3; f->acols = 1;
+    book_set_formula(b, 0, 14, 0, f);
+  }
+  ok("{=...} fills its range, #N/A past the result", num_at(b, "A15") == 10 && num_at(b, "A16") == 20 && is_err(b, "A17", E_NA));
+  data = xlsx_save(b, &n);
+  c = data ? xlsx_load(data, n, err, sizeof err) : NULL;
+  ok("xlsx: {=...} loaded back", c && num_at(c, "A16") == 20 && is_err(c, "A17", E_NA) && sheet_cell(c->sh[0], 14, 0)->f->cse &&
+     num_at(c, "A1") == 2 && num_at(c, "D2") == 4 && is_err(c, "A10", E_SPILL));
+  if (c) book_free(c);
   free(data);
   book_free(b);
 }
