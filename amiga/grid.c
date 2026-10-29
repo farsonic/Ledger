@@ -1201,8 +1201,13 @@ static int commit(struct Data *d, int move)
     while (depth-- > 0 && strlen(u) + 1 < sizeof u) strcat(u, ")");
   }
   {
-    /* (datatab) the entry against the cell's data validation */
-    int v = datatab_entry_ok(d->book, SI(d), move == 5 ? sel.r1 : s->cur_r, move == 5 ? sel.c1 : s->cur_c, u);
+    /* (datatab) a protected sheet's locked cells, and the entry against the cell's data validation */
+    Rect one;
+    int v;
+    one.r1 = one.r2 = move == 5 ? sel.r1 : s->cur_r; one.c1 = one.c2 = move == 5 ? sel.c1 : s->cur_c;
+    if (move == 5) one = sel;
+    if (!datatab_may(d->book, SI(d), DT_CELLS, one)) { edit_end(d); redraw(d); moved(d); return 1; }
+    v = datatab_entry_ok(d->book, SI(d), move == 5 ? sel.r1 : s->cur_r, move == 5 ? sel.c1 : s->cur_c, u);
     if (v < 0) { edit_end(d); redraw(d); moved(d); return 1; }
     if (!v) { d->editing = 2; redraw(d); return 0; }
   }
