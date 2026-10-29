@@ -467,6 +467,40 @@ static void ink_geom(Buf *o, Sheet *s, const DObj *ob)
   }
   buf_adds(o, "</a:path></a:pathLst></a:custGeom>");
 }
+/* an icon (drawing.c's little language) as DrawingML paths on its 16 x 16 grid */
+static long inum(const char **p) { while (**p == ' ') (*p)++; return strtol(*p, (char **)p, 10); }
+static void icon_geom(Buf *o, const DObj *ob)
+{
+  const char *p = drw_icon_desc(ob->text ? atoi(ob->text) : 0);
+  buf_adds(o, "<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l=\"0\" t=\"0\" r=\"r\" b=\"b\"/><a:pathLst>");
+  while (p && *p) {
+    char c = *p++;
+    long a, bb, e, f, n, i;
+    switch (c) {
+    case 'L': case 'R': case 'F':
+      a = inum(&p); bb = inum(&p); e = inum(&p); f = inum(&p);
+      buf_printf(o, "<a:path w=\"16\" h=\"16\"%s><a:moveTo><a:pt x=\"%ld\" y=\"%ld\"/></a:moveTo>", c == 'F' ? "" : " fill=\"none\"", a, bb);
+      if (c == 'L') buf_printf(o, "<a:lnTo><a:pt x=\"%ld\" y=\"%ld\"/></a:lnTo>", e, f);
+      else buf_printf(o, "<a:lnTo><a:pt x=\"%ld\" y=\"%ld\"/></a:lnTo><a:lnTo><a:pt x=\"%ld\" y=\"%ld\"/></a:lnTo><a:lnTo><a:pt x=\"%ld\" y=\"%ld\"/></a:lnTo><a:close/>", e, bb, e, f, a, f);
+      buf_adds(o, "</a:path>");
+      break;
+    case 'O': case 'E':
+      a = inum(&p); bb = inum(&p); e = inum(&p);
+      buf_printf(o, "<a:path w=\"16\" h=\"16\"%s><a:moveTo><a:pt x=\"%ld\" y=\"%ld\"/></a:moveTo><a:arcTo wR=\"%ld\" hR=\"%ld\" stAng=\"0\" swAng=\"21600000\"/><a:close/></a:path>",
+                 c == 'E' ? "" : " fill=\"none\"", a + e, bb, e, e);
+      break;
+    case 'P': case 'Q':
+      n = inum(&p);
+      buf_printf(o, "<a:path w=\"16\" h=\"16\"%s>", c == 'Q' ? "" : " fill=\"none\"");
+      for (i = 0; i < n; i++) { a = inum(&p); bb = inum(&p); buf_printf(o, "<a:%s><a:pt x=\"%ld\" y=\"%ld\"/></a:%s>", i ? "lnTo" : "moveTo", a, bb, i ? "lnTo" : "moveTo"); }
+      if (c == 'Q') buf_adds(o, "<a:close/>");
+      buf_adds(o, "</a:path>");
+      break;
+    default: break;
+    }
+  }
+  buf_adds(o, "</a:pathLst></a:custGeom>");
+}
 void xd_write_parts(Book *b, int si, ZipWriter *w)
 {
   Sheet *s = b->sh[si];
@@ -536,8 +570,10 @@ void xd_write_parts(Book *b, int si, ZipWriter *w)
       buf_adds(&o, "<xdr:spPr>");
       xfrm(&o, "a", s, ob);
       if (ob->shape == SK_INK) ink_geom(&o, s, ob);
+      else if (ob->shape == SK_ICON) icon_geom(&o, ob);
       else buf_printf(&o, "<a:prstGeom prst=\"%s\"><a:avLst/></a:prstGeom>", prst[ob->shape % SK_N]);
-      if (ob->fill && !conn && ob->shape != SK_INK) solid(&o, ob->fill); else buf_adds(&o, "<a:noFill/>");
+      if (ob->shape == SK_ICON) solid(&o, ob->line ? ob->line : FILLRGB(0x404040));
+      else if (ob->fill && !conn && ob->shape != SK_INK) solid(&o, ob->fill); else buf_adds(&o, "<a:noFill/>");
       if (ob->line) {
         buf_printf(&o, "<a:ln w=\"%ld\"", ob->linew ? (long)ob->linew * 127 : 9525L);
         if (ob->shape == SK_INK) buf_adds(&o, " cap=\"rnd\"");
@@ -1061,7 +1097,14 @@ static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
           if (o.kind == OB_SHAPE) {
             if (o.shape == SK_LINE && o.arrow) o.shape = SK_ARROW;
             if (o.txbox) o.shape = SK_TEXTBOX;
-            if (o.custgeom) {
+            if (o.custgeom && !strncmp(o.name, "Icon: ", 6) && drw_icon_by_name(o.name + 6) >= 0) {
+              char t[8];
+              sprintf(t, "%d", drw_icon_by_name(o.name + 6));
+              ob->text = str_dup(t);
+              o.shape = SK_ICON;
+              o.custgeom = 0;
+              o.text.len = 0;
+            } else if (o.custgeom) {
               /* a freehand path: its points in pixels from the shape's corner */
               Buf pts;
               const char *p = o.ink.data ? o.ink.data : "";

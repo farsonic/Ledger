@@ -298,6 +298,24 @@ static void pictures_shapes(void)
   }
   if (d) book_free(d);
   free(x);
+  {
+    /* an icon from Ledger's set */
+    Book *e = book_new(), *f;
+    DObj *io;
+    drw_begin(e, 0);
+    io = drw_new(e->sh[0], OB_SHAPE);
+    io->shape = SK_ICON; io->text = str_dup("13"); io->line = FILL_ON | 0x70AD47;
+    snprintf(io->name, sizeof io->name, "Icon: %s 1", drw_icon_names[13]);
+    dobj_place(e->sh[0], io, 50, 50, 98, 98);
+    drw_end(e);
+    x = xlsx_save(e, &len);
+    f = x ? xlsx_load(x, len, err, sizeof err) : NULL;
+    io = f ? drw_obj(f->sh[0], 0) : NULL;
+    ok("icon: through a file", io && io->shape == SK_ICON && io->text && !strcmp(io->text, "13") && drw_icon_desc(13));
+    if (f) book_free(f);
+    free(x);
+    book_free(e);
+  }
   /* objects follow columns deleted */
   book_delete_cols(b, 0, 0, 2);
   o = drw_obj(b->sh[0], 1);

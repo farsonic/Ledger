@@ -50,6 +50,14 @@ typedef struct {
   Chart *chart;                    /* OB_CHART */
 } DObj;
 
+/* Ledger's own icons for Insert > Icons (SK_ICON shapes): drawn on a 16 x 16 grid by commands
+   L x0 y0 x1 y1 (line), R (box), F (filled box), O cx cy r (circle), E (disc), P n x y... (lines
+   joining n points), Q n x y... (a filled polygon) */
+#define DRW_NICONS 16
+extern const char *const drw_icon_names[DRW_NICONS];
+const char *drw_icon_desc(int k);         /* NULL if k isn't one */
+int   drw_icon_by_name(const char *name);  /* -1 if none */
+
 /* ------------------------------------------------------------------ charts */
 enum {
   CK_COL, CK_COLSTACK, CK_COL100, CK_BAR, CK_BARSTACK, CK_BAR100, CK_LINE, CK_LINEMARK, CK_LINESTACK,
@@ -133,6 +141,7 @@ void  dobj_place(Sheet *s, DObj *o, i32 x0, i32 y0, i32 x1, i32 y1);          /*
 /* undo for a change to objects or sparklines: the sheet noted before, a step closed after */
 void  drw_begin(Book *b, int sheet);
 void  drw_end(Book *b);
+void  book_note_all(Book *b);              /* (book.c, inside a step) every sheet noted for undo: objects moved between sheets */
 
 /* ------------------------------------------------------------------ drawing primitives */
 enum { PR_RECT, PR_LINE, PR_POLY, PR_ELLIPSE, PR_TEXT };

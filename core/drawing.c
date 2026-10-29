@@ -94,6 +94,35 @@ void drw_move_z(Sheet *s, int i, int to)
   d->o[to] = t;
 }
 
+/* ------------------------------------------------------------------ icons */
+const char *const drw_icon_names[DRW_NICONS] = { "Star", "Heart", "Tick", "Cross", "Arrow Right", "Arrow Up", "House", "Envelope",
+                                                 "Telephone", "Person", "Clock", "Calendar", "Light Bulb", "Flag", "Gear", "Warning" };
+static const char *const icon_desc[DRW_NICONS] = {
+  "Q 10 8 1 10 6 15 6 11 9 13 14 8 11 3 14 5 9 1 6 6 6",
+  "E 5 6 3 E 11 6 3 Q 4 2 7 14 7 8 14 2 7",
+  "P 3 2 8 6 12 14 3 P 3 2 9 6 13 14 4",
+  "L 3 3 13 13 L 13 3 3 13 L 4 3 14 13 L 14 3 4 13",
+  "Q 7 1 6 9 6 9 2 15 8 9 14 9 10 1 10",
+  "Q 7 6 15 6 7 2 7 8 1 14 7 10 7 10 15",
+  "Q 3 8 1 15 8 1 8 F 3 8 13 15 F 11 2 12 5",
+  "R 1 3 15 13 P 3 1 3 8 9 15 3",
+  "Q 9 3 1 6 1 8 5 6 7 9 10 11 8 15 10 13 15 4 13",
+  "E 8 4 3 Q 6 3 15 4 9 7 8 9 8 12 9 13 15",
+  "O 8 8 7 L 8 8 8 3 L 8 8 12 10",
+  "R 1 3 15 15 F 1 3 15 6 L 5 1 5 4 L 11 1 11 4 F 4 9 5 10 F 8 9 9 10 F 12 9 13 10 F 4 12 5 13 F 8 12 9 13",
+  "O 8 6 5 F 6 11 10 13 L 6 15 10 15",
+  "L 3 1 3 15 L 4 1 4 15 Q 4 4 2 13 2 10 6 13 10 4 10",
+  "O 8 8 5 E 8 8 2 L 8 1 8 3 L 8 13 8 15 L 1 8 3 8 L 13 8 15 8 L 3 3 4 4 L 12 12 13 13 L 13 3 12 4 L 3 13 4 12",
+  "P 4 8 1 15 14 1 14 8 1 L 8 5 8 10 E 8 12 1",
+};
+const char *drw_icon_desc(int k) { return k >= 0 && k < DRW_NICONS ? icon_desc[k] : NULL; }
+int drw_icon_by_name(const char *name)
+{
+  int k;
+  for (k = 0; k < DRW_NICONS; k++) { size_t n = strlen(drw_icon_names[k]); if (!strncmp(name, drw_icon_names[k], n) && (!name[n] || name[n] == ' ')) return k; }
+  return -1;
+}
+
 /* ------------------------------------------------------------------ the whole drawing */
 void spark_group_clear(SparkGroup *g)
 {

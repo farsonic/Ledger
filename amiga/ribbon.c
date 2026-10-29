@@ -163,7 +163,7 @@ enum { S_SMALL, S_LARGE, S_ICON };
    tr(); NULL for an icon alone), the command it returns (ID_), the RB_ states shown as checked and
    needed to be usable, F_ flags, a field's width in pixels, and its help */
 typedef struct {
-  u8 kind, size, icon, list;
+  u8 kind, size; UWORD icon; u8 list;
   const char *label;
   UWORD id;
   u8 st, en;
@@ -262,8 +262,11 @@ static const Item i_links[] = {
   { K_BUTTON, S_LARGE, IC_LINK, 0, "Link", ID_LINK, 0, 0, 0, 0, "A link to a web page, a mail address or a place in the workbook" },
   { K_BUTTON, S_LARGE, IC_COMMENT, 0, "Note", ID_NOTENEW, 0, 0, 0, 0, "A note on the active cell" },
 };
-static const Group insert[] = { { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Functions", G_COLS, i_fn, N(i_fn) },
-                                { "Links", G_COLS, i_links, N(i_links) }, { "Names", G_COLS, i_names, N(i_names) } };
+#include "chartrib.h"            /* charts, pictures, shapes, ink, sparklines (charttab.c does their commands) */
+static const Group insert[] = { { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Illustrations", G_COLS, ix_illus, N(ix_illus) },
+                                { "Charts", G_COLS, ix_charts, N(ix_charts) }, { "Sparklines", G_COLS, ix_spark, N(ix_spark) },
+                                { "Functions", G_COLS, i_fn, N(i_fn) }, { "Links", G_COLS, i_links, N(i_links) }, { "Text", G_COLS, ix_text, N(ix_text) },
+                                { "Names", G_COLS, i_names, N(i_names) } };
 /* Page Layout (the printing settings aren't here: Ledger doesn't print) */
 static const Item p_opts[] = {
   { K_BUTTON, S_SMALL, 0, 0, "Gridlines", ID_GRIDLINES, RB_GRIDLINES, 0, F_CHECK, 0, "Show the gridlines between cells" },
@@ -419,8 +422,9 @@ static const char *tip_for(UWORD id)
 }
 /* the tab strip, left to right. File isn't a tab of tools: a click on it opens the File page */
 static const Tab tabs[] = {
-  { "File", NULL, 0 }, { "Home", home, N(home) }, { "Insert", insert, N(insert) }, { "Page Layout", playout, N(playout) },
+  { "File", NULL, 0 }, { "Home", home, N(home) }, { "Insert", insert, N(insert) }, { "Draw", x_draw, N(x_draw) }, { "Page Layout", playout, N(playout) },
   { "Formulas", formulas, N(formulas) }, { "Data", data, N(data) }, { "Review", review, N(review) }, { "View", view, N(view) },
+  { "Chart Design", x_design, N(x_design) }, { "Format", x_format, N(x_format) }, { "Sparkline", x_spark, N(x_spark) },
 };
 #define NTABS N(tabs)
 /* (ledger.h) the label of entry v of the list of the item that returns id */
@@ -432,7 +436,7 @@ const char *ribbon_entry(ULONG id, LONG v)
       for (i = 0; i < tabs[t].groups[g].n; i++) {
         const Item *it = &tabs[t].groups[g].items[i];
         if (it->id == id && it->list) {
-          const List *l = &lists[it->list];
+          const List *l = LIST(it->list);
           if (l->kind == PL_FONTS) return ribbon_font_name((int)v);
           return v >= 0 && v < l->n ? l->labels[v] : NULL;
         }
@@ -475,7 +479,7 @@ static int rowh(void) { return fh() + 7; }
 static int bodyh(void) { return 3 * rowh() + 4; }
 static int caph(void) { return fh() + 3; }
 
-static int bit_on(struct RData *d, int b) { return (d->st.on & RBIT(b)) != 0; }
+static int bit_on(struct RData *d, int b) { return b >= 32 ? (d->st.ext & (1UL << (b - 32))) != 0 : (d->st.on & RBIT(b)) != 0; }
 static int item_on(struct RData *d, const Item *it) { return it->st && bit_on(d, it->st); }
 static int item_enabled(struct RData *d, const Item *it) { return !it->en || bit_on(d, it->en); }
 
@@ -547,8 +551,19 @@ static void layout_ribbon(struct RData *d, Object *obj)
   int t, g, i, n = 0;
   const Tab *tab;
   LONG gw[12];
+  {
+    /* contextual tabs only while wanted (back to Home when the shown one goes); the padding
+       shrinks when they would run off the strip */
+    LONG all = 0, pad = 16;
+    int shown = 0;
+    for (t = 0; t < NTABS; t++) if (!x_tab_hidden(tabs[t].groups, d->st.ext)) { all += theme_textlen(rp, theme_font(), tabs[t].name); shown++; }
+    if (x_tab_hidden(tabs[d->tab].groups, d->st.ext)) d->tab = 1;
+    while (pad > 4 && all + pad * shown > _mwidth(obj) - 8) pad -= 2;
+    for (t = 0; t < NTABS; t++) d->tabbox[t].x0 = (WORD)(x_tab_hidden(tabs[t].groups, d->st.ext) ? -1 : pad);
+  }
   for (t = 0; t < NTABS; t++) {
-    LONG w = theme_textlen(rp, theme_font(), tabs[t].name) + 16;
+    LONG w = theme_textlen(rp, theme_font(), tabs[t].name) + d->tabbox[t].x0;
+    if (d->tabbox[t].x0 < 0) { d->tabbox[t].x1 = -1; continue; }
     d->tabbox[t].x0 = (WORD)x; d->tabbox[t].x1 = (WORD)(x + w - 1);
     d->tabbox[t].y0 = (WORD)_mtop(obj); d->tabbox[t].y1 = (WORD)(_mtop(obj) + tabh() - 1);
     x += w;
@@ -654,6 +669,7 @@ static void field_text(struct RData *d, const Item *it, char *out, size_t cap)
   case ID_FONTDD: utf8_to_latin1(d->st.font ? d->st.font : "", d->st.font ? (u32)strlen(d->st.font) : 0, out, cap); break;
   case ID_SIZEDD: sprintf(out, "%d%s", d->st.size / 10, d->st.size % 10 ? ".5" : ""); break;
   case ID_NUMFMTDD: strncpy(out, tr(d->st.numfmt ? d->st.numfmt : "General"), cap - 1); out[cap - 1] = 0; break;
+  default: chartrib_field(it->id, out, cap); break;
   }
 }
 static void draw_item(struct RData *d, Object *obj, int k)
@@ -812,7 +828,7 @@ static void open_list(struct RData *d, Object *obj, int k)
   const Item *it = nth_item(d, k, NULL);
   if (!it) return;
   d->popgroup = -1; d->popdirect = NULL;
-  open_list_l(d, obj, k, &lists[it->list]);
+  open_list_l(d, obj, k, LIST(it->list));
 }
 /* a collapsed group's list: its tools by name */
 static void open_group(struct RData *d, Object *obj, int k)
@@ -1250,12 +1266,12 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
   case MUIM_DeleteShortHelp: return 0;
   case MUIM_Ribbon_Open:
     d = INST_DATA(cl, obj);
-    if (d->defer) { const Item *it = d->defer; d->defer = NULL; d->popgroup = -1; d->popdirect = it; open_list_l(d, obj, (int)((ULONG *)msg)[1], &lists[it->list]); }
+    if (d->defer) { const Item *it = d->defer; d->defer = NULL; d->popgroup = -1; d->popdirect = it; open_list_l(d, obj, (int)((ULONG *)msg)[1], LIST(it->list)); }
     return 0;
   case MUIM_Ribbon_State: {
     struct MUIP_Ribbon_State *m = (struct MUIP_Ribbon_State *)msg;
     d = INST_DATA(cl, obj);
-    if (m->on == d->st.on && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt)) return 0;
+    if (m->on == d->st.on && m->ext == d->st.ext && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt)) return 0;
     d->st = *m;
     if (m->font) { strncpy(d->font, m->font, sizeof d->font - 1); d->font[sizeof d->font - 1] = 0; }
     if (m->numfmt) { strncpy(d->numfmt, m->numfmt, sizeof d->numfmt - 1); d->numfmt[sizeof d->numfmt - 1] = 0; }

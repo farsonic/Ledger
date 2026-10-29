@@ -903,6 +903,7 @@ static void undo_cell(Book *b, int sheet, i32 r, i32 c)
   }
 }
 /* note a whole sheet before a structural change (rows, columns, sizes, merges) */
+static void undo_book(Book *b);
 static void undo_sheet(Book *b, int sheet)
 {
   UndoStep *u = b->open;
@@ -914,6 +915,7 @@ static void undo_sheet(Book *b, int sheet)
   }
 }
 void book_note_sheet(Book *b, int sheet) { undo_sheet(b, sheet); }
+void book_note_all(Book *b) { undo_book(b); }     /* (drawing.h) the whole book noted: a change to several sheets */
 /* note the whole book before sheets come, go or move */
 static void undo_book(Book *b)
 {

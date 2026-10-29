@@ -18,6 +18,7 @@
 #include "../core/fonts.h"
 #include "../core/ttraster.h"
 #include "lang.h"
+#include "chartids.h"
 
 extern struct Library *DiskfontBase;
 #include <stdio.h>
@@ -1027,10 +1028,11 @@ void theme_icon(struct RastPort *rp, int icon, LONG x, LONG y, LONG size, int di
   const char *p;
   LONG pen = mono >= 0 ? mono : tpen(dim ? T_DISABLED : T_ICON);
 #define SC(v) ((v) * size / 16)
-  if (icon <= IC_NONE || icon >= IC_N) return;
+  const char *desc = icon >= ICX_BASE ? chart_icon_desc(icon) : icon > IC_NONE && icon < IC_N ? icons[icon] : NULL;   /* (chart tools' icons: charticons.c) */
+  if (!desc) return;
   SetDrMd(rp, JAM1);
   SetAPen(rp, pen);
-  for (p = icons[icon]; *p; ) {
+  for (p = desc; *p; ) {
     char c = *p++;
     LONG a, b, e, f;
     switch (c) {
