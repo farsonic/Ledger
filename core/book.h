@@ -195,6 +195,7 @@ typedef struct {
   u8 protect;                     /* sheet protected: locked cells can't be changed */
   u16 pwhash, protallow;          /* its password's legacy hash (0 none); what users may still do (PA_ bits) */
   char protkey[144];              /* or a newer file's password check, "SHA-512:spin:salt:hash" ("" none) */
+  struct EditRange *eranges; int neranges;   /* Allow Edit Ranges (analysis.h) */
   struct PageSetup *page;         /* page setup (pagesetup.h), NULL: the defaults */
 } Sheet;
 

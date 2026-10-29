@@ -10,6 +10,7 @@
  * cell tested; a custom formula sees the value being entered.
  */
 #include "data.h"
+#include "analysis.h"
 #include "calc.h"
 #include "cond.h"
 #include "ops.h"
@@ -557,11 +558,13 @@ void data_sheet_free(Sheet *s)
   for (i = 0; i < s->nscens; i++) scenario_free(&s->scens[i]);
   free(s->scens);
   s->scens = NULL; s->nscens = 0;
+  edit_ranges_free(s);
 }
 void data_sheet_clone(Sheet *dst, const Sheet *src)
 {
   int i;
   dst->dvs = NULL; dst->ndvs = 0; dst->scens = NULL; dst->nscens = 0;
+  edit_ranges_clone(dst, src);
   if (src->ndvs && (dst->dvs = (DVRule *)calloc((size_t)src->ndvs, sizeof(DVRule))))
     for (i = 0; i < src->ndvs; i++) if (dv_rule_copy(&dst->dvs[dst->ndvs], &src->dvs[i])) dst->ndvs++;
   if (src->nscens && (dst->scens = (Scenario *)calloc((size_t)src->nscens, sizeof(Scenario))))
@@ -594,6 +597,7 @@ void data_shift(Sheet *s, int rows, i32 at, i32 n)
 {
   int i, j, k, m;
   i32 lim = rows ? MAXROW : MAXCOL;
+  edit_ranges_shift(s, rows, at, n);
   for (i = m = 0; i < s->ndvs; i++) {
     DVRule *r = &s->dvs[i];
     i32 ar = r->nareas ? r->areas[0].r1 : 0, ac = r->nareas ? r->areas[0].c1 : 0, *pa = rows ? &ar : &ac;

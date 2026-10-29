@@ -562,7 +562,7 @@ void fmt_value(Book *b, const char *code, const Value *v, char *out, size_t cap,
   o.o = out; o.cap = cap; o.n = 0;
   if (cap) out[0] = 0;
   *color = COLOR_AUTO;
-  if (!code || !*code) code = "General";
+  if (!code || !*code || !strcmp(code, "checkbox")) code = "General";   /* (a checkbox cell, analysis.h: General but for TRUE/FALSE) */
   switch (v->t) {
   case V_EMPTY: return;
   case V_BOOL: puts_(&o, v->e ? "TRUE" : "FALSE"); return;

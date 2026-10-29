@@ -4,6 +4,7 @@
  * Forecast Sheet, checkboxes, Lock Cell and Allow Edit Ranges, and their .xlsx round trips.
  */
 #include "../core/analysis.h"
+#include "../core/drawing.h"
 
 static int close_to(double a, double b, double tol) { return fabs(a - b) <= tol * (fabs(b) > 1 ? fabs(b) : 1); }
 static double sol_of(const SolverResult *r, int j) { return r->sol && j < r->n ? r->sol[j] : -999999; }
@@ -302,8 +303,141 @@ static void toolpak_tests(void)
   book_free(b);
 }
 
+static Book *an_roundtrip(Book *b)
+{
+  size_t n;
+  char err[200];
+  u8 *data = xlsx_save(b, &n);
+  Book *c = data ? xlsx_load(data, n, err, sizeof err) : NULL;
+  free(data);
+  return c;
+}
+static void forecast_tests(void)
+{
+  Book *b = book_new();
+  ForecastOpts o;
+  const char *why;
+  int at, i;
+  char t[32], v[32];
+  double last, step;
+  int np;
+  /* y = 10 + 2t with a four-step season, t = 1..16 (GridCraft's test: t = 17 forecasts 47) */
+  static const double season[4] = { 3, -1, 4, -6 };
+  put(b, "A1", "Month"); put(b, "B1", "Sales");
+  for (i = 1; i <= 16; i++) { sprintf(t, "A%d", i + 1); sprintf(v, "%d", i); put(b, t, v); sprintf(t, "B%d", i + 1); sprintf(v, "%g", 10 + 2.0 * i + season[(i - 1) % 4]); put(b, t, v); }
+  ok("forecast: timeline", forecast_timeline(b, 0, "A1:A17", &last, &step, &np) && last == 16 && step == 1 && np == 16);
+  forecast_defaults(&o);
+  strcpy(o.timeline, "A1:A17"); strcpy(o.values, "B1:B17"); o.end = 20; o.stats = 1;
+  at = forecast_sheet(b, 0, &o, &why);
+  ok("forecast: sheet", at == 0 && b->nsh == 2 && b->active == 0 && text_at(b, "A1", "Month") && text_at(b, "C1", "Forecast(Sales)") &&
+     text_at(b, "D1", "Lower Confidence Bound(Sales)") && text_at(b, "E1", "Upper Confidence Bound(Sales)") && num_at(b, "A18") == 17 && num_at(b, "A21") == 20 &&
+     cell_value(b, 0, 21, 0)->t == V_EMPTY);
+  ok("forecast: formulas", text_at(b, "C17", "=B17") && text_at(b, "C18", "=FORECAST.ETS(A18,$B$2:$B$17,$A$2:$A$17,1,1)") &&
+     text_at(b, "D18", "=C18-FORECAST.ETS.CONFINT(A18,$B$2:$B$17,$A$2:$A$17,0.95,1,1)") && text_at(b, "H2", "=FORECAST.ETS.STAT($B$2:$B$17,$A$2:$A$17,1,1,1)"));
+  ok("forecast: values", close_to(num_at(b, "C18"), 47, 1e-6) && num_at(b, "D19") <= num_at(b, "E19") && num_at(b, "D17") == num_at(b, "B17"));
+  ok("forecast: table and chart", b->sh[0]->ntables == 1 && drw_count(b->sh[0]) == 1 && drw_obj(b->sh[0], 0)->chart->ns == 4 && drw_obj(b->sh[0], 0)->chart->kind == CK_LINE);
+  ok("forecast: one undo step", book_undo(b, NULL, NULL) && b->nsh == 1 && !strcmp(b->sh[0]->name, "Sheet1"));
+  /* options: no confidence, seasonality 4, zeros, sum, a column chart */
+  forecast_defaults(&o);
+  strcpy(o.timeline, "A2:A17"); strcpy(o.values, "B2:B17"); o.conf = 0; o.seasonality = 4; o.fill = 0; o.aggregate = 7; o.column = 1;
+  at = forecast_sheet(b, 0, &o, &why);
+  ok("forecast: options", at == 0 && text_at(b, "B1", "Values") && text_at(b, "C18", "=FORECAST.ETS(A18,$B$2:$B$17,$A$2:$A$17,4,0,7)") &&
+     cell_value(b, 0, 0, 3)->t == V_EMPTY && num_at(b, "A23") == 22 && drw_obj(b->sh[0], 0)->chart->kind == CK_COMBO);
+  b->active = 1;
+  o.end = 3;
+  ok("forecast: end before the data", forecast_sheet(b, 1, &o, &why) < 0 && why);
+  o.end = 0;
+  put(b, "Sheet1!A5", "4.5");
+  ok("forecast: uneven timeline", forecast_sheet(b, 1, &o, &why) < 0 && why);
+  book_free(b);
+}
+
+static void cellctl_tests(void)
+{
+  Book *b = book_new(), *c;
+  Rect a;
+  int ok1;
+  /* checkboxes */
+  put(b, "A2", "TRUE"); put(b, "A3", "=1>2");
+  a.r1 = 0; a.r2 = 3; a.c1 = 0; a.c2 = 0;
+  ok("checkbox: made", book_checkbox(b, 0, a) && cell_is_checkbox(b, 0, 0, 0) && cell_value(b, 0, 0, 0)->t == V_BOOL && !cell_value(b, 0, 0, 0)->e &&
+     cell_value(b, 0, 1, 0)->e == 1 && sheet_cell(b->sh[0], 2, 0)->f && !cell_is_checkbox(b, 0, 0, 1) &&
+     b->styles[sheet_cell_style(b->sh[0], 0, 0)].halign == HA_CENTER);
+  ok("checkbox: toggles", book_checkbox_toggle(b, 0, 0, 0) && cell_value(b, 0, 0, 0)->e == 1 && book_checkbox_toggle(b, 0, 0, 0) && cell_value(b, 0, 0, 0)->e == 0 &&
+     !book_checkbox_toggle(b, 0, 2, 0) && !book_checkbox_toggle(b, 0, 0, 1));
+  ok("checkbox: shows as General otherwise", (put(b, "A4", "12.5"), shows(b, 0, 3, 0, "12.5")));
+  ok("checkbox: undo", book_undo(b, NULL, NULL) && book_undo(b, NULL, NULL) && book_undo(b, NULL, NULL) && book_undo(b, NULL, NULL) && !cell_is_checkbox(b, 0, 0, 0));
+  book_redo(b, NULL, NULL);
+  c = an_roundtrip(b);
+  ok("checkbox: .xlsx round trip", c && cell_is_checkbox(c, 0, 0, 0) && cell_is_checkbox(c, 0, 1, 0) && cell_value(c, 0, 1, 0)->e == 1 && !cell_is_checkbox(c, 0, 5, 0));
+  if (c) {
+    size_t n;
+    u8 *data = xlsx_save(c, &n);
+    /* the part and the extension Excel looks for (stored uncompressed or not, the names show in the zip directory) */
+    ok1 = data && n > 0;
+    {
+      size_t i;
+      int part = 0;
+      for (i = 0; data && i + 40 < n; i++) if (!memcmp(data + i, "xl/featurePropertyBag/featurePropertyBag.xml", 44)) part = 1;
+      ok("checkbox: feature property bag part", ok1 && part);
+    }
+    free(data);
+    book_free(c);
+  }
+  /* the bag chain read from another order of bags */
+  {
+    static const char x[] = "<FeaturePropertyBags xmlns=\"x\"><bag type=\"XFComplements\"><a k=\"MappedFeaturePropertyBags\"><bagId>3</bagId><bagId>9</bagId></a></bag>"
+                            "<bag type=\"Checkbox\"/><bag type=\"XFControls\"><bagId k=\"CellControl\">1</bagId></bag><bag type=\"XFComplement\"><bagId k=\"XFControls\">2</bagId></bag></FeaturePropertyBags>";
+    u8 fl[4];
+    ok("checkbox: bag chain", checkbox_complements(x, strlen(x), fl, 4) == 2 && fl[0] == 1 && fl[1] == 0);
+  }
+  /* Lock Cell */
+  a.r1 = 4; a.r2 = 5; a.c1 = 1; a.c2 = 1;
+  ok("lock cell", cell_locked(b, 0, 4, 1) && book_lock_cells(b, 0, a, 0) && !cell_locked(b, 0, 4, 1) && !cell_locked(b, 0, 5, 1) && cell_locked(b, 0, 6, 1));
+  book_protect_sheet(b, 0, "", PA_DEFAULT);
+  ok("lock cell: protection", !prot_locked(b, 0, 4, 1) && prot_locked(b, 0, 6, 1));
+  /* Allow Edit Ranges: D1:D3 open, F1:F2 behind a password */
+  {
+    Rect d, f, x;
+    d.r1 = 0; d.r2 = 2; d.c1 = d.c2 = 3; f.r1 = 0; f.r2 = 1; f.c1 = f.c2 = 5;
+    ok("edit ranges: added", book_edit_range_set(b, 0, -1, "Open", &d, 1, "", 0) && book_edit_range_set(b, 0, -1, "Secret", &f, 1, "pw", 0) && b->sh[0]->neranges == 2);
+    x = d; x.r2 = 1;
+    ok("edit ranges: open on a protected sheet", !prot_locked(b, 0, 1, 3) && !prot_area_locked(b, 0, x) && prot_locked(b, 0, 3, 3) && prot_locked(b, 0, 0, 5) &&
+       edit_range_shut(b->sh[0], f) == &b->sh[0]->eranges[1]);
+    c = an_roundtrip(b);
+    ok("edit ranges: .xlsx round trip", c && c->sh[0]->neranges == 2 && !strcmp(c->sh[0]->eranges[1].title, "Secret") && c->sh[0]->eranges[1].pwhash == prot_hash("pw") &&
+       c->sh[0]->eranges[0].areas[0].r2 == 2 && !prot_locked(c, 0, 2, 3) && prot_locked(c, 0, 0, 5));
+    if (c) book_free(c);
+    ok("edit ranges: password", !edit_range_unlock(&b->sh[0]->eranges[1], "no") && edit_range_unlock(&b->sh[0]->eranges[1], "pw") && !prot_locked(b, 0, 1, 5));
+    book_insert_rows(b, 0, 0, 2);
+    ok("edit ranges: follow inserted rows", b->sh[0]->eranges[0].areas[0].r1 == 2 && b->sh[0]->eranges[0].areas[0].r2 == 4);
+    ok("edit ranges: deleted", book_edit_range_delete(b, 0, 0) && b->sh[0]->neranges == 1 && prot_locked(b, 0, 3, 3));
+  }
+  book_free(b);
+}
+static void solver_file_tests(void)
+{
+  Book *b = book_new(), *c;
+  SolverModel m, l;
+  put(b, "B1", "0"); put(b, "B2", "0"); put(b, "B4", "=3*B1+5*B2"); put(b, "C3", "=3*B1+2*B2");
+  solver_model_init(&m, 0);
+  strcpy(m.objective, "B4"); strcpy(m.vars, "B1:B2"); m.method = SM_SIMPLEX; m.goal = SG_MIN; m.multistart = 1; m.population = 7;
+  solver_add(&m, "B1", SR_LE, "4"); solver_add(&m, "C3", SR_GE, "C1"); solver_add(&m, "B1:B2", SR_INT, "");
+  solver_save(b, &m);
+  c = an_roundtrip(b);
+  ok("solver: model in .xlsx", c && solver_load(c, 0, &l) && !strcmp(l.objective, "B4") && l.goal == SG_MIN && l.method == SM_SIMPLEX && l.ncons == 3 &&
+     !strcmp(l.cons[1].rhs, "C1") && l.cons[1].rel == SR_GE && l.cons[2].rel == SR_INT && l.multistart && l.population == 7);
+  solver_model_free(&l);
+  if (c) book_free(c);
+  solver_model_free(&m);
+  book_free(b);
+}
+
 static void analysis_tests(void)
 {
+  forecast_tests();
+  cellctl_tests();
+  solver_file_tests();
   solver_tests();
   toolpak_tests();
 }
