@@ -6,11 +6,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef __VBCC__
+/* (built for the Amiga too, to check the 68040 build: the clock as Ledger reads it) */
+#include <dos/dos.h>
+#include <proto/dos.h>
+double ledger_now(void)
+{
+  struct DateStamp ds;
+  DateStamp(&ds);
+  return 28491.0 + ds.ds_Days + ds.ds_Minute / 1440.0 + ds.ds_Tick / (50.0 * 86400.0);
+}
+#else
 double ledger_now(void)
 {
   time_t t = time(NULL); struct tm *l = localtime(&t);
   return 25569.0 + (double)(t + l->tm_gmtoff) / 86400.0;
 }
+#endif
 static const char *errs[] = { "", "#NULL!", "#DIV/0!", "#VALUE!", "#REF!", "#NAME?", "#NUM!", "#N/A", "#GETTING_DATA", "#SPILL!", "#CALC!" };
 static void show_in(Book *b, int sh, int r, int c, const char *sep)
 {
