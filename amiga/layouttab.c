@@ -584,34 +584,88 @@ static void properties(void)
   }
   MUI_DisposeObject(w);
 }
-static void calc_options(void)
+/* the options kept in Ledger.prefs: a new workbook's font and size and how many sheets it has */
+static char opt_font[48] = "Calibri";
+static int opt_size = 110, opt_sheets = 1;
+int lx_pref_line(const char *line)
+{
+  if (!strncmp(line, "font=", 5)) { strncpy(opt_font, line + 5, sizeof opt_font - 1); opt_font[sizeof opt_font - 1] = 0; return 1; }
+  if (!strncmp(line, "fontsize=", 9)) { int n = atoi(line + 9); if (n >= 60 && n <= 720) opt_size = n; return 1; }
+  if (!strncmp(line, "sheets=", 7)) { int n = atoi(line + 7); if (n >= 1 && n <= 255) opt_sheets = n; return 1; }
+  return 0;
+}
+void lx_pref_save(FILE *f)
+{
+  if (strcmp(opt_font, "Calibri")) fprintf(f, "font=%s\n", opt_font);
+  if (opt_size != 110) fprintf(f, "fontsize=%d\n", opt_size);
+  if (opt_sheets != 1) fprintf(f, "sheets=%d\n", opt_sheets);
+}
+Book *lx_new_book(void)
+{
+  Book *b = book_new();
+  int i;
+  if (!b) return NULL;
+  if (strcmp(opt_font, "Calibri") || opt_size != 110) {
+    lx_latin1_utf8(opt_font, b->fonts[0].name, sizeof b->fonts[0].name);
+    b->fonts[0].size = (u16)opt_size;
+  }
+  for (i = 1; i < opt_sheets; i++) { char nm[32]; book_unique_sheet_name(b, "Sheet1", nm); book_add_sheet(b, nm, -1); }
+  book_forget_undo(b);
+  b->dirty = 0;
+  return b;
+}
+static void opt_each(ULONG id) { if (id == ID_DLG1) { book_recalc(book); refresh_all(); } }
+/* Ledger Options: General (a new workbook's font, size, sheets) and Formulas (calculation) */
+static void calc_options(int page)
 {
   static const char *const modes_en[] = { "Automatic", "Manual", NULL };
-  static const char *modes[4];
+  static const char *const pages_en[] = { "General", "Formulas", NULL };
+  static const char *modes[4], *pl[4];
   static const ULONG ends[] = { ID_DLGOK, 0 };
   LayoutBook *x = book_lx(book);
-  Object *w, *mode, *it, *maxi, *maxc;
-  char mc[24];
+  Object *w, *reg, *mode, *it, *maxi, *maxc, *font, *size, *sheets, *r1c1, *calcnow;
+  char mc[24], sz[12];
   if (!x) return;
-  lx_trl(modes_en, modes);
+  lx_trl(modes_en, modes); lx_trl(pages_en, pl);
   sprintf(mc, "%g", x->maxchange);
-  w = dialog_window("Calculation Options", VGroup,
-        Child, ColGroup(2),
-          Child, Label1(tr("Workbook calculation:")), Child, mode = lx_cycle(modes, book->manualcalc),
-          Child, Label1(tr("Enable iterative calculation:")), Child, HGroup, Child, it = lx_check(x->iterate), Child, HSpace(0), End,
-          Child, Label1(tr("Maximum iterations:")), Child, maxi = lx_int(x->maxiter, 5),
-          Child, Label1(tr("Maximum change:")), Child, maxc = StringObject, StringFrame, MUIA_String_Contents, (ULONG)mc, MUIA_String_Accept, (ULONG)"0123456789.eE-", MUIA_String_MaxLen, 20, MUIA_CycleChain, 1, End,
-        End,
-        Child, TextObject, MUIA_Text_Contents, (ULONG)tr("\33cIterative calculation works circular formulas out again and again\nuntil they change less than the maximum change."), End,
-      End, NULL);
+  sprintf(sz, "%d", opt_size / 10);
+  reg = RegisterGroup(pl), MUIA_Register_Frame, TRUE, MUIA_CycleChain, 1,
+    Child, VGroup,
+      Child, ColGroup(2),
+        Child, Label1(tr("Default font for new workbooks:")), Child, font = lx_str(opt_font, 40),
+        Child, Label1(tr("Font size:")), Child, size = StringObject, StringFrame, MUIA_String_Contents, (ULONG)sz, MUIA_String_Accept, (ULONG)"0123456789.", MUIA_String_MaxLen, 5, MUIA_CycleChain, 1, End,
+        Child, Label1(tr("Sheets in a new workbook:")), Child, sheets = lx_int(opt_sheets, 3),
+      End,
+      Child, VSpace(0),
+    End,
+    Child, VGroup,
+      Child, ColGroup(2),
+        Child, Label1(tr("Workbook calculation:")), Child, mode = lx_cycle(modes, book->manualcalc),
+        Child, Label1(tr("Enable iterative calculation:")), Child, HGroup, Child, it = lx_check(x->iterate), Child, HSpace(0), End,
+        Child, Label1(tr("Maximum iterations:")), Child, maxi = lx_int(x->maxiter, 5),
+        Child, Label1(tr("Maximum change:")), Child, maxc = StringObject, StringFrame, MUIA_String_Contents, (ULONG)mc, MUIA_String_Accept, (ULONG)"0123456789.eE-", MUIA_String_MaxLen, 20, MUIA_CycleChain, 1, End,
+        Child, Label1(tr("R1C1 reference style:")), Child, HGroup, Child, r1c1 = lx_check(x->r1c1), Child, LLabel1(tr("(kept in the file; Ledger shows A1)")), Child, HSpace(0), End,
+      End,
+      Child, TextObject, MUIA_Text_Contents, (ULONG)tr("\33cIterative calculation works circular formulas out again and again\nuntil they change less than the maximum change."), End,
+      Child, HGroup, Child, HSpace(0), Child, calcnow = QButton(tr("Calculate Now (F9)")), Child, HSpace(0), End,
+    End,
+  End;
+  w = dialog_window("Ledger Options", reg, NULL);
   if (!w) return;
-  if (run_modal(w, ends, NULL) == ID_DLGOK) {
+  set(reg, MUIA_Group_ActivePage, page);
+  DoMethod(calcnow, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG1);
+  if (run_modal(w, ends, opt_each) == ID_DLGOK) {
     long n = atol(lx_sget(maxi));
     double d = atof(lx_sget(maxc));
     book->manualcalc = (int)lx_xget(mode, MUIA_Cycle_Active);
     x->iterate = lx_xget(it, MUIA_Selected) != 0;
+    x->r1c1 = lx_xget(r1c1, MUIA_Selected) != 0;
     if (n >= 1 && n <= 32767) x->maxiter = (u16)n;
     if (d > 0) x->maxchange = d;
+    if (lx_sget(font)[0]) { strncpy(opt_font, lx_sget(font), sizeof opt_font - 1); opt_font[sizeof opt_font - 1] = 0; }
+    n = (long)(atof(lx_sget(size)) * 10 + 0.5); if (n >= 60 && n <= 720) opt_size = (int)n;
+    n = atol(lx_sget(sheets)); if (n >= 1 && n <= 255) opt_sheets = (int)n;
+    lx_save_prefs();
     book->dirty = 1;
     if (!book->manualcalc) book_recalc(book);
     refresh_all();
@@ -899,7 +953,8 @@ void lt_command(ULONG id, LONG v)
   case ID_LX_EXPORTPDF: case ID_LX_SAVEPDF: export_pdf(); break;
   case ID_LX_EXPORTHTML: export_html(); break;
   case ID_LX_PROPS: properties(); break;
-  case ID_LX_CALCOPTS: calc_options(); break;
+  case ID_LX_CALCOPTS: calc_options(v == -2 ? 0 : 1); break;
+  case ID_LX_OPTIONS: calc_options(0); break;
   case ID_LX_MOVECOPY: move_copy_sheet(); break;
   case ID_LX_PASTESPECIAL: paste_special(); break;
   case ID_LX_CLEARNOTES: clear_notes_links(0); break;

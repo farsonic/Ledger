@@ -21,7 +21,7 @@ enum {
   ID_LX_THEMEDD = ID_LX_FIRST, ID_LX_COLORSDD, ID_LX_FONTSDD, ID_LX_MARGINSDD, ID_LX_ORIENTDD, ID_LX_SIZEDD, ID_LX_AREADD, ID_LX_BREAKSDD,
   ID_LX_TITLES, ID_LX_PAGESETUP, ID_LX_HEADERFOOTER, ID_LX_FITWDD, ID_LX_FITHDD, ID_LX_SCALEDD, ID_LX_PRINTGRID, ID_LX_PRINTHEAD, ID_LX_VIEWGRID, ID_LX_VIEWHEAD,
   /* File */
-  ID_LX_EXPORTPDF, ID_LX_EXPORTHTML, ID_LX_PROPS, ID_LX_CALCOPTS, ID_LX_SAVEPDF,
+  ID_LX_EXPORTPDF, ID_LX_EXPORTHTML, ID_LX_PROPS, ID_LX_CALCOPTS, ID_LX_OPTIONS, ID_LX_SAVEPDF,
   /* View */
   ID_LX_NORMAL, ID_LX_PBP, ID_LX_PAGELAYOUT, ID_LX_CUSTOMVIEWS, ID_LX_RULER, ID_LX_NEWWIN, ID_LX_ARRANGE, ID_LX_SPLIT, ID_LX_HIDEWIN,
   ID_LX_UNHIDEWIN, ID_LX_SIDEBYSIDE, ID_LX_SYNCSCROLL, ID_LX_RESETWIN, ID_LX_SWITCHDD, ID_LX_ZOOMDLG,
@@ -88,6 +88,13 @@ int   lx_grid_mouse(Object *obj, int what, LONG x, LONG y);
 LONG  lx_gap_before(Book *b, int sheet, int rows, i32 idx, LONG zoom);
 void  lx_selection_moved(void);           /* (Go To Special's marks go when the selection moves) */
 
+/* File > Options: Ledger's own lines in Ledger.prefs, and a new workbook as the options say */
+#include <stdio.h>
+int   lx_pref_line(const char *line);      /* 1 if the line was one of these options */
+void  lx_pref_save(FILE *f);
+void  lx_save_prefs(void);                 /* (main.c) Ledger.prefs written again */
+Book *lx_new_book(void);
+
 /* main.c's workbook windows (View > Window) */
 int   win_slots(void);
 int   win_current(void);
@@ -101,7 +108,7 @@ Clip *app_clip(void);              /* what was copied last */
 /* the menus (main.c's menus[], with its M, I, T and BAR) */
 #define LX_PROJECT_ITEMS \
   I("Export as PDF...", "P", ID_LX_EXPORTPDF), I("Export as Web Page...", 0, ID_LX_EXPORTHTML), I("Properties...", 0, ID_LX_PROPS), \
-  I("Calculation Options...", 0, ID_LX_CALCOPTS),
+  I("Calculation Options...", 0, ID_LX_CALCOPTS), I("Ledger Options...", 0, ID_LX_OPTIONS),
 #define LX_EDIT_ITEMS \
   I("Go To Special...", 0, ID_LX_GOTOSPECIAL), I("Paste Special...", 0, ID_LX_PASTESPECIAL), I("Clear Notes", 0, ID_LX_CLEARNOTES), \
   I("Clear Hyperlinks", 0, ID_LX_CLEARLINKS), I("Fill Justify", 0, ID_LX_JUSTIFY),

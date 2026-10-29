@@ -618,6 +618,7 @@ static void load_prefs(void)
     else if (!strcmp(line, "aatext=off")) theme_no_aatext();
     else if (!strcmp(line, "hinting=off")) theme_no_hinting();
     else if (!strncmp(line, "screen=", 7)) { strncpy(pub_screen, line + 7, sizeof pub_screen - 1); pub_screen[sizeof pub_screen - 1] = 0; }
+    else if (lx_pref_line(line)) ;
     else if (!strncmp(line, "windowbox=", 10)) {
       long b[4] = { 0, 0, 0, 0 };
       if (sscanf(line + 10, "%ld,%ld,%ld,%ld", &b[0], &b[1], &b[2], &b[3]) == 4 && b[2] >= 200 && b[3] >= 150)
@@ -635,8 +636,10 @@ static void save_prefs(void)
   if (username[0]) fprintf(f, "name=%s\n", username);
   if (pub_screen[0]) fprintf(f, "screen=%s\n", pub_screen);
   if (win_box[2] > 0) fprintf(f, "windowbox=%ld,%ld,%ld,%ld\n", (long)win_box[0], (long)win_box[1], (long)win_box[2], (long)win_box[3]);
+  lx_pref_save(f);
   fclose(f);
 }
+void lx_save_prefs(void) { save_prefs(); }
 
 /* ------------------------------------------------------------------ files */
 static int win_new(Book *b, const char *path);
@@ -1265,7 +1268,7 @@ static void command(ULONG id)
 {
   Sheet *s = cur_sheet();
   switch (id) {
-  case ID_NEW: win_new(book_new(), ""); break;
+  case ID_NEW: win_new(lx_new_book(), ""); break;
   case ID_OPEN: {
     char path[512];
     strcpy(path, bookpath);
@@ -1858,7 +1861,7 @@ int main(int argc, char **argv)
   End;
   if (!app) { printf("Ledger: the application could not be made (MUI classes missing?)\n"); goto done; }
   splash_step(75, tr("Opening the window and loading its fonts"));
-  if (!win_new(book_new(), "")) { printf("Ledger: the window could not be made\n"); goto done; }
+  if (!win_new(lx_new_book(), "")) { printf("Ledger: the window could not be made\n"); goto done; }
   if (start[0]) {
     static char what[300];
     snprintf(what, sizeof what, tr("Opening %s"), (const char *)FilePart((STRPTR)start));
