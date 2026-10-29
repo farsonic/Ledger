@@ -17,6 +17,7 @@ import json, os, re, subprocess, sys, datetime
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.formatting.rule import CellIsRule
+from openpyxl.worksheet.formula import ArrayFormula
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = os.path.normpath(os.path.join(HERE, '..', '..'))
@@ -29,6 +30,10 @@ XLFN = eval(re.search(r'^XLFN = (\{.*\})$', _g, re.M).group(1))
 import cases_stat, cases_eng, cases_fin, cases_misc, cases_array
 for _m in (cases_stat, cases_eng, cases_fin, cases_misc, cases_array): XLFN |= set(getattr(_m, 'XLFN', ()))
 def call(fn, args): return fn.replace('@', args) if '(' in fn else '%s(%s)' % (fn, args)   # (as gen.py)
+# and every function whose table entry in core/func*.c is flagged FF_XLFN (as gen.py)
+import glob
+for _f in glob.glob(os.path.join(TOP, 'core', 'func*.c')):
+    XLFN |= set(re.findall(r'\{ "([A-Z0-9._]+)", \d+, \d+, [^,}]*FF_XLFN', open(_f).read()))
 
 out = sys.argv[1]
 work = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.environ.get('TMPDIR', '/tmp'), 'ledger-mkexample')
@@ -57,7 +62,8 @@ def put(ws, cell, frag):
     if num.match(frag): ws[cell] = float(frag) if '.' in frag else int(frag)
     elif frag in ('TRUE', 'FALSE'): ws[cell] = frag == 'TRUE'
     elif re.match(r'^"([^"]|"")*"$', frag):
-        ws[cell] = frag[1:-1].replace('""', '"'); ws[cell].data_type = 's'
+        ws[cell] = frag[1:-1].replace('""', '"')
+        if not ws[cell].value.startswith('='): ws[cell].data_type = 's'   # (text like ="=Apple" is a formula there, as gen.py writes it)
     else: ws[cell] = '=' + frag
 def lit(v):
     if isinstance(v, (int, float)): return str(v)
@@ -75,6 +81,8 @@ def build(expected=None, notes=None):
     rows = []                               # (row, case index, form, display formula)
     r = FIRST
     for i, case in enumerate(C):
+        opts = {}
+        if isinstance(case[-1], dict): opts = case[-1]; case = case[:-1]
         if len(case) == 3: name, _, args = case; refonly = True
         else: name, args = case; refonly = False
         refonly = refonly or name in RANGE_ONLY
@@ -93,7 +101,18 @@ def build(expected=None, notes=None):
         fn = ('_xlfn.' if name in XLFN else '') + name
         forms = []
         if not refonly: forms.append(('typed', '=' + call(fn, ','.join(la))))
-        if args: forms.append(('cells', '=' + call(fn, ','.join(ra))))
+        if args and not opts.get('nocells'): forms.append(('cells', '=' + call(fn, ','.join(ra))))
+        if opts.get('spill') and isinstance(opts.get('x'), list) and any(isinstance(v, str) and v.startswith('#') for row in opts['x'] for v in (row if isinstance(row, list) else [row])):
+            continue          # (an array with errors in it: tools/functest's suite compares those cell by cell)
+        if opts.get('spill'):
+            # a dynamic array: in one cell as its shape and its values joined (a spill would run over the
+            # next columns), or for RANDARRAY what must be true of its shape and range
+            def wrap(f):
+                g = f[1:]
+                if 'shape' in opts:
+                    return '=AND(ROWS(%s)=%d,COLUMNS(%s)=%d,MIN(%s)>=%s,MAX(%s)<=%s)' % (g, opts['shape'][0], g, opts['shape'][1], g, opts['range'][0], g, opts['range'][1])
+                return '=ROWS(%s)&"x"&COLUMNS(%s)&": "&_xlfn.TEXTJOIN(", ",FALSE,%s)' % (g, g, g)
+            forms = [(fm, wrap(f)) for fm, f in forms]
         for form, f in forms:
             if form == 'cells':
                 f = f.replace('%d', str(r))
@@ -104,10 +123,15 @@ def build(expected=None, notes=None):
             T.cell(r, 1, len(rows) + 1)
             T.cell(r, COL_FN, name)
             T.cell(r, COL_FORM, form)
-            text(T, T.cell(r, COL_TEXT).coordinate, f.replace('_xlfn.', ''))
-            T.cell(r, COL_RES, f)
+            text(T, T.cell(r, COL_TEXT).coordinate, f.replace('_xlfn.', '').replace('_xlpm.', ''))
+            if opts.get('spill'): T[T.cell(r, COL_RES).coordinate] = ArrayFormula(T.cell(r, COL_RES).coordinate, f)
+            else: T.cell(r, COL_RES, f)
             # (not TYPE(): LibreOffice gives 8, "formula", for a cell with a formula in it)
-            T.cell(r, COL_CHK, ('=IF(ISERROR(F{0}),IF(ISERROR(E{0}),IF(ERROR.TYPE(E{0})=ERROR.TYPE(F{0}),"PASS","FAIL"),"FAIL"),IF(ISERROR(E{0}),"FAIL",'
+            if name.startswith('IM') or name == 'COMPLEX':
+                # complex numbers as text: compared as numbers (the last of 15 digits may differ with the maths library)
+                T.cell(r, COL_CHK, ('=IF(ISERROR(F{0}),IF(ISERROR(E{0}),IF(ERROR.TYPE(E{0})=ERROR.TYPE(F{0}),"PASS","FAIL"),"FAIL"),IF(ISERROR(E{0}),"FAIL",'
+                                    'IF(ISERROR(IMABS(IMSUB(E{0},F{0}))),IF(E{0}=F{0},"PASS","FAIL"),IF(IMABS(IMSUB(E{0},F{0}))<=1E-9*MAX(1,IMABS(F{0})),"PASS","FAIL"))))').format(r))
+            else: T.cell(r, COL_CHK, ('=IF(ISERROR(F{0}),IF(ISERROR(E{0}),IF(ERROR.TYPE(E{0})=ERROR.TYPE(F{0}),"PASS","FAIL"),"FAIL"),IF(ISERROR(E{0}),"FAIL",'
                                 'IF(ISNUMBER(F{0}),IF(ISNUMBER(E{0}),IF(ABS(E{0}-F{0})<=1E-9*MAX(1,ABS(F{0})),"PASS","FAIL"),"FAIL"),'
                                 'IF(ISLOGICAL(F{0}),IF(ISLOGICAL(E{0}),IF(E{0}=F{0},"PASS","FAIL"),"FAIL"),'
                                 'IF(ISTEXT(E{0}),IF(EXACT(E{0},F{0}),"PASS","FAIL"),"FAIL")))))').format(r))
@@ -120,7 +144,7 @@ def build(expected=None, notes=None):
                 elif v == 'S:': cell.value = '=""'
                 else: cell.value = v[2:]; cell.data_type = 's'
             if notes and r in notes: text(T, T.cell(r, COL_NOTE).coordinate, notes[r])
-            rows.append((r, i, form, f))
+            rows.append((r, i, form, f, opts))
             r += 1
     last = r - 1
     # the top: title, what it is, the summary
@@ -175,13 +199,48 @@ for line in open(os.path.join(HERE, 'excel.txt')):
     if line.strip() and not line.startswith('#'):
         k, why = line.rstrip('\n').split('\t', 1); known[k] = why
 # (gen.py's own numbering: case i is on row i + 1 of its sheet; its formulas are the keys of excel.txt)
-gen_forms = {}                              # case index -> (typed formula, cells formula, name) as gen.py writes them
+gen_forms = {}                              # case index -> (typed formula, cells formula, name, FUNC#n) as gen.py writes them
 subprocess.check_output([sys.executable, os.path.join(HERE, 'gen.py'), HERE, os.path.join(work, 'ref.xlsx'), os.path.join(work, 'ref.json')], text=True)
-for row, name, fl, fr in json.load(open(os.path.join(work, 'ref.json'))): gen_forms[row - 1] = (fl, fr, name)
+_seen = {}
+for i, m in enumerate(json.load(open(os.path.join(work, 'ref.json')))):
+    _seen[m[1]] = _seen.get(m[1], 0) + 1
+    gen_forms[i] = (m[2], m[3], m[1], '%s#%d' % (m[1], _seen[m[1]]))
 def reason(i, form):
-    fl, fr, name = gen_forms[i]
+    fl, fr, name, nth = gen_forms[i]
     f = fl if form == 'typed' else fr
-    return known.get(f) or known.get('LIT:' + name)
+    # (a cells form is explained by its typed twin's line too, as compare.py takes it)
+    return known.get(f) or known.get(nth) or known.get('LIT:' + name) or (form == 'cells' and known.get(fl))
+def excel_value(x):
+    """a case's documented Excel answer ('x') as evalcols writes values; a spill as the wrapper shows it"""
+    def one(v):
+        if v is None: return ''
+        if isinstance(v, bool): return 'TRUE' if v else 'FALSE'
+        if isinstance(v, (int, float)): return '%.15g' % v
+        return str(v)
+    if isinstance(x, list):
+        rows = [r if isinstance(r, list) else [r] for r in x]
+        return 'S:%dx%d: %s' % (len(rows), len(rows[0]), ', '.join(one(v) for r in rows for v in r))
+    if isinstance(x, bool): return 'B:' + one(x)
+    if isinstance(x, (int, float)): return 'N:' + one(x)
+    if isinstance(x, str) and x.startswith('#'): return 'E:' + x
+    return 'S:' + x
+def same_x(ours, x):
+    """Ledger's answer against Excel's documented one, numbers to 1E-9"""
+    want = excel_value(x)
+    if same(ours, want): return True
+    if not isinstance(x, list) and ours.startswith('S:1x1: '):      # (a spill of one value)
+        v = ours[7:]
+        return v == want[2:] or same('N:' + v, want) if want[:2] == 'N:' else v == want[2:]
+    if ours[:2] == want[:2] == 'S:' and isinstance(x, list):
+        a, b = ours[2:].split(', '), want[2:].split(', ')
+        if len(a) != len(b): return False
+        for u, v in zip(a, b):
+            try:
+                if abs(float(u.split(': ')[-1]) - float(v.split(': ')[-1])) > 1e-9 * max(1, abs(float(v.split(': ')[-1]))): return False
+            except ValueError:
+                if u != v: return False
+        return True
+    return False
 
 # 1: the workbook without its answers, worked out by both
 wb, rows, last = build()
@@ -189,13 +248,17 @@ p1 = os.path.join(work, 'stage1.xlsx'); wb.save(p1)
 led = ledger_eval(p1, [COL_RES])
 lo = lo_eval(p1)
 expected, notes, problems = {}, {}, []
-for r, i, form, f in rows:
+for r, i, form, f, opts in rows:
     ours = led[r][0]
     theirs = lo_val(lo.cell(r, COL_RES).value)
     expected[r] = ours
     if same(ours, theirs): continue
-    why = reason(i, form)
+    why = reason(i, form) or opts.get('lodiff')
+    if 'x' in opts and not same_x(ours, opts['x']): problems.append((r, f, ours, 'Excel ' + excel_value(opts['x']))); continue
+    if 'shape' in opts and ours != 'B:TRUE': problems.append((r, f, ours, 'B:TRUE')); continue
     if why: notes[r] = 'Excel\'s answer; LibreOffice gives %s (%s)' % (shown(theirs), why)
+    elif 'x' in opts or 'shape' in opts:
+        notes[r] = 'Excel\'s documented answer; LibreOffice gives %s (it hasn\'t this function, or not in this form)' % shown(theirs)
     else: problems.append((r, f, ours, theirs))
 if problems:
     for p in problems: print('UNEXPLAINED row %d %s: Ledger %s, LibreOffice %s' % p)
@@ -214,7 +277,9 @@ for attempt in range(2):
     fails_lo = [r for r, *_ in rows2 if lo.cell(r, COL_CHK).value != 'PASS']
     unexpected_lo = [r for r in fails_lo if r not in notes]
     own = [r for r in unexpected_lo if expected[r].startswith('E:') and lo_val(lo.cell(r, COL_RES).value) == expected[r]]
-    if not own: break
+    empty = [r for r in unexpected_lo if expected[r] == 'N:0' and lo_val(lo.cell(r, COL_RES).value) == 'N:0']
+    for r in empty: notes[r] = 'Excel\'s answer; LibreOffice gives the empty cell itself (shown as 0 but no number to ISNUMBER)'
+    if not own and not empty: break
     for r in own: notes[r] = 'Excel\'s answer; LibreOffice raises its own error here (Err:502) and shows it as %s, which its ERROR.TYPE doesn\'t take for one' % expected[r][2:]
 nfun = len({c[0] for c in C})
 report = ['FunctionTests.xlsx: %d tests of %d functions (%d cases, each with arguments typed in and in cells where it takes any)' % (len(rows2), nfun, len(C)),
