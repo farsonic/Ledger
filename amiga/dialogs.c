@@ -340,15 +340,15 @@ static const struct { const char *name, *args, *what; u8 cat; } fdesc[] = {
 };
 #define NFDESC ((int)(sizeof fdesc / sizeof fdesc[0]))
 static const char *const fn_cats[] = { "All", "Financial", "Logical", "Text", "Date & Time", "Lookup & Reference", "Math & Trig", "Statistical", "Information", NULL };
-static const char *fn_shown[400]; static int fn_nshown;
+static const char *fn_shown[700]; static int fn_nshown;
 static Object *fn_cat, *fn_list, *fn_text;
 static int fn_desc(const char *name) { int i; for (i = 0; i < NFDESC; i++) if (!strcmp(fdesc[i].name, name)) return i; return -1; }
 static void fn_fill(void)
 {
   int cat = (int)xget(fn_cat, MUIA_Cycle_Active), i;
   fn_nshown = 0;
-  if (cat == 0) { for (i = 0; i < func_count && fn_nshown < 399; i++) fn_shown[fn_nshown++] = func_table[i].name; }
-  else for (i = 0; i < NFDESC && fn_nshown < 399; i++) if (fdesc[i].cat == cat) fn_shown[fn_nshown++] = fdesc[i].name;
+  if (cat == 0) { func_init(); for (i = 0; i < func_count && fn_nshown < 699; i++) fn_shown[fn_nshown++] = func_table[i].name; }
+  else for (i = 0; i < NFDESC && fn_nshown < 699; i++) if (fdesc[i].cat == cat) fn_shown[fn_nshown++] = fdesc[i].name;
   fn_shown[fn_nshown] = NULL;
   DoMethod(fn_list, MUIM_List_Clear);
   DoMethod(fn_list, MUIM_List_Insert, (ULONG)fn_shown, fn_nshown, MUIV_List_Insert_Bottom);

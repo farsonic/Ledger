@@ -17,8 +17,7 @@
 /* ------------------------------------------------------------------ number gathering */
 /* the numbers of a list of arguments, as SUM/AVERAGE/MIN/... see them: numbers anywhere; logical
    values and numeric text only when typed straight in (or, with all = 1, everywhere: AVERAGEA ...) */
-typedef struct { double *v; long n, cap; int err; int all; long count_all; } Nums;
-static int nums_add(Nums *ns, double d)
+int nums_add(Nums *ns, double d)
 {
   if (ns->n == ns->cap) {
     long cap = ns->cap ? ns->cap * 2 : 64;
@@ -47,7 +46,7 @@ static int nums_cb(Ctx *cx, const Value *v, int direct, void *arg)
   default: return 0;
   }
 }
-static int gather(Ctx *cx, Value *args, int argc, Nums *ns, int all)
+int gather(Ctx *cx, Value *args, int argc, Nums *ns, int all)
 {
   int i;
   memset(ns, 0, sizeof *ns);
@@ -58,12 +57,12 @@ static int gather(Ctx *cx, Value *args, int argc, Nums *ns, int all)
   }
   return ns->err;
 }
-static Value num_or_err(double d)
+Value num_or_err(double d)
 {
   if (!(d == d) || d > 1.7976931348623157e308 || d < -1.7976931348623157e308) return val_err(E_NUM);
   return val_num(d);
 }
-static int dcmp(const void *a, const void *b) { double x = *(const double *)a, y = *(const double *)b; return x < y ? -1 : x > y; }
+int dcmp(const void *a, const void *b) { double x = *(const double *)a, y = *(const double *)b; return x < y ? -1 : x > y; }
 
 /* ------------------------------------------------------------------ maths */
 static Value f_sum(Ctx *cx, Value *a, int n) { Nums ns; double s = 0; long i; if (gather(cx, a, n, &ns, 0)) { free(ns.v); return val_err(ns.err); } for (i = 0; i < ns.n; i++) s += ns.v[i]; free(ns.v); return num_or_err(s); }
@@ -1861,7 +1860,7 @@ static Value f_sln(Ctx *cx, Value *a, int n) { double x[3]; int e = fin_args(cx,
 
 /* ------------------------------------------------------------------ the table: names must stay in alphabetical order (binary search) */
 #define V FF_VOLATILE
-const FuncDef func_table[] = {
+static const FuncDef core_defs[] = {
   { "ABS", 1, 1, 0, f_abs }, { "ACOS", 1, 1, 0, f_acos }, { "ADDRESS", 2, 5, 0, f_address }, { "AND", 1, 255, 0, f_and },
   { "ASIN", 1, 1, 0, f_asin }, { "ATAN", 1, 1, 0, f_atan }, { "ATAN2", 2, 2, 0, f_atan2 }, { "AVEDEV", 1, 255, 0, f_avedev },
   { "AVERAGE", 1, 255, 0, f_average }, { "AVERAGEA", 1, 255, 0, f_averagea }, { "AVERAGEIF", 2, 3, 0, f_averageif },
@@ -1913,17 +1912,47 @@ const FuncDef func_table[] = {
   { "YEAR", 1, 1, 0, f_year }, { "YEARFRAC", 2, 3, 0, f_yearfrac },
 };
 #undef V
-const int func_count = (int)(sizeof func_table / sizeof func_table[0]);
+/* the functions of the other files of the library, each its own table in name order; merged with
+   the core's into one table in name order the first time a function is looked up */
+extern const FuncDef func_stat_defs[], func_eng_defs[], func_fin_defs[], func_misc_defs[], func_array_defs[];
+extern const int func_stat_count, func_eng_count, func_fin_count, func_misc_count, func_array_count;
+#define MAXFUNCS 640
+static FuncDef merged[MAXFUNCS];
+const FuncDef *func_table = merged;
+int func_count;
+static int def_cmp(const void *a, const void *b) { return strcmp(((const FuncDef *)a)->name, ((const FuncDef *)b)->name); }
+static void add_defs(const FuncDef *d, int n)
+{
+  int i, j;
+  for (i = 0; i < n && func_count < MAXFUNCS; i++) {
+    for (j = 0; j < func_count; j++) if (!strcmp(merged[j].name, d[i].name)) break;
+    if (j < func_count) merged[j] = d[i];      /* a later table's version replaces the core's */
+    else merged[func_count++] = d[i];
+  }
+}
+void func_init(void)
+{
+  if (func_count) return;
+  add_defs(core_defs, (int)(sizeof core_defs / sizeof core_defs[0]));
+  add_defs(func_stat_defs, func_stat_count);
+  add_defs(func_eng_defs, func_eng_count);
+  add_defs(func_fin_defs, func_fin_count);
+  add_defs(func_misc_defs, func_misc_count);
+  add_defs(func_array_defs, func_array_count);
+  qsort(merged, (size_t)func_count, sizeof merged[0], def_cmp);
+}
 
 int func_lookup(const char *name)
 {
-  int lo = 0, hi = func_count - 1;
+  int lo = 0, hi, mid, c;
   char up[64];
   size_t i;
+  func_init();
+  hi = func_count - 1;
   for (i = 0; name[i] && i < 63; i++) up[i] = (char)toupper((u8)name[i]);
   up[i] = 0;
   while (lo <= hi) {
-    int mid = (lo + hi) / 2, c = strcmp(up, func_table[mid].name);
+    mid = (lo + hi) / 2; c = strcmp(up, func_table[mid].name);
     if (!c) return mid;
     if (c < 0) hi = mid - 1; else lo = mid + 1;
   }

@@ -19,8 +19,18 @@ typedef struct {
 typedef Value (*FuncFn)(Ctx *cx, Value *args, int argc);
 typedef struct { const char *name; u8 minargs, maxargs; u8 flags; FuncFn fn; } FuncDef;
 enum { FF_VOLATILE = 1 };
-extern const FuncDef func_table[];
-extern const int func_count;
+extern const FuncDef *func_table;   /* every function, in name order (after func_init) */
+extern int func_count;
+void func_init(void);
+
+/* helpers of func.c the other files of the library share */
+typedef struct { double *v; long n, cap; int err; int all; long count_all; } Nums;
+int   nums_add(Nums *ns, double d);
+/* the numbers of a list of arguments as SUM sees them (all = 1: as AVERAGEA does); 0 or an E_ error.
+   ns->v is malloc'd: free it */
+int   gather(Ctx *cx, Value *args, int argc, Nums *ns, int all);
+Value num_or_err(double d);          /* #NUM! for NaN and infinities */
+int   dcmp(const void *a, const void *b);   /* qsort order of doubles */
 
 #define IS_MISSING(v) ((v)->t == V_EMPTY && (v)->e == 1)
 

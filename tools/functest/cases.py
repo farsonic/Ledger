@@ -164,3 +164,11 @@ C = [
  ('NUMBERVALUE', ['"1 234,5"', '","', '" "']), ('NUMBERVALUE', ['"12.5%%"']), ('NUMBERVALUE', ['"1,5,0"', '","']), ('NUMBERVALUE', ['""']),
  ('TEXTJOIN', ['"-"', 'TRUE', [['"a"'], [''], ['"c"']]]),
 ]
+
+# the cases of the other function files
+from cases_stat import C as _c1
+from cases_eng import C as _c2
+from cases_fin import C as _c3
+from cases_misc import C as _c4
+from cases_array import C as _c5
+C = C + _c1 + _c2 + _c3 + _c4 + _c5
