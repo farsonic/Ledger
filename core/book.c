@@ -5,6 +5,7 @@
 #include "book.h"
 #include "calc.h"
 #include "cond.h"
+#include "drawing.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -574,6 +575,7 @@ static void sheet_free(Sheet *s)
   cond_free_all(s->cfs, s->ncfs);
   notes_free(s->notes, s->nnotes);
   links_free(s->links, s->nlinks);
+  drw_free(s->drw);
   free(s);
 }
 /* a deep copy of a sheet, for undo (NULL out of memory) */
@@ -593,6 +595,7 @@ static Sheet *sheet_clone(const Sheet *s)
   if (!c->notes) c->nnotes = 0;
   c->links = links_copy(s->links, s->nlinks);
   if (!c->links) c->nlinks = 0;
+  c->drw = drw_copy(s->drw);
   if (s->nrows && !(c->rows = (Row **)calloc((size_t)s->nrows, sizeof(Row *)))) goto fail;
   c->nrows = s->nrows;
   for (r = 0; r < s->nrows; r++) {
@@ -998,6 +1001,7 @@ static void each_formula(Book *b, void (*fn)(Formula *f, int home, void *arg), v
       if (sh->rows[r]) for (i = 0; i < sh->rows[r]->n; i++) if (sh->rows[r]->c[i].f) fn(sh->rows[r]->c[i].f, s, arg);
     /* conditional formatting's formulas too */
     for (i = 0; i < sh->ncfs; i++) { if (sh->cfs[i].f1) fn(sh->cfs[i].f1, s, arg); if (sh->cfs[i].f2) fn(sh->cfs[i].f2, s, arg); }
+    drw_each_formula(sh, s, fn, arg);    /* charts' and sparklines' */
   }
   for (i = 0; i < b->nnames; i++) if (b->names[i].f) fn(b->names[i].f, b->names[i].sheet == SHEET_SELF ? 0 : b->names[i].sheet, arg);
 }
@@ -1687,6 +1691,7 @@ static void move_extras(Sheet *s, int rows, i32 at, i32 n)
     s->links[k++] = ln;
   }
   s->nlinks = k;
+  drw_shift(s, rows, at, n);
   /* the AutoFilter's range and its columns */
   if (s->filter.r1 >= 0) {
     i32 *a1 = rows ? &s->filter.r1 : &s->filter.c1, *a2 = rows ? &s->filter.r2 : &s->filter.c2;

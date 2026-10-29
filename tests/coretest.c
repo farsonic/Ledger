@@ -760,6 +760,8 @@ static void links(void)
   book_free(b);
 }
 
+#include "drawtest.c"
+
 static void templates(void)
 {
   Book *b;
@@ -803,6 +805,7 @@ int main(void)
   condfmt();
   notes();
   links();
+  drawings();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }

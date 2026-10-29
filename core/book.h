@@ -160,6 +160,7 @@ typedef struct {
   CondRule *cfs; int ncfs;        /* conditional formatting, first rule first */
   Note *notes; int nnotes;        /* notes on cells, in no order */
   Link *links; int nlinks;        /* hyperlinks on cells, in no order */
+  struct Drawing *drw;            /* charts, pictures, shapes and sparklines (drawing.h), NULL none */
   u8 hidden, gridlines, headings, showzeros, rtl;
   i32 cur_r, cur_c;               /* where the cursor was, and the selection */
   Rect sel;
