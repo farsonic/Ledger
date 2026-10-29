@@ -105,6 +105,7 @@ static struct NewMenu menus[] = {
   I("Function...", 0, ID_FUNCTION), I("AutoSum", "=", ID_AUTOSUM), I("Today's Date", ";", ID_DATE), I("Time Now", ":", ID_TIME), BAR,
   I("Link...", 0, ID_LINK), I("Note...", 0, ID_NOTENEW), BAR,
   I("Define Name...", 0, ID_DEFNAME), I("Name Manager...", 0, ID_NAMES),
+  CHART_MENUS,                     /* charts, pictures, shapes, ink, sparklines (charttab.h) */
   M("Format"),
   I("Cells...", "1", ID_FORMATCELLS), I("Bold", "B", ID_BOLD), I("Italic", "I", ID_ITALIC), I("Underline", "U", ID_UNDERLINE), BAR,
   I("New or Edit Note...", 0, ID_NOTENEW), I("Delete Note", 0, ID_NOTEDEL), BAR,
@@ -122,8 +123,7 @@ static struct NewMenu menus[] = {
   I("Data Validation...", 0, ID_DV), I("Circle Invalid Data", 0, ID_CIRCLE), I("Clear Validation Circles", 0, ID_CIRCLECLEAR), I("Clear Validation", 0, ID_DVCLEAR),
   I("Consolidate...", 0, ID_CONSOLIDATE), BAR,
   I("Calculate Now", 0, ID_CALCNOW), T("Manual Calculation", 0, ID_MANUALCALC), BAR, I("Workbook Statistics...", 0, ID_STATS),
-  TABLE_MENUS,
-  M("Tools"),
+  BAR,
   I("Scenario Manager...", 0, ID_SCENARIOS), I("Goal Seek...", 0, ID_GOALSEEK), I("Data Table...", 0, ID_DATATABLE), BAR,
   I("Group...", 0, ID_GROUP), I("Ungroup...", 0, ID_UNGROUP), I("Clear Outline", 0, ID_CLEAROUTLINE), I("Subtotal...", 0, ID_SUBTOTAL),
   I("Show Detail", 0, ID_SHOWDETAIL), I("Hide Detail", 0, ID_HIDEDETAIL), I("Outline Settings...", 0, ID_OUTLINESET), BAR,
@@ -132,8 +132,9 @@ static struct NewMenu menus[] = {
   T("Show All Notes", 0, ID_NOTESHOW), T("Formula Bar", 0, ID_FORMULABAR), T("Gridlines", 0, ID_GRIDLINES), T("Headings", 0, ID_HEADINGS), T("Show Formulas", 0, ID_SHOWFORMULAS), BAR,
   I("Zoom In", "+", ID_ZOOMIN), I("Zoom Out", "-", ID_ZOOMOUT), I("Zoom 100%", 0, ID_ZOOM100), I("Zoom to Selection", 0, ID_ZOOMSEL), BAR,
   I("Freeze Panes", 0, ID_FREEZE), I("Unfreeze Panes", 0, ID_UNFREEZE), BAR, T("Dark Mode", 0, ID_DARKUI),
-  CHART_MENUS,                     /* charts, pictures, shapes, ink, sparklines (charttab.h) */
+  LX_WINDOW_ITEMS
   LX_MENUS
+  TABLE_MENUS,
   { NM_END, 0, 0, 0, 0, 0 }
 };
 

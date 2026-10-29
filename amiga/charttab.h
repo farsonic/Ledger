@@ -23,7 +23,7 @@ ULONG chart_ribbon_state(void);
   XS("Waterfall", base + 19), XS("Funnel", base + 20), XS("Treemap", base + 21), XS("Sunburst", base + 22), XS("Box & Whisker", base + 23), \
   XS("Stock", base + 24), XS("Combo", base + 25)
 #define CHART_MENUS \
-  XM("Objects"), \
+  XBAR, \
   XI("Picture...", ID_X_PICTURE), \
   XP("Shape"), XS("Rectangle", ID_X_SHAPE0), XS("Rounded Rectangle", ID_X_SHAPE0 + 1), XS("Oval", ID_X_SHAPE0 + 2), XS("Triangle", ID_X_SHAPE0 + 3), \
     XS("Line", ID_X_SHAPE0 + 4), XS("Arrow", ID_X_SHAPE0 + 5), XS("Text Box", ID_X_SHAPE0 + 6), \
