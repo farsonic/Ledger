@@ -37,6 +37,8 @@
 #include "../core/calc.h"
 #include "../core/ops.h"
 #include "../core/cond.h"
+#include "../core/data.h"
+#include "datatab.h"
 
 #ifndef MUIM_GoActive
 #define MUIM_GoActive   0x8042491aUL
@@ -69,6 +71,7 @@ struct Data {
   /* the layout of the last drawing: headings' size, the rows and columns shown and their pixels
      (from the grid's top left); the first nfr rows and nfcol columns are the frozen ones */
   LONG hw, hh, w, h;
+  LONG bandw, bandh;             /* (datatab) the outline's bands, inside hw and hh */
   int nvr, nvc, nfr, nfcol;
   i32 vr[MAXVR]; LONG vy[MAXVR + 1];
   i32 vc[MAXVC]; LONG vx[MAXVC + 1];
@@ -309,6 +312,9 @@ static void layout(struct Data *d, LONG w, LONG h)
   InitRastPort(&rp);
   SetFont(&rp, theme_font());
   d->hw = s->headings ? TextLength(&rp, (STRPTR)"0000000", (ULONG)digits) + 12 : 0;
+  /* (datatab) the outline's bands beside the headings */
+  d->bandw = gx_band(s, 1); d->bandh = gx_band(s, 0);
+  d->hw += d->bandw; d->hh += d->bandh;
   /* rows */
   y = d->hh; d->nvr = 0; d->nfr = 0;
   for (r = 0; r < s->freezer && d->nvr < MAXVR; r++) {
@@ -798,13 +804,13 @@ static void draw_headings(struct Data *d, struct RastPort *rp)
     LONG x0 = d->vx[i], x1 = d->vx[i + 1] - 1, tw;
     int on = c >= sel.c1 && c <= sel.c2, whole = on && sel.r1 == 0 && sel.r2 >= MAXROW - 1;
     col_name(c, t);
-    if (on) { fill(rp, x0, 0, x1, d->hh - 1, whole ? d->pen_sel : d->pen_headsel); fill(rp, x0, d->hh - 2, x1, d->hh - 1, d->pen_accent); }
-    vline(rp, x1, 0, d->hh - 1, d->pen_headline);
+    if (on) { fill(rp, x0, d->bandh, x1, d->hh - 1, whole ? d->pen_sel : d->pen_headsel); fill(rp, x0, d->hh - 2, x1, d->hh - 1, d->pen_accent); }
+    vline(rp, x1, d->bandh, d->hh - 1, d->pen_headline);
     /* (0.1.1) the edge a drag would resize, or is resizing, lit */
     if (c == d->hot_col || (d->drag == DR_COLW && c == d->drag_idx)) fill(rp, x1 - 1, 0, x1 + 1 < d->w ? x1 + 1 : x1, d->hh - 1, d->pen_accent);
     tw = TextLength(rp, (STRPTR)t, (ULONG)strlen(t));
     SetAPen(rp, on ? d->pen_accent : d->pen_headtext);
-    Move(rp, x0 + (x1 - x0 + 1 - tw) / 2, (d->hh - fh()) / 2 + theme_font()->tf_Baseline);
+    Move(rp, x0 + (x1 - x0 + 1 - tw) / 2, d->bandh + (d->hh - d->bandh - fh()) / 2 + theme_font()->tf_Baseline);
     if (x1 - x0 > tw) Text(rp, (STRPTR)t, (ULONG)strlen(t));
   }
   if (!(sel.r1 == 0 && sel.r2 >= MAXROW - 1)) {}
@@ -814,8 +820,8 @@ static void draw_headings(struct Data *d, struct RastPort *rp)
     LONG y0 = d->vy[i], y1 = d->vy[i + 1] - 1, tw;
     int on = r >= sel.r1 && r <= sel.r2, whole = on && sel.c1 == 0 && sel.c2 >= MAXCOL - 1;
     sprintf(t, "%ld", (long)r + 1);
-    if (on) { fill(rp, 0, y0, d->hw - 1, y1, whole ? d->pen_sel : d->pen_headsel); fill(rp, d->hw - 2, y0, d->hw - 1, y1, d->pen_accent); }
-    hline(rp, 0, d->hw - 1, y1, d->pen_headline);
+    if (on) { fill(rp, d->bandw, y0, d->hw - 1, y1, whole ? d->pen_sel : d->pen_headsel); fill(rp, d->hw - 2, y0, d->hw - 1, y1, d->pen_accent); }
+    hline(rp, d->bandw, d->hw - 1, y1, d->pen_headline);
     if (r == d->hot_row || (d->drag == DR_ROWH && r == d->drag_idx)) fill(rp, 0, y1 - 1, d->hw - 1, y1 + 1 < d->h ? y1 + 1 : y1, d->pen_accent);
     tw = TextLength(rp, (STRPTR)t, (ULONG)strlen(t));
     /* the rows of a filtered table numbered in the accent colour (some rows are hidden) */
@@ -1015,13 +1021,29 @@ static void draw_notes(struct Data *d, struct RastPort *rp)
     draw_box(d, rp, d->hover_r, d->hover_c, NULL, t);
   }
 }
+/* (datatab) the geometry gridx.c draws the Data tab's extras by */
+static LONG geo_pen(void *ctx, ULONG rgb) { return pen_for((struct Data *)ctx, rgb); }
+static void geo(struct Data *d, GridGeo *g)
+{
+  g->book = d->book; g->sheet = SI(d);
+  g->w = d->w; g->h = d->h; g->hw = d->hw; g->hh = d->hh; g->bandw = d->bandw; g->bandh = d->bandh;
+  g->nvr = d->nvr; g->nvc = d->nvc; g->editing = d->editing;
+  g->vr = d->vr; g->vy = d->vy; g->vc = d->vc; g->vx = d->vx;
+  g->pen_head = d->pen_head; g->pen_headline = d->pen_headline; g->pen_headtext = d->pen_headtext; g->pen_accent = d->pen_accent;
+  g->pen_white = d->pen_white; g->pen_text = d->pen_text; g->pen = geo_pen; g->ctx = d;
+  g->cur_r = SH(d)->cur_r; g->cur_c = SH(d)->cur_c;
+}
 static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
 {
+  GridGeo g;
   layout(d, w, h);
   draw_cells(d, rp);
   draw_headings(d, rp);
+  geo(d, &g);
+  gx_draw_outline(rp, &g);
   draw_filters(d, rp);
   draw_marks(d, rp);
+  gx_draw_marks(rp, &g);
   draw_notes(d, rp);
   draw_editor(d, rp, 0, 0);
 }
@@ -1137,6 +1159,11 @@ static void edit_notify(struct Data *d) { SetAttrs(d->obj, MUIA_Grid_EditText, +
 static void edit_begin(struct Data *d, const char *text, int mode)
 {
   Sheet *s = SH(d);
+  {
+    Rect one;
+    one.r1 = one.r2 = s->cur_r; one.c1 = one.c2 = s->cur_c;
+    if (!datatab_may(d->book, SI(d), DT_CELLS, one)) return;     /* (a protected sheet's locked cell) */
+  }
   if (text) { strncpy(d->ebuf, text, EMAX); d->ebuf[EMAX] = 0; }
   else grid_edit_text(d->book, SI(d), s->cur_r, s->cur_c, d->ebuf, sizeof d->ebuf);
   d->elen = (int)strlen(d->ebuf);
@@ -1172,6 +1199,12 @@ static int commit(struct Data *d, int move)
     char *p;
     for (p = u; *p; p++) { if (*p == '"') q = !q; else if (!q && *p == '(') depth++; else if (!q && *p == ')') depth--; }
     while (depth-- > 0 && strlen(u) + 1 < sizeof u) strcat(u, ")");
+  }
+  {
+    /* (datatab) the entry against the cell's data validation */
+    int v = datatab_entry_ok(d->book, SI(d), move == 5 ? sel.r1 : s->cur_r, move == 5 ? sel.c1 : s->cur_c, u);
+    if (v < 0) { edit_end(d); redraw(d); moved(d); return 1; }
+    if (!v) { d->editing = 2; redraw(d); return 0; }
   }
   if (move == 5) {
     i32 r, c;
@@ -1354,6 +1387,7 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   n = (code >= 0x50 && code <= 0x59) || code == 0x5F ? 0 : key_text(im, typed, sizeof typed);
   if (d->editing) return edit_key(d, code, q, typed, n);
   if (!shift) { r = s->cur_r; c = s->cur_c; }
+  if (alt && shift && (code == 0x4E || code == 0x4F)) { DoMethod(_app(obj), MUIM_Application_ReturnID, code == 0x4E ? ID_GROUP : ID_UNGROUP); return 1; }
   switch (code) {
   case 0x4C: case 0x4D: case 0x4E: case 0x4F: {
     int dr = code == 0x4C ? -1 : code == 0x4D ? 1 : 0, dc = code == 0x4E ? 1 : code == 0x4F ? -1 : 0;
@@ -1378,6 +1412,7 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   case 0x42: go(d, s->cur_r, step_col(d, s->cur_r, s->cur_c, shift ? -1 : 1), 0); return 1;   /* Tab */
   case 0x46: {                                                  /* Del: the selection's contents go */
     Rect sel = sel_rect(d);
+    if (!datatab_may(d->book, SI(d), DT_CELLS, sel)) return 1;
     book_clear(d->book, SI(d), sel, CLR_CONTENTS);
     changed(d); redraw(d); moved(d);
     return 1; }
@@ -1387,6 +1422,8 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   case 0x58: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_CALCNOW); return 1;   /* F9 */
   case 0x7A: case 0x7B: scroll_rows(d, code == 0x7A ? -3 : 3); return 1;             /* the mouse wheel */
   }
+  /* (datatab) Ctrl-E Flash Fill; Alt-Shift-Right and Left group and ungroup */
+  if (code == 0x12 && ctrl) { DoMethod(_app(obj), MUIM_Application_ReturnID, ID_FLASHFILL); return 1; }
   /* Shift-F3 Insert Function, Shift-F11 a new sheet, Alt-= AutoSum, Ctrl-` show formulas */
   if (code == 0x52 && shift) { DoMethod(_app(obj), MUIM_Application_ReturnID, ID_FUNCTION); return 1; }
   if ((code == 0x4B || code == 0x5A) && shift) { DoMethod(_app(obj), MUIM_Application_ReturnID, ID_NEWSHEET); return 1; }
@@ -1535,6 +1572,7 @@ static void drag_end(struct Data *d, Object *obj)
   int k = d->drag;
   d->drag = DR_NONE;
   events_set(d, obj, EV_IDLE);
+  if ((k == DR_COLW || k == DR_ROWH) && !datatab_may(d->book, SI(d), k == DR_COLW ? DT_COLS : DT_ROWS, sel_rect(d))) { redraw(d); return; }
   if (k == DR_COLW) {
     Rect sel = sel_rect(d);
     i32 c;
@@ -1559,7 +1597,7 @@ static void drag_end(struct Data *d, Object *obj)
     Rect sel = sel_rect(d), dst = sel;
     if (d->fill_r > sel.r2) dst.r2 = d->fill_r; else if (d->fill_r < sel.r1) dst.r1 = d->fill_r;
     else if (d->fill_c > sel.c2) dst.c2 = d->fill_c; else if (d->fill_c < sel.c1) dst.c1 = d->fill_c;
-    if (dst.r1 != sel.r1 || dst.r2 != sel.r2 || dst.c1 != sel.c1 || dst.c2 != sel.c2) {
+    if ((dst.r1 != sel.r1 || dst.r2 != sel.r2 || dst.c1 != sel.c1 || dst.c2 != sel.c2) && datatab_may(d->book, SI(d), DT_CELLS, dst)) {
       book_fill(d->book, SI(d), sel, dst);
       SH(d)->cur_r = dst.r1; SH(d)->cur_c = dst.c1; d->end_r = dst.r2; d->end_c = dst.c2;
       changed(d); moved(d);
@@ -1610,6 +1648,13 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
     d->secs = im->Seconds; d->micros = im->Micros; d->click_r = r; d->click_c = c; d->click_region = region;
     set(_win(obj), MUIA_Window_ActiveObject, (ULONG)obj);
     key_grab = NULL;
+    if (!d->editing) {
+      /* (datatab) the outline's buttons and bands, validation's drop-down arrow */
+      GridGeo g;
+      int k = (geo(d, &g), gx_click(&g, x, y));
+      if (k == 1) { changed(d); redraw(d); update_props(d); moved(d); return MUI_EventHandlerRC_Eat; }
+      if (k == 2) { DoMethod(_app(obj), MUIM_Application_ReturnID, ID_DVPICK); return MUI_EventHandlerRC_Eat; }
+    }
     /* while typing a formula, a click points at a cell for it */
     if (region == 0 && d->editing && pointable(d)) {
       d->pt_on = 0;
@@ -1833,6 +1878,16 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
     case MUIA_Grid_ShowNotes: *g->opg_Storage = (ULONG)d->show_notes; return TRUE;
     case MUIA_Grid_CtxPick: *g->opg_Storage = d->ctx_pick; return TRUE;
     case MUIA_Grid_FilterCol: *g->opg_Storage = (ULONG)d->filter_col; return TRUE;
+    case MUIA_Grid_CellBox: {
+      /* (datatab) the active cell's box in window pixels (all -1 when it isn't shown) */
+      static LONG cb[4];
+      int i, j;
+      for (i = 0; i < d->nvr && d->vr[i] != SH(d)->cur_r; i++) ;
+      for (j = 0; j < d->nvc && d->vc[j] != SH(d)->cur_c; j++) ;
+      if (i < d->nvr && j < d->nvc) { cb[0] = _mleft(obj) + d->vx[j]; cb[1] = _mtop(obj) + d->vy[i]; cb[2] = _mleft(obj) + d->vx[j + 1] - 1; cb[3] = _mtop(obj) + d->vy[i + 1] - 1; }
+      else cb[0] = cb[1] = cb[2] = cb[3] = -1;
+      *g->opg_Storage = (ULONG)cb;
+      return TRUE; }
     case MUIA_Grid_Zoom: *g->opg_Storage = d->book ? (ULONG)zoom(d) : 100; return TRUE;
     case MUIA_Grid_Brush: *g->opg_Storage = (ULONG)d->brush; return TRUE;
     }

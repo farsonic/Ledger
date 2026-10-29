@@ -111,7 +111,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Rename Sheet (Cells) `sheet.rename`
 - ⬜ Move or Copy Sheet (Cells) `sheet.move`
 - ⬜ Tab Color (Cells) `sheet.tabColor`
-- ⬜ Protect Sheet (Cells) `review.protectSheet`
+- ✅ Protect Sheet (Cells) `review.protectSheet`
 - ⬜ Lock Cell (Cells) `home.lockCell`
 - ✅ Format Cells (Cells) `home.formatCells`
 - ✅ AutoSum (Editing) `formulas.autoSum`
@@ -217,29 +217,29 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Calculate Now (Calculation) `formulas.calculateNow`
 - ⬜ Calculate Sheet (Calculation) `formulas.calculateSheet`
 
-### Data (3 of 23 by name)
+### Data (17 of 23 by name; 3 not applicable)
 
 - ✅ Get Data (Get & Transform Data) `data.getData`
 - ✅ From Text/CSV (Get & Transform Data) `data.fromTextCsv`
-- ⬜ From Table/Range (Get & Transform Data) `data.fromTableRange`
-- ⬜ Refresh All (Queries & Connections) `data.refreshAll`
-- ⬜ Queries & Connections (Queries & Connections) `data.queriesConnections`
-- ⬜ Advanced (Sort & Filter) `data.advancedFilter`
-- ⬜ Text to Columns (Data Tools) `data.textToColumns`
-- ⬜ Flash Fill (Data Tools) `data.flashFill`
+- ➖ From Table/Range (Get & Transform Data) `data.fromTableRange` (Ledger has no tables, queries or pivot tables to refresh)
+- ➖ Refresh All (Queries & Connections) `data.refreshAll` (Ledger has no tables, queries or pivot tables to refresh)
+- ➖ Queries & Connections (Queries & Connections) `data.queriesConnections` (Ledger has no tables, queries or pivot tables to refresh)
+- ✅ Advanced (Sort & Filter) `data.advancedFilter`
+- ✅ Text to Columns (Data Tools) `data.textToColumns`
+- ✅ Flash Fill (Data Tools) `data.flashFill`
 - ✅ Remove Duplicates (Data Tools) `data.removeDuplicates`
-- ⬜ Data Validation (Data Tools) `data.validation`
-- ⬜ Circle Invalid Data (Data Tools) `data.circleInvalid`
-- ⬜ Consolidate (Data Tools) `data.consolidate`
-- ⬜ Scenario Manager (Forecast) `data.scenarioManager`
-- ⬜ Goal Seek (Forecast) `data.goalSeek`
-- ⬜ Data Table (Forecast) `data.dataTable`
+- ✅ Data Validation (Data Tools) `data.validation`
+- ✅ Circle Invalid Data (Data Tools) `data.circleInvalid`
+- ✅ Consolidate (Data Tools) `data.consolidate`
+- ✅ Scenario Manager (Forecast) `data.scenarioManager`
+- ✅ Goal Seek (Forecast) `data.goalSeek`
+- ✅ Data Table (Forecast) `data.dataTable`
 - ⬜ Forecast Sheet (Forecast) `data.forecastSheet`
-- ⬜ Group (Outline) `data.group`
-- ⬜ Ungroup (Outline) `data.ungroup`
-- ⬜ Subtotal (Outline) `data.subtotal`
-- ⬜ Show Detail (Outline) `data.showDetail`
-- ⬜ Hide Detail (Outline) `data.hideDetail`
+- ✅ Group (Outline) `data.group`
+- ✅ Ungroup (Outline) `data.ungroup`
+- ✅ Subtotal (Outline) `data.subtotal`
+- ✅ Show Detail (Outline) `data.showDetail`
+- ✅ Hide Detail (Outline) `data.hideDetail`
 - ⬜ Solver (Analysis) `data.solver`
 - ⬜ Data Analysis (Analysis) `data.analysisToolPak`
 
@@ -257,8 +257,8 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ⬜ Show/Hide Note (Notes) `review.showNote`
 - ✅ Show All Notes (Notes) `review.showAllNotes`
 - ⬜ Convert to Comments (Notes) `review.convertToComments`
-- ⬜ Unprotect Sheet (Protect) `review.unprotectSheet`
-- ⬜ Protect Workbook (Protect) `review.protectWorkbook`
+- ✅ Unprotect Sheet (Protect) `review.unprotectSheet`
+- ✅ Protect Workbook (Protect) `review.protectWorkbook`
 - ⬜ Allow Edit Ranges (Protect) `review.allowEditRanges`
 
 ### View (13 of 20 by name)
