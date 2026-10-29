@@ -44,7 +44,7 @@ static int base_text(Ctx *cx, const Value *v, char *out)
    complement over 10 digits) */
 static int base_parse(const char *s, int base, double *out)
 {
-  double v = 0, full = pow((double)base, 10);
+  double v = 0, full = ipow((double)base, 10);
   int k, len = (int)strlen(s);
   if (len > 10) return E_NUM;
   for (k = 0; k < len; k++) {
@@ -75,12 +75,12 @@ static int base_places(Ctx *cx, Value *a, int n, int i, int *places)
 /* v (an integer) written in base, padded to places; negatives as ten digits of two's complement */
 static Value base_out(double v, int base, int places)
 {
-  double full = pow((double)base, 10), lim = full / 2;
+  double full = ipow((double)base, 10), lim = full / 2;
   char tmp[16], out[16];
   int k = 0, j;
   if (v < -lim || v >= lim) return val_err(E_NUM);
   if (v < 0) { v += full; places = 10; }
-  do { double d = fmod(v, base); tmp[k++] = "0123456789ABCDEF"[(int)d]; v = floor(v / base); } while (v > 0 && k < 15);
+  do { double d = dmod(v, base); tmp[k++] = "0123456789ABCDEF"[(int)d]; v = floor(v / base); } while (v > 0 && k < 15);
   if (places && k > places) return val_err(E_NUM);
   for (j = 0; j < places - k; j++) out[j] = '0';
   for (j = 0; j < k; j++) out[(places > k ? places - k : 0) + j] = tmp[k - 1 - j];
@@ -130,7 +130,7 @@ static Value f_base(Ctx *cx, Value *a, int n)
   if (HAS(2) && (e = arg_num(cx, &a[2], &m))) return val_err(e);
   v = floor(v); r = floor(r); m = floor(m);
   if (v < 0 || v >= 9007199254740992.0 || r < 2 || r > 36 || m < 0 || m > 255) return val_err(E_NUM);
-  do { tmp[k++] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[(int)fmod(v, r)]; v = floor(v / r); } while (v > 0 && k < 63);
+  do { tmp[k++] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[(int)dmod(v, r)]; v = floor(v / r); } while (v > 0 && k < 63);
   len = k > (int)m ? k : (int)m;
   for (j = 0; j < len - k; j++) out[j] = '0';
   for (j = 0; j < k; j++) out[len - k + j] = tmp[k - 1 - j];
@@ -177,7 +177,7 @@ static Value bitop(Ctx *cx, Value *a, int op)
   if ((e = bit_arg(cx, &a[0], &x)) || (e = bit_arg(cx, &a[1], &y))) return val_err(e);
   /* bit by bit (no 64-bit integers needed) */
   while (x > 0 || y > 0) {
-    int bx = fmod(x, 2) != 0, by = fmod(y, 2) != 0, b;
+    int bx = dmod(x, 2) != 0, by = dmod(y, 2) != 0, b;
     b = op == 0 ? (bx & by) : op == 1 ? (bx | by) : (bx ^ by);
     if (b) r += bit;
     bit *= 2; x = floor(x / 2); y = floor(y / 2);
@@ -195,7 +195,7 @@ static Value bitshift(Ctx *cx, Value *a, int left)
   s = s < 0 ? ceil(s) : floor(s);
   if (fabs(s) > 53) return val_err(E_NUM);
   if (!left) s = -s;
-  r = s >= 0 ? x * pow(2.0, s) : floor(x / pow(2.0, -s));
+  r = s >= 0 ? x * ipow(2.0, (int)s) : floor(x / ipow(2.0, (int)-s));
   if (r >= BITLIM) return val_err(E_NUM);
   return val_num(r);
 }

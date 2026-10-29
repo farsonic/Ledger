@@ -278,8 +278,8 @@ static Value evenodd(Ctx *cx, Value *a, int odd)
   double x, r; int e;
   if ((e = arg_num(cx, &a[0], &x))) return val_err(e);
   r = ceil(fabs(x) - 1e-12);
-  if (odd) { if (fmod(r, 2) == 0) r += 1; }
-  else if (fmod(r, 2) != 0) r += 1;
+  if (odd) { if (dmod(r, 2) == 0) r += 1; }
+  else if (dmod(r, 2) != 0) r += 1;
   return val_num(x < 0 ? -r : r);
 }
 static Value f_even(Ctx *cx, Value *a, int n) { (void)n; return evenodd(cx, a, 0); }
@@ -319,7 +319,7 @@ static Value f_permut(Ctx *cx, Value *a, int n)
   for (i = 0; i < k; i++) r *= x - i;
   return num_or_err(r);
 }
-static double gcd2(double a, double b) { while (b > 0.5) { double t = fmod(a, b); a = b; b = t; } return a; }
+static double gcd2(double a, double b) { while (b > 0.5) { double t = dmod(a, b); a = b; b = t; } return a; }
 static Value gcdlcm(Ctx *cx, Value *a, int n, int lcm)
 {
   Nums ns; double r; long i;
@@ -710,8 +710,8 @@ static Value f_isna(Ctx *cx, Value *a, int n) { (void)n; return is_impl(cx, a, 5
 static Value f_islogical(Ctx *cx, Value *a, int n) { (void)n; return is_impl(cx, a, 6); }
 static Value f_isref(Ctx *cx, Value *a, int n) { (void)n; return is_impl(cx, a, 7); }
 static Value f_isnontext(Ctx *cx, Value *a, int n) { (void)n; return is_impl(cx, a, 8); }
-static Value f_iseven(Ctx *cx, Value *a, int n) { double x; int e = arg_num(cx, &a[0], &x); (void)n; return e ? val_err(e) : val_bool(fmod(floor(fabs(x)), 2) == 0); }
-static Value f_isodd(Ctx *cx, Value *a, int n) { double x; int e = arg_num(cx, &a[0], &x); (void)n; return e ? val_err(e) : val_bool(fmod(floor(fabs(x)), 2) != 0); }
+static Value f_iseven(Ctx *cx, Value *a, int n) { double x; int e = arg_num(cx, &a[0], &x); (void)n; return e ? val_err(e) : val_bool(dmod(floor(fabs(x)), 2) == 0); }
+static Value f_isodd(Ctx *cx, Value *a, int n) { double x; int e = arg_num(cx, &a[0], &x); (void)n; return e ? val_err(e) : val_bool(dmod(floor(fabs(x)), 2) != 0); }
 static Value f_isformula(Ctx *cx, Value *a, int n)
 {
   Cell *cell;
@@ -1534,8 +1534,8 @@ static Value hms_part(Ctx *cx, Value *a, int part)
   if (e) return val_err(e);
   secs = floor((d - floor(d)) * 86400 + 0.5);
   if (part == 0) return val_num(floor(secs / 3600));
-  if (part == 1) return val_num(floor(fmod(secs, 3600) / 60));
-  return val_num(fmod(secs, 60));
+  if (part == 1) return val_num(floor(dmod(secs, 3600) / 60));
+  return val_num(dmod(secs, 60));
 }
 static Value f_hour(Ctx *cx, Value *a, int n) { (void)n; return hms_part(cx, a, 0); }
 static Value f_minute(Ctx *cx, Value *a, int n) { (void)n; return hms_part(cx, a, 1); }

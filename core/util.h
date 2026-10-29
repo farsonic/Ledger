@@ -44,6 +44,10 @@ int    latin1_of(u32 cp);                          /* one code point; -1 if it h
 char  *str_dup(const char *s);
 char  *str_ndup(const char *s, size_t n);
 int    str_ieq(const char *a, const char *b);      /* ASCII case-insensitive equality */
+/* a - b * floor(a / b): the remainder, exact for whole numbers up to 2^53 (vbcc's fmod isn't, past 2^31) */
+double dmod(double a, double b);
+/* b to the whole power n by multiplying (exact where the result is; vbcc's pow isn't always) */
+double ipow(double b, int n);
 int    str_ncasecmp(const char *a, const char *b, size_t n);   /* like strncasecmp */
 #define strncasecmp str_ncasecmp
 
@@ -56,5 +60,18 @@ int    iatan2(i32 y, i32 x);
 /* whole files: read (malloc'd, 0-terminated; NULL if unreadable) and written (0 on failure) */
 u8    *file_read(const char *path, size_t *len);
 int    file_write(const char *path, const void *data, size_t len);
+
+
+/* vbcc's floor and ceil (m040) go through a 32-bit integer and are wrong past 2^31: Ledger's own,
+   exact for every double, take their place there */
+double ledger_floor(double x);
+double ledger_ceil(double x);
+#ifdef __VBCC__
+#include <math.h>
+#undef floor
+#undef ceil
+#define floor(x) ledger_floor(x)
+#define ceil(x) ledger_ceil(x)
+#endif
 
 #endif
