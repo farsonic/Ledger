@@ -21,7 +21,7 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 15 | Group and outline rows/columns; Subtotals | yes | ✅ |
 | 16 | Protect sheet (locked cells can't be changed) | yes | ✅ |
 | 17 | Sparklines (line, column) | yes | ✅ |
-| 18 | Pivot tables | yes | ✅ |
+| 18 | Pivot tables (calculated fields, grouping by dates, intervals and by hand, expand/collapse, running total and rank, Recommended PivotTables, PivotCharts, slicers on tables and pivot tables) | yes | ✅ |
 | 19 | Old Excel .xls files (values, formulas, number formats) | yes | ✅ |
 | 20 | OpenDocument .ods import | yes | ✅ |
 | 21 | Pictures on the sheet (PNG/JPEG) | yes | ✅ |

@@ -130,7 +130,7 @@ static void rp_show(void)
     for (r = 0; r < rows; r++) {
       for (c = 0; c < cols && c < 4; c++) {
         char l[64];
-        int w = c ? 10 : 16, n;
+        int w = c ? 13 : 14, n;
         to_latin1(cells[(long)r * cols + c], l, sizeof l);
         n = (int)strlen(l);
         if (n > w - 1) { l[w - 1] = 0; n = w - 1; }
@@ -154,7 +154,12 @@ static void recommended(void)
   PivotSuggest *sg;
   Object *w;
   int n, i;
-  if (!data_source(src, sizeof src)) { say("Select a cell in a range with headings, or in a table, first."); return; }
+  {
+    /* in a PivotTable: its source */
+    LPivot *pv = pivot_here(NULL, NULL);
+    if (pv) snprintf(src, sizeof src, "%s", pv->source);
+    else if (!data_source(src, sizeof src)) { say("Select a cell in a range with headings, or in a table, first."); return; }
+  }
   if (!(sg = (PivotSuggest *)calloc(NSUGG, sizeof(PivotSuggest)))) return;
   n = pivot_recommend(book, cur_index(), src, sg, NSUGG);
   if (!n) { free(sg); say("Ledger has no PivotTables to recommend for this data."); return; }
@@ -163,12 +168,12 @@ static void recommended(void)
         Child, VGroup, MUIA_Weight, 45,
           Child, LLabel1(tr("Choose a PivotTable:")),
           Child, ListviewObject, MUIA_Listview_List, rp_list = ListObject, InputListFrame, MUIA_List_ConstructHook, MUIV_List_ConstructHook_String,
-            MUIA_List_DestructHook, MUIV_List_DestructHook_String, End, MUIA_CycleChain, 1, End,
+            MUIA_List_DestructHook, MUIV_List_DestructHook_String, MUIA_List_MinLineHeight, 0, MUIA_FixWidthTxt, (ULONG)"Sum of Sales by Region and Prod", End, MUIA_CycleChain, 1, End,
         End,
         Child, VGroup, MUIA_Weight, 55,
           Child, LLabel1(tr("Preview:")),
           Child, rp_prev = TextObject, TextFrame, MUIA_Background, MUII_TextBack, MUIA_Font, MUIV_Font_Fixed, MUIA_Text_SetVMax, FALSE,
-            MUIA_FixHeightTxt, (ULONG)"\n\n\n\n\n\n\n\n\n\n", MUIA_FixWidthTxt, (ULONG)"MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM", End,
+            MUIA_FixHeightTxt, (ULONG)"\n\n\n\n\n\n\n\n\n\n", MUIA_FixWidthTxt, (ULONG)"MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM", End,
         End,
       End, "OK");
   if (!w) { for (i = 0; i < n; i++) pivot_free1(&sg[i].def); free(sg); return; }
@@ -215,7 +220,7 @@ static void pivot_chart(void)
   lab[i] = NULL;
   w = dialog_window("Insert PivotChart", VGroup,
         Child, LLabel1(tr("Chart type:")),
-        Child, lv = ListviewObject, MUIA_Listview_List, list = ListObject, InputListFrame, MUIA_List_SourceArray, (ULONG)lab, End,
+        Child, lv = ListviewObject, MUIA_Listview_List, list = ListObject, InputListFrame, MUIA_List_SourceArray, (ULONG)lab, MUIA_FixWidthTxt, (ULONG)"Line with Markers MM", End,
           MUIA_Listview_DoubleClick, TRUE, MUIA_CycleChain, 1, End,
       End, "OK");
   if (!w) return;
