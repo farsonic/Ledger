@@ -82,6 +82,7 @@ void drw_remove(Sheet *s, int i)
   dobj_clear(&d->o[i]);
   memmove(&d->o[i], &d->o[i + 1], (size_t)(d->n - i - 1) * sizeof(DObj));
   d->n--;
+  if (d->ngrp) drw_group_prune(s);
 }
 void drw_move_z(Sheet *s, int i, int to)
 {
@@ -143,6 +144,7 @@ void drw_free(Drawing *d)
   for (i = 0; i < d->ng; i++) spark_group_clear(&d->g[i]);
   free(d->g);
   blob_free(d->bg);
+  free(d->grp);
   free(d);
 }
 Drawing *drw_copy(const Drawing *d)
@@ -152,6 +154,7 @@ Drawing *drw_copy(const Drawing *d)
   if (!d || !(c = (Drawing *)calloc(1, sizeof *c))) return NULL;
   c->nextid = d->nextid;
   c->bg = blob_ref(d->bg); c->bgtype = d->bgtype;
+  if (!drw_groups_copy(c, d)) goto fail;
   if (d->n && !(c->o = (DObj *)calloc((size_t)d->n, sizeof(DObj)))) goto fail;
   for (i = 0; i < d->n; i++) { if (!dobj_copy(&c->o[i], &d->o[i])) goto fail; c->n = i + 1; }
   if (d->ng && !(c->g = (SparkGroup *)calloc((size_t)d->ng, sizeof(SparkGroup)))) goto fail;

@@ -34,7 +34,8 @@ out = sys.argv[1]
 work = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.environ.get('TMPDIR', '/tmp'), 'ledger-mkexample')
 os.makedirs(work, exist_ok=True)
 
-CORE = "core/util.c core/zip.c core/xml.c core/book.c core/formula.c core/calc.c core/func.c core/func_stat.c core/func_eng.c core/func_fin.c core/func_misc.c core/func_array.c core/numfmt.c core/xlsx.c core/ops.c core/cond.c core/template.c core/fonts.c core/ttraster.c"
+# the core's source files, as build.sh lists them
+CORE = re.search(r'^CORE="([^"]*)"', open(os.path.join(TOP, "build.sh")).read(), re.M).group(1)
 EVAL = os.path.join(work, 'evalcols')
 subprocess.check_call('cc -std=c99 -D_DEFAULT_SOURCE -O1 -I. %s tools/functest/evalcols.c -o %s -lm' % (CORE, EVAL), shell=True, cwd=TOP)
 

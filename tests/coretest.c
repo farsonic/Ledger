@@ -887,6 +887,7 @@ static Book *reload(Book *b)
   free(x);
   return d;
 }
+#include "uitest.c"
 static void validation(void)
 {
   Book *b = book_new(), *d;
@@ -1841,6 +1842,7 @@ int main(void)
   imports();
   layout_tests();
   dynarrays();
+  ui_tests();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }

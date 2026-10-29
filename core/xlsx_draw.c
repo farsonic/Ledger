@@ -524,6 +524,106 @@ static void icon_geom(Buf *o, const DObj *ob)
   }
   buf_adds(o, "</a:pathLst></a:custGeom>");
 }
+/* one object's element (a graphicFrame, pic, sp or cxnSp); in a group its frame's place is given */
+static void w_obj(Book *b, int si, DObj *ob, Buf *o, Buf *r, Buf *cbuf, ZipWriter *w, int *rid, int *nc, int *nx, int *ni, int ingroup)
+{
+  Sheet *s = b->sh[si];
+  char path[64];
+  if (ob->kind == OB_CHART) {
+    int ex = is_ex(ob->chart->kind);
+    (*rid)++;
+    cbuf->len = 0;
+    if (ex) {
+      (*nx)++;
+      buf_printf(r, "<Relationship Id=\"rId%d\" Type=\"http://schemas.microsoft.com/office/2014/relationships/chartEx\" Target=\"../charts/chartEx%d.xml\"/>", *rid, *nx);
+      buf_adds(o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">");
+      buf_printf(o, "<mc:Choice xmlns:%s=\"%s\" Requires=\"%s\">", ob->chart->kind == CK_FUNNEL ? "cx2" : "cx1",
+                 ob->chart->kind == CK_FUNNEL ? "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex" : "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
+                 ob->chart->kind == CK_FUNNEL ? "cx2" : "cx1");
+    } else {
+      (*nc)++;
+      buf_printf(r, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart\" Target=\"../charts/chart%d.xml\"/>", *rid, *nc);
+    }
+    buf_adds(o, "<xdr:graphicFrame macro=\"\"><xdr:nvGraphicFramePr>"); cnvpr(o, ob); buf_adds(o, "<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>");
+    if (ingroup) { xfrm(o, "xdr", s, ob); buf_adds(o, "<a:graphic>"); }
+    else buf_adds(o, "<xdr:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></xdr:xfrm><a:graphic>");
+    if (ex) buf_printf(o, "<a:graphicData uri=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chart xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\" r:id=\"rId%d\"/></a:graphicData>", *rid);
+    else buf_printf(o, "<a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/chart\"><c:chart r:id=\"rId%d\"/></a:graphicData>", *rid);
+    buf_adds(o, "</a:graphic></xdr:graphicFrame>");
+    if (ex) {
+      buf_adds(o, "</mc:Choice><mc:Fallback><xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>"); cnvpr(o, ob);
+      buf_adds(o, "<xdr:cNvSpPr><a:spLocks noTextEdit=\"1\"/></xdr:cNvSpPr></xdr:nvSpPr><xdr:spPr>"); xfrm(o, "a", s, ob);
+      buf_adds(o, "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:solidFill><a:prstClr val=\"white\"/></a:solidFill><a:ln w=\"1\"><a:solidFill><a:prstClr val=\"green\"/></a:solidFill></a:ln></xdr:spPr>"
+                   "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\"/><a:lstStyle/><a:p><a:r><a:rPr lang=\"en-GB\" sz=\"1100\"/><a:t>This chart isn't available in your version of Excel.</a:t></a:r></a:p></xdr:txBody></xdr:sp></mc:Fallback></mc:AlternateContent>");
+      w_chartex(b, si, ob->chart, cbuf);
+      sprintf(path, "xl/charts/chartEx%d.xml", *nx);
+    } else {
+      w_chart(b, si, ob->chart, cbuf);
+      sprintf(path, "xl/charts/chart%d.xml", *nc);
+    }
+    zip_add(w, path, cbuf->data, cbuf->len);
+  } else if (ob->kind == OB_SLICER) {
+    /* Excel 2010's pivot table slicers, Excel 2013's table ones; others see the fallback */
+    if (ob->slicer->onpivot) buf_adds(o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:Choice xmlns:a14=\"http://schemas.microsoft.com/office/drawing/2010/main\" Requires=\"a14\">");
+    else buf_adds(o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:Choice xmlns:sle15=\"http://schemas.microsoft.com/office/drawing/2012/slicer\" Requires=\"sle15\">");
+    buf_adds(o, "<xdr:graphicFrame macro=\"\"><xdr:nvGraphicFramePr>"); cnvpr(o, ob); buf_adds(o, "<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>");
+    buf_adds(o, "<xdr:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></xdr:xfrm><a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/drawing/2010/slicer\">"
+                "<sle:slicer xmlns:sle=\"http://schemas.microsoft.com/office/drawing/2010/slicer\" name=\"");
+    xesc(o, ob->slicer->name);
+    buf_adds(o, "\"/></a:graphicData></a:graphic></xdr:graphicFrame></mc:Choice><mc:Fallback><xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>"); cnvpr(o, ob);
+    buf_adds(o, "<xdr:cNvSpPr><a:spLocks noTextEdit=\"1\"/></xdr:cNvSpPr></xdr:nvSpPr><xdr:spPr>"); xfrm(o, "a", s, ob);
+    buf_adds(o, "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:solidFill><a:prstClr val=\"white\"/></a:solidFill><a:ln w=\"1\"><a:solidFill><a:prstClr val=\"green\"/></a:solidFill></a:ln></xdr:spPr>"
+                "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\"/><a:lstStyle/><a:p><a:r><a:rPr lang=\"en-GB\" sz=\"1100\"/><a:t>This shape represents a slicer. Slicers need Excel 2010 or later.</a:t></a:r></a:p></xdr:txBody></xdr:sp></mc:Fallback></mc:AlternateContent>");
+  } else if (ob->kind == OB_PICTURE) {
+    (*rid)++; (*ni)++;
+    buf_printf(r, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image%d.%s\"/>", *rid, *ni, ob->pictype == PIC_JPEG ? "jpeg" : "png");
+    buf_adds(o, "<xdr:pic><xdr:nvPicPr>"); cnvpr(o, ob); buf_adds(o, "<xdr:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></xdr:cNvPicPr></xdr:nvPicPr>");
+    buf_printf(o, "<xdr:blipFill><a:blip r:embed=\"rId%d\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr>", *rid);
+    xfrm(o, "a", s, ob);
+    buf_adds(o, "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>");
+    if (ob->line) { buf_printf(o, "<a:ln w=\"%ld\">", ob->linew ? (long)ob->linew * 127 : 9525L); solid(o, ob->line); buf_adds(o, "</a:ln>"); }
+    buf_adds(o, "</xdr:spPr></xdr:pic>");
+    sprintf(path, "xl/media/image%d.%s", *ni, ob->pictype == PIC_JPEG ? "jpeg" : "png");
+    zip_add(w, path, ob->pic->data, ob->pic->len);
+  } else {
+    int conn = ob->shape == SK_LINE || ob->shape == SK_ARROW;
+    buf_adds(o, conn ? "<xdr:cxnSp macro=\"\"><xdr:nvCxnSpPr>" : "<xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>");
+    cnvpr(o, ob);
+    buf_adds(o, conn ? "<xdr:cNvCxnSpPr/></xdr:nvCxnSpPr>" : ob->shape == SK_TEXTBOX ? "<xdr:cNvSpPr txBox=\"1\"/></xdr:nvSpPr>" : "<xdr:cNvSpPr/></xdr:nvSpPr>");
+    buf_adds(o, "<xdr:spPr>");
+    xfrm(o, "a", s, ob);
+    if (ob->shape == SK_INK) ink_geom(o, s, ob);
+    else if (ob->shape == SK_ICON) icon_geom(o, ob);
+    else buf_printf(o, "<a:prstGeom prst=\"%s\"><a:avLst/></a:prstGeom>", prst[ob->shape % SK_N]);
+    if (ob->shape == SK_ICON) solid(o, ob->line ? ob->line : FILLRGB(0x404040));
+    else if (ob->fill && !conn && ob->shape != SK_INK) solid(o, ob->fill); else buf_adds(o, "<a:noFill/>");
+    if (ob->line) {
+      buf_printf(o, "<a:ln w=\"%ld\"", ob->linew ? (long)ob->linew * 127 : 9525L);
+      if (ob->shape == SK_INK) buf_adds(o, " cap=\"rnd\"");
+      buf_adds(o, ">");
+      solid(o, ob->line);
+      if (ob->shape == SK_INK) buf_adds(o, "<a:round/>");
+      if (ob->shape == SK_ARROW) buf_adds(o, "<a:tailEnd type=\"triangle\"/>");
+      buf_adds(o, "</a:ln>");
+    } else buf_adds(o, "<a:ln><a:noFill/></a:ln>");
+    buf_adds(o, "</xdr:spPr>");
+    if (!conn && ob->shape != SK_INK && ob->shape != SK_ICON) txbody(o, ob);
+    buf_adds(o, conn ? "</xdr:cxnSp>" : "</xdr:sp>");
+  }
+}
+/* a group's own element start (its frame: child coordinates the same as the sheet's) */
+static void w_group_open(Buf *o, Sheet *s, u32 gid)
+{
+  DGroup *g = drw_group_find(s, gid);
+  i32 x0, y0, x1, y1;
+  drw_group_box(s, gid, &x0, &y0, &x1, &y1);
+  buf_printf(o, "<xdr:grpSp><xdr:nvGrpSpPr><xdr:cNvPr id=\"%lu\" name=\"", (unsigned long)gid + 1);
+  xesc(o, g ? g->name : "Group");
+  buf_printf(o, "\"/><xdr:cNvGrpSpPr/></xdr:nvGrpSpPr><xdr:grpSpPr><a:xfrm><a:off x=\"%ld\" y=\"%ld\"/><a:ext cx=\"%ld\" cy=\"%ld\"/>"
+             "<a:chOff x=\"%ld\" y=\"%ld\"/><a:chExt cx=\"%ld\" cy=\"%ld\"/></a:xfrm></xdr:grpSpPr>",
+             (long)x0 * EMU, (long)y0 * EMU, (long)(x1 - x0) * EMU, (long)(y1 - y0) * EMU, (long)x0 * EMU, (long)y0 * EMU, (long)(x1 - x0) * EMU, (long)(y1 - y0) * EMU);
+}
+static int writable(const DObj *ob) { return !((ob->kind == OB_CHART && !ob->chart) || (ob->kind == OB_PICTURE && !ob->pic) || (ob->kind == OB_SLICER && !ob->slicer)); }
 void xd_write_parts(Book *b, int si, ZipWriter *w)
 {
   Sheet *s = b->sh[si];
@@ -543,88 +643,38 @@ void xd_write_parts(Book *b, int si, ZipWriter *w)
   for (k = 0; k < drw_count(s); k++) {
     DObj *ob = drw_obj(s, k);
     static const char *const edit[3] = { "", " editAs=\"oneCell\"", " editAs=\"absolute\"" };
-    if ((ob->kind == OB_CHART && !ob->chart) || (ob->kind == OB_PICTURE && !ob->pic) || (ob->kind == OB_SLICER && !ob->slicer)) continue;
-    buf_printf(&o, "<xdr:twoCellAnchor%s>", edit[ob->anchor % 3]);
-    corner(&o, "from", &ob->from); corner(&o, "to", &ob->to);
-    if (ob->kind == OB_CHART) {
-      int ex = is_ex(ob->chart->kind);
-      rid++;
-      cbuf.len = 0;
-      if (ex) {
-        nx++;
-        buf_printf(&r, "<Relationship Id=\"rId%d\" Type=\"http://schemas.microsoft.com/office/2014/relationships/chartEx\" Target=\"../charts/chartEx%d.xml\"/>", rid, nx);
-        buf_adds(&o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">");
-        buf_printf(&o, "<mc:Choice xmlns:%s=\"%s\" Requires=\"%s\">", ob->chart->kind == CK_FUNNEL ? "cx2" : "cx1",
-                   ob->chart->kind == CK_FUNNEL ? "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex" : "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex",
-                   ob->chart->kind == CK_FUNNEL ? "cx2" : "cx1");
-      } else {
-        nc++;
-        buf_printf(&r, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart\" Target=\"../charts/chart%d.xml\"/>", rid, nc);
-      }
-      buf_adds(&o, "<xdr:graphicFrame macro=\"\"><xdr:nvGraphicFramePr>"); cnvpr(&o, ob); buf_adds(&o, "<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>");
-      buf_adds(&o, "<xdr:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></xdr:xfrm><a:graphic>");
-      if (ex) buf_printf(&o, "<a:graphicData uri=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chart xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\" r:id=\"rId%d\"/></a:graphicData>", rid);
-      else buf_printf(&o, "<a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/chart\"><c:chart r:id=\"rId%d\"/></a:graphicData>", rid);
-      buf_adds(&o, "</a:graphic></xdr:graphicFrame>");
-      if (ex) {
-        buf_adds(&o, "</mc:Choice><mc:Fallback><xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>"); cnvpr(&o, ob);
-        buf_adds(&o, "<xdr:cNvSpPr><a:spLocks noTextEdit=\"1\"/></xdr:cNvSpPr></xdr:nvSpPr><xdr:spPr>"); xfrm(&o, "a", s, ob);
-        buf_adds(&o, "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:solidFill><a:prstClr val=\"white\"/></a:solidFill><a:ln w=\"1\"><a:solidFill><a:prstClr val=\"green\"/></a:solidFill></a:ln></xdr:spPr>"
-                     "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\"/><a:lstStyle/><a:p><a:r><a:rPr lang=\"en-GB\" sz=\"1100\"/><a:t>This chart isn't available in your version of Excel.</a:t></a:r></a:p></xdr:txBody></xdr:sp></mc:Fallback></mc:AlternateContent>");
-        w_chartex(b, si, ob->chart, &cbuf);
-        sprintf(path, "xl/charts/chartEx%d.xml", nx);
-      } else {
-        w_chart(b, si, ob->chart, &cbuf);
-        sprintf(path, "xl/charts/chart%d.xml", nc);
-      }
-      zip_add(w, path, cbuf.data, cbuf.len);
-    } else if (ob->kind == OB_SLICER) {
-      /* Excel 2010's pivot table slicers, Excel 2013's table ones; others see the fallback */
-      if (ob->slicer->onpivot) buf_adds(&o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:Choice xmlns:a14=\"http://schemas.microsoft.com/office/drawing/2010/main\" Requires=\"a14\">");
-      else buf_adds(&o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:Choice xmlns:sle15=\"http://schemas.microsoft.com/office/drawing/2012/slicer\" Requires=\"sle15\">");
-      buf_adds(&o, "<xdr:graphicFrame macro=\"\"><xdr:nvGraphicFramePr>"); cnvpr(&o, ob); buf_adds(&o, "<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>");
-      buf_adds(&o, "<xdr:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></xdr:xfrm><a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/drawing/2010/slicer\">"
-                   "<sle:slicer xmlns:sle=\"http://schemas.microsoft.com/office/drawing/2010/slicer\" name=\"");
-      xesc(&o, ob->slicer->name);
-      buf_adds(&o, "\"/></a:graphicData></a:graphic></xdr:graphicFrame></mc:Choice><mc:Fallback><xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>"); cnvpr(&o, ob);
-      buf_adds(&o, "<xdr:cNvSpPr><a:spLocks noTextEdit=\"1\"/></xdr:cNvSpPr></xdr:nvSpPr><xdr:spPr>"); xfrm(&o, "a", s, ob);
-      buf_adds(&o, "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:solidFill><a:prstClr val=\"white\"/></a:solidFill><a:ln w=\"1\"><a:solidFill><a:prstClr val=\"green\"/></a:solidFill></a:ln></xdr:spPr>"
-                   "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\"/><a:lstStyle/><a:p><a:r><a:rPr lang=\"en-GB\" sz=\"1100\"/><a:t>This shape represents a slicer. Slicers need Excel 2010 or later.</a:t></a:r></a:p></xdr:txBody></xdr:sp></mc:Fallback></mc:AlternateContent>");
-    } else if (ob->kind == OB_PICTURE) {
-      rid++; ni++;
-      buf_printf(&r, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image%d.%s\"/>", rid, ni, ob->pictype == PIC_JPEG ? "jpeg" : "png");
-      buf_adds(&o, "<xdr:pic><xdr:nvPicPr>"); cnvpr(&o, ob); buf_adds(&o, "<xdr:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></xdr:cNvPicPr></xdr:nvPicPr>");
-      buf_printf(&o, "<xdr:blipFill><a:blip r:embed=\"rId%d\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr>", rid);
-      xfrm(&o, "a", s, ob);
-      buf_adds(&o, "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>");
-      if (ob->line) { buf_printf(&o, "<a:ln w=\"%ld\">", ob->linew ? (long)ob->linew * 127 : 9525L); solid(&o, ob->line); buf_adds(&o, "</a:ln>"); }
-      buf_adds(&o, "</xdr:spPr></xdr:pic>");
-      sprintf(path, "xl/media/image%d.%s", ni, ob->pictype == PIC_JPEG ? "jpeg" : "png");
-      zip_add(w, path, ob->pic->data, ob->pic->len);
+    u32 top = drw_top_group(s, k);
+    if (!writable(ob)) continue;
+    if (!top) {
+      buf_printf(&o, "<xdr:twoCellAnchor%s>", edit[ob->anchor % 3]);
+      corner(&o, "from", &ob->from); corner(&o, "to", &ob->to);
+      w_obj(b, si, ob, &o, &r, &cbuf, w, &rid, &nc, &nx, &ni, 0);
     } else {
-      int conn = ob->shape == SK_LINE || ob->shape == SK_ARROW;
-      buf_adds(&o, conn ? "<xdr:cxnSp macro=\"\"><xdr:nvCxnSpPr>" : "<xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>");
-      cnvpr(&o, ob);
-      buf_adds(&o, conn ? "<xdr:cNvCxnSpPr/></xdr:nvCxnSpPr>" : ob->shape == SK_TEXTBOX ? "<xdr:cNvSpPr txBox=\"1\"/></xdr:nvSpPr>" : "<xdr:cNvSpPr/></xdr:nvSpPr>");
-      buf_adds(&o, "<xdr:spPr>");
-      xfrm(&o, "a", s, ob);
-      if (ob->shape == SK_INK) ink_geom(&o, s, ob);
-      else if (ob->shape == SK_ICON) icon_geom(&o, ob);
-      else buf_printf(&o, "<a:prstGeom prst=\"%s\"><a:avLst/></a:prstGeom>", prst[ob->shape % SK_N]);
-      if (ob->shape == SK_ICON) solid(&o, ob->line ? ob->line : FILLRGB(0x404040));
-      else if (ob->fill && !conn && ob->shape != SK_INK) solid(&o, ob->fill); else buf_adds(&o, "<a:noFill/>");
-      if (ob->line) {
-        buf_printf(&o, "<a:ln w=\"%ld\"", ob->linew ? (long)ob->linew * 127 : 9525L);
-        if (ob->shape == SK_INK) buf_adds(&o, " cap=\"rnd\"");
-        buf_adds(&o, ">");
-        solid(&o, ob->line);
-        if (ob->shape == SK_INK) buf_adds(&o, "<a:round/>");
-        if (ob->shape == SK_ARROW) buf_adds(&o, "<a:tailEnd type=\"triangle\"/>");
-        buf_adds(&o, "</a:ln>");
-      } else buf_adds(&o, "<a:ln><a:noFill/></a:ln>");
-      buf_adds(&o, "</xdr:spPr>");
-      if (!conn && ob->shape != SK_INK && ob->shape != SK_ICON) txbody(&o, ob);
-      buf_adds(&o, conn ? "</xdr:cxnSp>" : "</xdr:sp>");
+      /* a group: one anchor round it, its groups opened and closed as its members need them */
+      u32 open[32], ch[32];
+      int nopen = 0, nch, j;
+      DObj box;
+      i32 x0, y0, x1, y1;
+      memset(&box, 0, sizeof box);
+      drw_group_box(s, top, &x0, &y0, &x1, &y1);
+      dobj_place(s, &box, x0, y0, x1, y1);
+      buf_adds(&o, "<xdr:twoCellAnchor>");
+      corner(&o, "from", &box.from); corner(&o, "to", &box.to);
+      for (; k < drw_count(s) && drw_top_group(s, k) == top; k++) {
+        DGroup *g;
+        ob = drw_obj(s, k);
+        if (!writable(ob)) continue;
+        /* its groups, outermost first */
+        nch = 0;
+        for (g = drw_group_find(s, ob->group); g && nch < 32; g = drw_group_find(s, g->parent)) ch[nch++] = g->id;
+        for (j = 0; j < nch / 2; j++) { u32 t = ch[j]; ch[j] = ch[nch - 1 - j]; ch[nch - 1 - j] = t; }
+        for (j = 0; j < nopen && j < nch && open[j] == ch[j]; j++) ;
+        while (nopen > j) { buf_adds(&o, "</xdr:grpSp>"); nopen--; }
+        for (; nopen < nch; nopen++) { open[nopen] = ch[nopen]; w_group_open(&o, s, ch[nopen]); }
+        w_obj(b, si, ob, &o, &r, &cbuf, w, &rid, &nc, &nx, &ni, 1);
+      }
+      k--;
+      while (nopen > 0) { buf_adds(&o, "</xdr:grpSp>"); nopen--; }
     }
     buf_adds(&o, "<xdr:clientData/></xdr:twoCellAnchor>");
   }
@@ -1004,13 +1054,98 @@ typedef struct {
   int flipx, flipy;
   Buf text, ink;
   u16 fsize; u8 bold, italic, halign, valign; u32 tcolor;
+  int hasx; long xo, yo, xe, ye;    /* (in a group) its frame: a:off and a:ext in its group's child coordinates */
 } RObj;
+/* the groups open while reading (grpSp): each one's id, its frame (off, ext) and child frame (chOff,
+   chExt), and from them where its children go: pixel = p0 + (v - ch0) * k */
+typedef struct { u32 id; long off[2], ext[2], choff[2], chext[2]; double p0[2], ch0[2], k[2]; } RGrp;
 static void robj_reset(RObj *o)
 {
   buf_free(&o->text); buf_free(&o->ink); free(o->descr);
   memset(o, 0, sizeof *o);
   o->kind = -1;
   buf_init(&o->text); buf_init(&o->ink);
+}
+/* the object read made (its frame box, pixels at 100%, when it is in a group); NULL if it wasn't */
+static DObj *finish_obj(Book *b, ZipReader *z, const XRel *rels, int nrels, int sheet, RObj *o, const i32 *box)
+{
+  Sheet *s = b->sh[sheet];
+  DObj *ob = NULL;
+  const XRel *r = rel_by_id(rels, nrels, o->rid);
+  Chart *ch = NULL;
+  Blob *pic = NULL;
+  int ptype = PIC_NONE;
+  if (o->kind == OB_CHART && r) {
+    size_t cl;
+    u8 *cd = part(z, r->target, &cl);
+    if (cd) { ch = strstr(r->type, "chartEx") || strstr(r->target, "chartEx") ? read_chartex(b, sheet, (const char *)cd, cl) : read_chart(b, sheet, (const char *)cd, cl); free(cd); }
+  } else if (o->kind == OB_PICTURE && r) {
+    size_t pl;
+    u8 *pd = part(z, r->target, &pl);
+    u32 w0, h0;
+    if (pd) {
+      int t = img_info(pd, (u32)pl, &w0, &h0);
+      if (t == IMG_PNG || t == IMG_JPEG) { pic = blob_new(pd, (u32)pl); ptype = t == IMG_PNG ? PIC_PNG : PIC_JPEG; }
+      free(pd);
+    }
+  }
+  struct Slicer *sl = o->kind == OB_SLICER ? tablexml_slicer_take(sheet, o->slname) : NULL;
+  if ((o->kind == OB_CHART && ch) || (o->kind == OB_PICTURE && pic) || o->kind == OB_SHAPE || sl) ob = drw_new(s, o->kind);
+  if (ob) {
+    ob->anchor = (u8)o->anchor;
+    ob->from = o->from;
+    if (box) { ob->anchor = AN_TWOCELL; dobj_place(s, ob, box[0], box[1], box[2], box[3]); }
+    else if (o->have_to) ob->to = o->to;
+    else {
+      i32 x0, y0;
+      if (o->anchor == AN_ABSOLUTE && !o->have_to) { ob->from.c = sheet_col_at(s, (i32)(o->posx / EMU), &ob->from.dx); ob->from.r = sheet_row_at(s, (i32)(o->posy / EMU), &ob->from.dy); }
+      x0 = sheet_col_px(s, ob->from.c) + ob->from.dx; y0 = sheet_row_px(s, ob->from.r) + ob->from.dy;
+      dobj_place(s, ob, x0, y0, x0 + (i32)(o->extx / EMU), y0 + (i32)(o->exty / EMU));
+    }
+    if (o->name[0]) snprintf(ob->name, sizeof ob->name, "%s", o->name);
+    ob->descr = o->descr; o->descr = NULL;
+    ob->flipx = (u8)o->flipx; ob->flipy = (u8)o->flipy;
+    ob->chart = ch; ob->pic = pic; ob->pictype = (u8)ptype;
+    ob->slicer = sl; sl = NULL;
+    ob->line = o->noline ? 0 : o->line; ob->linew = o->linew;
+    if (o->kind == OB_SHAPE) {
+      if (o->shape == SK_LINE && o->arrow) o->shape = SK_ARROW;
+      if (o->txbox) o->shape = SK_TEXTBOX;
+      if (o->custgeom && !strncmp(o->name, "Icon: ", 6) && drw_icon_by_name(o->name + 6) >= 0) {
+        char t[8];
+        sprintf(t, "%d", drw_icon_by_name(o->name + 6));
+        ob->text = str_dup(t);
+        o->shape = SK_ICON;
+        o->custgeom = 0;
+        o->text.len = 0;
+      } else if (o->custgeom) {
+        /* a freehand path: its points in pixels from the shape's corner */
+        Buf pts;
+        const char *p = o->ink.data ? o->ink.data : "";
+        i32 x0, y0, x1, y1;
+        double sx, sy;
+        dobj_box(s, ob, &x0, &y0, &x1, &y1);
+        sx = o->gw > 0 ? (double)(x1 - x0) / o->gw : 1.0 / EMU; sy = o->gh > 0 ? (double)(y1 - y0) / o->gh : 1.0 / EMU;
+        buf_init(&pts);
+        while (*p) {
+          long px = strtol(p, (char **)&p, 10), py;
+          if (*p == ',') p++;
+          py = strtol(p, (char **)&p, 10);
+          buf_printf(&pts, "%s%ld,%ld", pts.len ? ";" : "", (long)(px * sx + 0.5), (long)(py * sy + 0.5));
+          while (*p == ';') p++;
+        }
+        ob->text = pts.data ? buf_take(&pts) : str_dup("");
+        buf_free(&pts);
+        o->shape = SK_INK;
+      }
+      ob->shape = (u8)o->shape;
+      ob->fill = o->nofill ? 0 : o->fill;
+      if (!o->custgeom && o->text.len) ob->text = str_dup(o->text.data);
+      ob->fsize = o->fsize; ob->bold = o->bold; ob->italic = o->italic; ob->halign = o->halign; ob->valign = o->valign; ob->tcolor = o->tcolor;
+    }
+  } else { chart_free(ch); blob_free(pic); }
+  slicer_free(sl);
+  return ob;
 }
 static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
 {
@@ -1022,6 +1157,8 @@ static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
   Stk st;
   RObj o;
   Sheet *s = b->sh[sheet];
+  RGrp gs[16];
+  int gsp = 0, ngrp_seen = 0;
   if (!d) return;
   nrels = rels_of(z, path, &rels);
   memset(&o, 0, sizeof o);
@@ -1032,10 +1169,38 @@ static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
     if (x.type == XT_START) {
       const char *n = x.name;
       stk_push(&st, n);
-      if (!strcmp(n, "Fallback") || !strcmp(n, "grpSp")) { xml_skip(&x); stk_pop(&st); continue; }
+      if (!strcmp(n, "Fallback") || (!strcmp(n, "grpSp") && gsp >= 16)) { xml_skip(&x); stk_pop(&st); continue; }
+      if (!strcmp(n, "grpSp")) {
+        /* a group: its children each an object of their own, placed through its frame */
+        DGroup *g = drw_group_add(s, gsp ? gs[gsp - 1].id : 0);
+        memset(&gs[gsp], 0, sizeof gs[gsp]);
+        gs[gsp].id = g ? g->id : 0;
+        gs[gsp].k[0] = gs[gsp].k[1] = 1.0 / EMU;
+        if (gsp) { gs[gsp].p0[0] = gs[gsp - 1].p0[0]; gs[gsp].p0[1] = gs[gsp - 1].p0[1]; gs[gsp].ch0[0] = gs[gsp - 1].ch0[0]; gs[gsp].ch0[1] = gs[gsp - 1].ch0[1]; gs[gsp].k[0] = gs[gsp - 1].k[0]; gs[gsp].k[1] = gs[gsp - 1].k[1]; }
+        gsp++; ngrp_seen = 1;
+        continue;
+      }
+      if (gsp && !strcmp(up(&st, 1), "xfrm") && (!strcmp(n, "off") || !strcmp(n, "ext") || !strcmp(n, "chOff") || !strcmp(n, "chExt"))) {
+        const char *a1 = xml_attr(&x, n[0] == 'o' || n[2] == 'O' ? "x" : "cx"), *a2 = xml_attr(&x, n[0] == 'o' || n[2] == 'O' ? "y" : "cy");
+        long v1 = a1 ? atol(a1) : 0, v2 = a2 ? atol(a2) : 0;
+        if (!strcmp(up(&st, 2), "grpSpPr")) {
+          RGrp *G = &gs[gsp - 1];
+          long *t = !strcmp(n, "off") ? G->off : !strcmp(n, "ext") ? G->ext : !strcmp(n, "chOff") ? G->choff : G->chext;
+          t[0] = v1; t[1] = v2;
+        } else if (!strcmp(n, "off")) { o.xo = v1; o.yo = v2; o.hasx = 1; }
+        else if (!strcmp(n, "ext")) { o.xe = v1; o.ye = v2; o.hasx = 1; }
+        continue;
+      }
+      if (gsp && !strcmp(n, "cNvPr") && !strcmp(up(&st, 1), "nvGrpSpPr")) {
+        DGroup *g = drw_group_find(s, gs[gsp - 1].id);
+        const char *nm = xml_attr(&x, "name");
+        if (g && nm && *nm) snprintf(g->name, sizeof g->name, "%s", nm);
+        continue;
+      }
       if (!strcmp(n, "twoCellAnchor") || !strcmp(n, "oneCellAnchor") || !strcmp(n, "absoluteAnchor")) {
         const char *e = xml_attr(&x, "editAs");
         robj_reset(&o);
+        gsp = 0; ngrp_seen = 0;
         o.anchor = n[0] == 'o' ? AN_ONECELL : n[0] == 'a' ? AN_ABSOLUTE : (e && !strcmp(e, "oneCell")) ? AN_ONECELL : (e && !strcmp(e, "absolute")) ? AN_ABSOLUTE : AN_TWOCELL;
         o.have_to = n[0] == 't';
         para = 0;
@@ -1104,81 +1269,43 @@ static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
     }
     if (x.type == XT_END) {
       const char *n = up(&st, 0);
-      if ((!strcmp(n, "twoCellAnchor") || !strcmp(n, "oneCellAnchor") || !strcmp(n, "absoluteAnchor")) && o.kind >= 0) {
-        DObj *ob = NULL;
-        const XRel *r = rel_by_id(rels, nrels, o.rid);
-        Chart *ch = NULL;
-        Blob *pic = NULL;
-        int ptype = PIC_NONE;
-        if (o.kind == OB_CHART && r) {
-          size_t cl;
-          u8 *cd = part(z, r->target, &cl);
-          if (cd) { ch = strstr(r->type, "chartEx") || strstr(r->target, "chartEx") ? read_chartex(b, sheet, (const char *)cd, cl) : read_chart(b, sheet, (const char *)cd, cl); free(cd); }
-        } else if (o.kind == OB_PICTURE && r) {
-          size_t pl;
-          u8 *pd = part(z, r->target, &pl);
-          u32 w0, h0;
-          if (pd) {
-            int t = img_info(pd, (u32)pl, &w0, &h0);
-            if (t == IMG_PNG || t == IMG_JPEG) { pic = blob_new(pd, (u32)pl); ptype = t == IMG_PNG ? PIC_PNG : PIC_JPEG; }
-            free(pd);
+      if (gsp && !strcmp(n, "xfrm") && !strcmp(up(&st, 1), "grpSpPr")) {
+        /* the group's frame known: where its children's coordinates go on the sheet */
+        RGrp *G = &gs[gsp - 1];
+        double box[4];
+        int k;
+        if (gsp == 1 && o.have_to) {
+          box[0] = sheet_col_px(s, o.from.c) + o.from.dx; box[1] = sheet_row_px(s, o.from.r) + o.from.dy;
+          box[2] = sheet_col_px(s, o.to.c) + o.to.dx; box[3] = sheet_row_px(s, o.to.r) + o.to.dy;
+        } else {
+          RGrp *P = gsp > 1 ? &gs[gsp - 2] : NULL;
+          for (k = 0; k < 2; k++) {
+            box[k] = P ? P->p0[k] + (G->off[k] - P->ch0[k]) * P->k[k] : (double)G->off[k] / EMU;
+            box[k + 2] = box[k] + (P ? G->ext[k] * P->k[k] : (double)G->ext[k] / EMU);
           }
         }
-        struct Slicer *sl = o.kind == OB_SLICER ? tablexml_slicer_take(sheet, o.slname) : NULL;
-        if ((o.kind == OB_CHART && ch) || (o.kind == OB_PICTURE && pic) || o.kind == OB_SHAPE || sl) ob = drw_new(s, o.kind);
-        if (ob) {
-          ob->anchor = (u8)o.anchor;
-          ob->from = o.from;
-          if (o.have_to) ob->to = o.to;
-          else {
-            i32 x0, y0;
-            if (o.anchor == AN_ABSOLUTE && !o.have_to) { ob->from.c = sheet_col_at(s, (i32)(o.posx / EMU), &ob->from.dx); ob->from.r = sheet_row_at(s, (i32)(o.posy / EMU), &ob->from.dy); }
-            x0 = sheet_col_px(s, ob->from.c) + ob->from.dx; y0 = sheet_row_px(s, ob->from.r) + ob->from.dy;
-            dobj_place(s, ob, x0, y0, x0 + (i32)(o.extx / EMU), y0 + (i32)(o.exty / EMU));
-          }
-          if (o.name[0]) snprintf(ob->name, sizeof ob->name, "%s", o.name);
-          ob->descr = o.descr; o.descr = NULL;
-          ob->flipx = (u8)o.flipx; ob->flipy = (u8)o.flipy;
-          ob->chart = ch; ob->pic = pic; ob->pictype = (u8)ptype;
-          ob->slicer = sl; sl = NULL;
-          ob->line = o.noline ? 0 : o.line; ob->linew = o.linew;
-          if (o.kind == OB_SHAPE) {
-            if (o.shape == SK_LINE && o.arrow) o.shape = SK_ARROW;
-            if (o.txbox) o.shape = SK_TEXTBOX;
-            if (o.custgeom && !strncmp(o.name, "Icon: ", 6) && drw_icon_by_name(o.name + 6) >= 0) {
-              char t[8];
-              sprintf(t, "%d", drw_icon_by_name(o.name + 6));
-              ob->text = str_dup(t);
-              o.shape = SK_ICON;
-              o.custgeom = 0;
-              o.text.len = 0;
-            } else if (o.custgeom) {
-              /* a freehand path: its points in pixels from the shape's corner */
-              Buf pts;
-              const char *p = o.ink.data ? o.ink.data : "";
-              i32 x0, y0, x1, y1;
-              double sx, sy;
-              dobj_box(s, ob, &x0, &y0, &x1, &y1);
-              sx = o.gw > 0 ? (double)(x1 - x0) / o.gw : 1.0 / EMU; sy = o.gh > 0 ? (double)(y1 - y0) / o.gh : 1.0 / EMU;
-              buf_init(&pts);
-              while (*p) {
-                long px = strtol(p, (char **)&p, 10), py;
-                if (*p == ',') p++;
-                py = strtol(p, (char **)&p, 10);
-                buf_printf(&pts, "%s%ld,%ld", pts.len ? ";" : "", (long)(px * sx + 0.5), (long)(py * sy + 0.5));
-                while (*p == ';') p++;
-              }
-              ob->text = pts.data ? buf_take(&pts) : str_dup("");
-              buf_free(&pts);
-              o.shape = SK_INK;
-            }
-            ob->shape = (u8)o.shape;
-            ob->fill = o.nofill ? 0 : o.fill;
-            if (!o.custgeom && o.text.len) ob->text = str_dup(o.text.data);
-            ob->fsize = o.fsize; ob->bold = o.bold; ob->italic = o.italic; ob->halign = o.halign; ob->valign = o.valign; ob->tcolor = o.tcolor;
-          }
-        } else { chart_free(ch); blob_free(pic); }
-        slicer_free(sl);
+        for (k = 0; k < 2; k++) {
+          G->p0[k] = box[k]; G->ch0[k] = (double)G->choff[k];
+          G->k[k] = G->chext[k] > 0 ? (box[k + 2] - box[k]) / G->chext[k] : G->ext[k] > 0 ? (box[k + 2] - box[k]) / G->ext[k] : 1.0 / EMU;
+        }
+      }
+      else if (gsp && !strcmp(n, "grpSp")) gsp--;
+      else if (gsp && o.kind >= 0 && (!strcmp(n, "sp") || !strcmp(n, "cxnSp") || !strcmp(n, "pic") || !strcmp(n, "graphicFrame")) &&
+               (!strcmp(up(&st, 1), "grpSp") || !strcmp(up(&st, 1), "Choice"))) {
+        /* a child of a group: made now, then the next child read in the same anchor */
+        RGrp *G = &gs[gsp - 1];
+        i32 box[4];
+        DObj *ob;
+        RObj keep = o;
+        box[0] = (i32)(G->p0[0] + (o.xo - G->ch0[0]) * G->k[0] + 0.5); box[1] = (i32)(G->p0[1] + (o.yo - G->ch0[1]) * G->k[1] + 0.5);
+        box[2] = box[0] + (i32)(o.xe * G->k[0] + 0.5); box[3] = box[1] + (i32)(o.ye * G->k[1] + 0.5);
+        if ((ob = finish_obj(b, z, rels, nrels, sheet, &o, box))) ob->group = G->id;
+        robj_reset(&o);
+        o.anchor = keep.anchor; o.have_to = keep.have_to; o.from = keep.from; o.to = keep.to;
+        para = 0;
+      }
+      if ((!strcmp(n, "twoCellAnchor") || !strcmp(n, "oneCellAnchor") || !strcmp(n, "absoluteAnchor")) && o.kind >= 0 && !ngrp_seen) {
+        finish_obj(b, z, rels, nrels, sheet, &o, NULL);
         robj_reset(&o);
       }
       stk_pop(&st);

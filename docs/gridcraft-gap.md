@@ -120,7 +120,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Fill Up (Editing) `edit.fillUp`
 - ✅ Fill Left (Editing) `edit.fillLeft`
 - ✅ Series (Editing) `edit.fillSeries`
-- ⬜ Flash Fill (Editing) `edit.flashFill`
+- ✅ Flash Fill (Editing) `edit.flashFill`
 - ✅ Clear All (Editing) `edit.clearAll`
 - ✅ Clear Formats (Editing) `edit.clearFormats`
 - ✅ Clear Contents (Editing) `edit.clearContents`
@@ -190,10 +190,10 @@ New Cell Style keeps the active cell's look under a name in Home > My Styles whi
 - ✅ Send Backward (Arrange) `arrange.sendBackward`
 - ✅ Selection Pane (Arrange) `arrange.selectionPane`
 - ✅ Align (Arrange) `arrange.align`
-- ⬜ Group (Arrange) `arrange.group`
+- ✅ Group (Arrange) `arrange.group`
 - ✅ Rotate (Arrange) `arrange.rotate`
 
-Not done on Page Layout: Effects only matter to charts and shapes (GridCraft keeps just the name), so they are left out here. Group isn't done: GridCraft's only lines the objects up on the first one (Align does that); a real group would need group shapes (xdr:grpSp) on the sheet and in files.
+Not done on Page Layout: Effects only matter to charts and shapes (GridCraft keeps just the name), so they are left out here. Group (with Regroup and Ungroup, also in the Insert menu's Group Objects) makes real group shapes: the objects move, stretch and are deleted together, groups nest, and they are saved and loaded as xdr:grpSp.
 
 ### Formulas (13 of 23 by name)
 
@@ -284,13 +284,13 @@ The Protect group (Unprotect Sheet, Protect Workbook, Allow Edit Ranges) is the 
 - ✅ Freeze Top Row (Window) `view.freezeTopRow`
 - ✅ Freeze First Column (Window) `view.freezeFirstColumn`
 - ✅ Unfreeze Panes (Window) `view.unfreezePanes`
-- ⬜ Split (Window) `view.split`
+- ✅ Split (Window) `view.split`
 - ✅ Hide (Window) `view.hideWindow`
 - ✅ Unhide (Window) `view.unhideWindow`
 - ✅ Switch Windows (Window) `view.switchWindows`
 - ➖ Macros (Macros) `view.macros`
 
-Not done on View: Split (panes that scroll on their own; Freeze Panes and New Window cover most of its uses). Custom Views are saved in the file (customWorkbookViews / customSheetViews). Macros: left out, as is scripting.
+Split makes two or four panes that scroll on their own, at the active cell (or the middle); the bars can be dragged, and go when double-clicked, dragged to an edge or Split is pressed again; saved and loaded as Excel does (pane state="split"). Custom Views are saved in the file (customWorkbookViews / customSheetViews). Macros: left out, as is scripting.
 
 ### Automate (0 of 4 by name)
 

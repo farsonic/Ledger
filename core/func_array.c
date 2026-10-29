@@ -1030,9 +1030,24 @@ static Value f_cell(Ctx *cx, Value *a, int n)
   else if (str_ieq(info, "contents")) out = v->t == V_EMPTY ? val_num(0) : val_copy(v);
   else if (str_ieq(info, "type")) out = val_str(v->t == V_EMPTY ? "b" : (v->t == V_STR && !(cell && cell->f)) ? "l" : "v");
   else if (str_ieq(info, "width")) {
+    /* as Excel now gives it: the width in characters (rounded) and whether it is the sheet's default */
     u16 px = sheet_col_width(s, c);
-    out = val_num(px <= 5 ? 0 : floor((px - 5) / 7.0 + 0.5));
-  } else if (str_ieq(info, "filename")) out = val_str("");
+    out = arr_make(1, 2);
+    if (out.t == V_ARR) {
+      out.a->v[0] = val_num(px <= 5 ? 0 : floor((px - 5) / 7.0 + 0.5));
+      out.a->v[1] = val_bool(!(c < s->ncols && s->cols[c].width));
+      if (cx->arrayish) *cx->arrayish = 1;
+    }
+  } else if (str_ieq(info, "filename")) {
+    /* "drawer/[Book.xlsx]Sheet1" (Excel: C:\folder\[Book.xlsx]Sheet1); empty text until the workbook is saved */
+    const char *p = cx->b->path, *base = p, *q;
+    Buf bb;
+    for (q = p; *q; q++) if (*q == '/' || *q == ':' || *q == '\\') base = q + 1;
+    buf_init(&bb);
+    if (*p) { buf_add(&bb, p, (size_t)(base - p)); buf_adds(&bb, "["); buf_adds(&bb, base); buf_adds(&bb, "]"); buf_adds(&bb, s->name); }
+    out = val_str(bb.data ? bb.data : "");
+    buf_free(&bb);
+  }
   else if (str_ieq(info, "format") || str_ieq(info, "color") || str_ieq(info, "parentheses")) {
     char f[16];
     fmt_letter(book_fmt_code(cx->b, st.numfmt), f);
@@ -1204,6 +1219,108 @@ static int data_rows(Ctx *cx, Value *a, int n, int fi, int nrows, int hdr, int *
   arr_free(flt);
   return k;
 }
+/* the lines of a GROUPBY (or the rows or columns of a PIVOTBY) as Excel lays them out for fields in
+   a hierarchy: each field's distinct values sorted within the one before, a subtotal after (or with a
+   negative total depth before) each group of the fields above total_depth, the grand total last (or
+   first). Each line: what it is (PL_), the field it subtotals, a row standing for its key, its rows */
+enum { PL_LEAF, PL_SUB, PL_GRAND };
+static int int_cmp(const void *x, const void *y) { int a = *(const int *)x, b = *(const int *)y; return a < b ? -1 : a > b; }
+typedef struct { int kind, level, rep, first, n; } PLine;
+typedef struct {
+  PLine *l; int n, cap;
+  int *pool; int npool;           /* the lines' rows, one after another */
+  Arr *f; int depth;              /* the key fields; the total depth */
+  int sortcol, order;             /* a key field to sort the other way (-1 none), 1 or -1 */
+  Ctx *cx; const Value *fn; Arr *vals; int vcol;   /* a value column to sort by (vcol >= 0) */
+  int err;
+} Plan;
+static void plan_add(Plan *p, int kind, int level, const int *rows, int n)
+{
+  PLine *nl;
+  if (p->err) return;
+  if (p->n == p->cap) {
+    int cap = p->cap ? p->cap * 2 : 32;
+    if (!(nl = (PLine *)realloc(p->l, (size_t)cap * sizeof *nl))) { p->err = E_NUM; return; }
+    p->l = nl; p->cap = cap;
+  }
+  p->l[p->n].kind = kind; p->l[p->n].level = level; p->l[p->n].rep = n ? rows[0] : -1;
+  p->l[p->n].first = rows ? (int)(rows - p->pool) : 0; p->l[p->n].n = n;
+  p->n++;
+}
+typedef struct { Plan *p; int level; Value *agg; const int *start; } PSort;
+static int plan_cmp(int x, int y, void *ctx)
+{
+  PSort *ps = (PSort *)ctx;
+  Plan *p = ps->p;
+  int r;
+  if (ps->agg) { r = ord_cmp(&ps->agg[x], &ps->agg[y], p->order); if (r) return r; }
+  return ord_cmp(EL(p->f, ps->start[x], ps->level), EL(p->f, ps->start[y], ps->level), ps->level == p->sortcol ? p->order : 1);
+}
+/* rows[0..n) (a block of the pool) laid out from field level on */
+static void plan_rec(Plan *p, int level, int *rows, int n)
+{
+  int ng = 0, i, j, k, *gstart, *glen, *order, *tmp, *grouped;
+  Value *agg = NULL;
+  PSort ps;
+  if (p->err || n <= 0) return;
+  gstart = (int *)malloc((size_t)n * 5 * sizeof(int));
+  if (!gstart) { p->err = E_NUM; return; }
+  glen = gstart + n; order = glen + n; tmp = order + n; grouped = tmp + n;
+  /* the distinct values of this field, each one's rows brought together (in the order met) */
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < ng; j++) if (same_val(EL(p->f, gstart[j], level), EL(p->f, rows[i], level))) break;
+    if (j == ng) { gstart[ng] = rows[i]; glen[ng] = 0; ng++; }
+    glen[j]++;
+  }
+  {
+    int *pos = order, at = 0;
+    for (j = 0; j < ng; j++) { pos[j] = at; at += glen[j]; }
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < ng; j++) if (same_val(EL(p->f, gstart[j], level), EL(p->f, rows[i], level))) break;
+      grouped[pos[j]++] = rows[i];
+    }
+    memcpy(rows, grouped, (size_t)n * sizeof(int));
+    for (j = 0, at = 0; j < ng; j++) { gstart[j] = at; at += glen[j]; }
+  }
+  /* sorted: by the field (or a value column's aggregate) */
+  for (j = 0; j < ng; j++) { order[j] = j; tmp[j] = rows[gstart[j]]; }
+  if (p->vcol >= 0 && (agg = (Value *)calloc((size_t)ng, sizeof(Value))))
+    for (j = 0; j < ng; j++) agg[j] = agg_rows(p->cx, p->fn, p->vals, p->vcol, rows + gstart[j], glen[j]);
+  ps.p = p; ps.level = level; ps.agg = agg; ps.start = tmp;
+  msort(order, grouped, ng, plan_cmp, &ps);
+  for (k = 0; k < ng; k++) {
+    int g = order[k], *sub = rows + gstart[g], subn = glen[g];
+    int here = abs(p->depth) >= 2 && level < abs(p->depth) - 1 && level < p->f->cols - 1;
+    if (level == p->f->cols - 1) { plan_add(p, PL_LEAF, level, sub, subn); continue; }
+    if (here && p->depth < 0) plan_add(p, PL_SUB, level, sub, subn);
+    plan_rec(p, level + 1, sub, subn);
+    if (here && p->depth > 0) plan_add(p, PL_SUB, level, sub, subn);
+  }
+  if (agg) { for (j = 0; j < ng; j++) val_free(&agg[j]); free(agg); }
+  free(gstart);
+}
+/* the plan of the data rows[0..n) by the fields f; 0 or an error */
+static int plan_make(Plan *p, Arr *f, const int *rows, int n, int depth, int sort)
+{
+  p->f = f; p->depth = depth; p->err = 0;
+  p->sortcol = sort && abs(sort) <= f->cols ? abs(sort) - 1 : -1;
+  p->order = sort < 0 ? -1 : 1;
+  if (!(p->pool = (int *)malloc((size_t)(n ? n : 1) * sizeof(int)))) return E_NUM;
+  memcpy(p->pool, rows, (size_t)n * sizeof(int));
+  p->npool = n;
+  if (depth < 0) plan_add(p, PL_GRAND, -1, p->pool, n);
+  plan_rec(p, 0, p->pool, n);
+  if (depth > 0) plan_add(p, PL_GRAND, -1, p->pool, n);
+  return p->err;
+}
+static void plan_free(Plan *p) { free(p->l); free(p->pool); memset(p, 0, sizeof *p); }
+/* a line's key cells: the fields down to its level (a leaf all of them; the grand total "Total") */
+static Value plan_key(const Plan *p, const PLine *l, int k)
+{
+  if (l->kind == PL_GRAND) return k == 0 ? val_str("Total") : val_empty();
+  if (l->kind == PL_SUB && k > l->level) return val_empty();
+  return l->rep >= 0 ? val_copy(EL(p->f, l->rep, k)) : val_empty();
+}
 static Value f_groupby(Ctx *cx, Value *a, int n)
 {
   int err, mode, hdr, nr, nk, i, k, line = 0, *rows, *keys, *grp, ng;
@@ -1222,6 +1339,37 @@ static Value f_groupby(Ctx *cx, Value *a, int n)
   keys = rows + vals->rows; grp = keys + vals->rows;
   nr = data_rows(cx, a, n, 6, vals->rows, hdr, rows, &err);
   if (err) { free(rows); arr_free(rf); arr_free(vals); return val_err(err); }
+  {
+    double rel = 0;
+    if ((err = opt_num(cx, a, n, 7, 0, &rel)) || (rel != 0 && rel != 1)) { free(rows); arr_free(rf); arr_free(vals); return val_err(err ? err : E_VALUE); }
+    if (rel == 0 && (fabs(total) >= 2 || rf->cols > 1)) {
+      /* fields in a hierarchy: sorted within each other, subtotals for total_depth 2 and more */
+      Plan pl;
+      memset(&pl, 0, sizeof pl);
+      memset(&g, 0, sizeof g);
+      g.cols = rf->cols + vals->cols;
+      pl.cx = cx; pl.fn = &a[2]; pl.vals = vals;
+      pl.vcol = fabs(sort) > rf->cols && fabs(sort) <= g.cols ? (int)fabs(sort) - rf->cols - 1 : -1;
+      if (mode >= 2) {
+        for (k = 0; k < g.cols; k++) {
+          char t[32];
+          if (hdr) grid_put(&g, 0, k, val_copy(k < rf->cols ? EL(rf, 0, k) : EL(vals, 0, k - rf->cols)));
+          else { if (k < rf->cols) sprintf(t, "Field %d", k + 1); else sprintf(t, "Value %d", k - rf->cols + 1); grid_put(&g, 0, k, val_str(t)); }
+        }
+        line = 1;
+      }
+      if ((err = plan_make(&pl, rf, rows, nr, (int)total, (int)sort))) { plan_free(&pl); free(g.v); free(rows); arr_free(rf); arr_free(vals); return val_err(err); }
+      for (i = 0; i < pl.n; i++, line++) {
+        const PLine *l = &pl.l[i];
+        for (k = 0; k < rf->cols; k++) grid_put(&g, line, k, plan_key(&pl, l, k));
+        for (k = 0; k < vals->cols; k++) grid_put(&g, line, rf->cols + k, agg_rows(cx, &a[2], vals, k, pl.pool + l->first, l->n));
+      }
+      plan_free(&pl);
+      free(rows); arr_free(rf); arr_free(vals);
+      return grid_take(&g);
+    }
+  }
+  if (fabs(total) > 1) total = total < 0 ? -1 : 1;      /* (a table of fields has no subtotals) */
   nk = distinct_keys(rf, rows, nr, (int)sort, keys);
   memset(&g, 0, sizeof g);
   g.cols = rf->cols + vals->cols;
@@ -1274,9 +1422,11 @@ static Value f_groupby(Ctx *cx, Value *a, int n)
 }
 static Value f_pivotby(Ctx *cx, Value *a, int n)
 {
-  int err, mode, hdr, nr, nrk, nck, i, j, k, line = 0, *rows, *rk, *ck, *sel, ns, lead, ncols, valrow;
+  int err, mode, hdr, nr, i, j, k, line = 0, *rows, *sel, ns, lead, ncols, valrow, nv;
   double rtot, rsort, ctot, csort;
   Arr *rf = get_arr(cx, &a[0], &err), *cf, *vals;
+  Plan rp, cp;
+  u8 *inrow;
   Grid g;
   if (!rf) return val_err(err);
   if (!(cf = get_arr(cx, &a[1], &err))) { arr_free(rf); return val_err(err); }
@@ -1287,26 +1437,31 @@ static Value f_pivotby(Ctx *cx, Value *a, int n)
     arr_free(rf); arr_free(cf); arr_free(vals); return val_err(err);
   }
   hdr = mode == 1 || mode == 3;
-  rows = (int *)malloc((size_t)vals->rows * 4 * sizeof(int) + sizeof(int));
-  if (!rows) { arr_free(rf); arr_free(cf); arr_free(vals); return val_err(E_NUM); }
-  rk = rows + vals->rows; ck = rk + vals->rows; sel = ck + vals->rows;
+  nv = vals->cols;
+  rows = (int *)malloc((size_t)vals->rows * 2 * sizeof(int) + sizeof(int));
+  inrow = (u8 *)calloc((size_t)vals->rows + 1, 1);
+  if (!rows || !inrow) { free(rows); free(inrow); arr_free(rf); arr_free(cf); arr_free(vals); return val_err(E_NUM); }
+  sel = rows + vals->rows;
   nr = data_rows(cx, a, n, 9, vals->rows, hdr, rows, &err);
-  if (err) { free(rows); arr_free(rf); arr_free(cf); arr_free(vals); return val_err(err); }
-  nrk = distinct_keys(rf, rows, nr, (int)rsort, rk);
-  nck = distinct_keys(cf, rows, nr, (int)csort, ck);
+  memset(&rp, 0, sizeof rp); memset(&cp, 0, sizeof cp);
+  rp.vcol = cp.vcol = -1;
+  if (err || (err = plan_make(&rp, rf, rows, nr, (int)rtot, (int)rsort)) || (err = plan_make(&cp, cf, rows, nr, (int)ctot, (int)csort))) {
+    plan_free(&rp); plan_free(&cp); free(rows); free(inrow); arr_free(rf); arr_free(cf); arr_free(vals); return val_err(err);
+  }
   lead = rf->cols;
-  ncols = nck + (ctot != 0);
-  valrow = vals->cols > 1 || mode >= 2;
+  ncols = cp.n;
+  valrow = nv > 1 || mode >= 2;
   memset(&g, 0, sizeof g);
-  g.cols = lead + ncols * vals->cols;
-  if ((long)g.cols * (nrk + 3 + cf->cols) > 1000000L) { free(rows); arr_free(rf); arr_free(cf); arr_free(vals); return val_err(E_NUM); }
-  /* column headings: one row per column field (Total at the end or start), the value names under them */
+  g.cols = lead + ncols * nv;
+  if ((long)g.cols * (rp.n + 3 + cf->cols) > 1000000L || g.cols < 1) {
+    plan_free(&rp); plan_free(&cp); free(rows); free(inrow); arr_free(rf); arr_free(cf); arr_free(vals); return val_err(E_NUM);
+  }
+  /* column headings: one row per column field (subtotals under their field, Total), the value names under them */
   for (k = 0; k < cf->cols; k++) {
     for (i = 0; i < lead; i++) grid_put(&g, line, i, val_empty());
     for (j = 0; j < ncols; j++) {
-      int cj = ctot < 0 ? j - 1 : j, v;
-      for (v = 0; v < vals->cols; v++)
-        grid_put(&g, line, lead + j * vals->cols + v, (cj < 0 || cj >= nck) ? (k == 0 ? val_str("Total") : val_empty()) : val_copy(EL(cf, ck[cj], k)));
+      int v;
+      for (v = 0; v < nv; v++) grid_put(&g, line, lead + j * nv + v, plan_key(&cp, &cp.l[j], k));
     }
     line++;
   }
@@ -1319,29 +1474,31 @@ static Value f_pivotby(Ctx *cx, Value *a, int n)
     }
     for (j = 0; j < ncols; j++) {
       int v;
-      for (v = 0; v < vals->cols; v++) {
+      for (v = 0; v < nv; v++) {
         char t[32];
-        if (hdr) grid_put(&g, line, lead + j * vals->cols + v, val_copy(EL(vals, 0, v)));
-        else { sprintf(t, "Value %d", v + 1); grid_put(&g, line, lead + j * vals->cols + v, val_str(t)); }
+        if (hdr) grid_put(&g, line, lead + j * nv + v, val_copy(EL(vals, 0, v)));
+        else { sprintf(t, "Value %d", v + 1); grid_put(&g, line, lead + j * nv + v, val_str(t)); }
       }
     }
     line++;
   }
-  /* body: each row key (Total first or last), each column key */
-  for (i = (rtot < 0 ? -1 : 0); i < nrk + (rtot > 0 ? 1 : 0); i++) {
-    int ri = i < nrk ? i : -1;
-    if (ri < 0) { grid_put(&g, line, 0, val_str("Total")); for (k = 1; k < lead; k++) grid_put(&g, line, k, val_empty()); }
-    else for (k = 0; k < lead; k++) grid_put(&g, line, k, val_copy(EL(rf, rk[ri], k)));
+  /* body: each row line, each column line: the values of the rows both take in */
+  for (i = 0; i < rp.n; i++, line++) {
+    const PLine *rl = &rp.l[i];
+    for (k = 0; k < rl->n; k++) inrow[rp.pool[rl->first + k]] = 1;
+    for (k = 0; k < lead; k++) grid_put(&g, line, k, plan_key(&rp, rl, k));
     for (j = 0; j < ncols; j++) {
-      int cj = ctot < 0 ? j - 1 : j, v;
+      const PLine *cl = &cp.l[j];
+      int v;
       ns = 0;
-      for (k = 0; k < nr; k++)
-        if ((ri < 0 || key_eq(rf, rows[k], rk[ri])) && (cj < 0 || cj >= nck || key_eq(cf, rows[k], ck[cj]))) sel[ns++] = rows[k];
-      for (v = 0; v < vals->cols; v++) grid_put(&g, line, lead + j * vals->cols + v, agg_rows(cx, &a[3], vals, v, sel, ns));
+      for (k = 0; k < cl->n; k++) if (inrow[cp.pool[cl->first + k]]) sel[ns++] = cp.pool[cl->first + k];
+      qsort(sel, (size_t)ns, sizeof(int), int_cmp);    /* (in the data's order, for functions that care) */
+      for (v = 0; v < nv; v++) grid_put(&g, line, lead + j * nv + v, agg_rows(cx, &a[3], vals, v, sel, ns));
     }
-    line++;
+    for (k = 0; k < rl->n; k++) inrow[rp.pool[rl->first + k]] = 0;
   }
-  free(rows); arr_free(rf); arr_free(cf); arr_free(vals);
+  plan_free(&rp); plan_free(&cp);
+  free(rows); free(inrow); arr_free(rf); arr_free(cf); arr_free(vals);
   return grid_take(&g);
 }
 

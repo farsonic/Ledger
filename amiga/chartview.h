@@ -39,6 +39,7 @@ int  ov_key(ObjView *ov, GridView *gv, UWORD code, UWORD qual);                 
 int  ov_busy(ObjView *ov);                      /* an object selected or a tool in use (the grid leaves keys to us) */
 
 /* (charttab.c) the selection and the tools */
+void ov_select_list(ObjView *ov, const int *list, int n);   /* (ui: Group) these objects selected */
 int  ov_selected(ObjView *ov);                  /* the object selected (index), -1 none */
 int  ov_selection(ObjView *ov, int *list, int max);
 void ov_select(ObjView *ov, int i);             /* -1: none */

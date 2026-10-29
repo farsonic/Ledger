@@ -201,6 +201,7 @@ static void ref_ready(Ctx *cx, const Value *v)
 }
 
 static int is_multi(const Value *v);
+static u8 *legacy_mask(const Formula *f);
 /* compute one formula cell and store its result; a dynamic array spills over the cells right and
    below (#SPILL! when something is in the way), a {=...} formula fills its range */
 static void compute_cell(Book *b, int sheet, i32 r, i32 c, Cell *cell, int depth)
@@ -219,7 +220,9 @@ static void compute_cell(Book *b, int sheet, i32 r, i32 c, Cell *cell, int depth
   memset(&cx, 0, sizeof cx);
   cx.b = b; cx.sheet = sheet; cx.row = r; cx.col = c; cx.depth = depth;
   cx.dyn = !f->legacy; cx.arrayish = &arrayish;
+  if (f->legacy) { cx.amask = legacy_mask(f); cx.amask_f = f; }
   v = eval_f(&cx, f);
+  free((void *)cx.amask); cx.amask = NULL;
   if (f->cse && f->arows > 0 && f->acols > 0) {
     /* {=...}: the result fitted to the formula's range, a single row or column repeated, #N/A past its end */
     int err;
@@ -830,8 +833,30 @@ static int op_scalar(Ctx *cx, int op, const Value *a, const Value *b, Value *out
   return 0;
 }
 /* a binary operator, element by element when either side is a range or array */
-static Value binop(Ctx *cx, int op, Value *a, Value *b)
+/* (legacy formulas) the token being worked out is where a range meets the formula's row */
+static int in_array_arg(const Ctx *cx)
 {
+  const Formula *f = (const Formula *)cx->cur_f;
+  return cx->amask && f && cx->amask_f == cx->cur_f && cx->tok >= 0 && cx->tok < f->n && cx->amask[cx->tok];
+}
+static int legacy_scalar(const Ctx *cx, const Formula *f) { return !cx->dyn && !in_array_arg(cx); }
+static Value binop_f(Ctx *cx, const Formula *f, int op, Value *a, Value *b);
+/* an operator; in a formula from before dynamic arrays (outside an argument taken as an array) a
+   range on either side meets the formula's row or column first, as Excel did */
+static Value binop_f(Ctx *cx, const Formula *f, int op, Value *a, Value *b)
+{
+  if (f && legacy_scalar(cx, f)) {
+    int ma = a->t == V_REF && (a->r1 != a->r2 || a->c1 != a->c2), mb = b->t == V_REF && (b->r1 != b->r2 || b->c1 != b->c2);
+    if (ma || mb) {
+      Value sa = ma ? scalar(cx, a) : val_copy(a), sb = mb ? scalar(cx, b) : val_copy(b), out;
+      if (sa.t == V_ERR && ma) out = val_copy(&sa);
+      else if (sb.t == V_ERR && mb) out = val_copy(&sb);
+      else out = binop_f(cx, NULL, op, &sa, &sb);
+      val_free(&sa); val_free(&sb);
+      return out;
+    }
+  }
+  {
   int multi_a = (a->t == V_REF && (a->r1 != a->r2 || a->c1 != a->c2)) || a->t == V_ARR;
   int multi_b = (b->t == V_REF && (b->r1 != b->r2 || b->c1 != b->c2)) || b->t == V_ARR;
   Value out;
@@ -862,12 +887,13 @@ static Value binop(Ctx *cx, int op, Value *a, Value *b)
     out = val_empty(); out.t = V_ARR; out.a = res;
     return out;
   }
+  }
 }
-static Value unop(Ctx *cx, int op, Value *a)
+static Value unop(Ctx *cx, const Formula *f, int op, Value *a)
 {
   Value one = val_num(op == T_PCT ? 0.01 : op == T_NEG ? -1 : 1), r;
   if (op == T_POS) { Value s = a->t == V_REF || a->t == V_ARR ? val_copy(a) : scalar(cx, a); return s; }
-  r = binop(cx, T_MUL, a, &one);
+  r = binop_f(cx, f, T_MUL, a, &one);
   return r;
 }
 
@@ -924,6 +950,53 @@ enum { LZ_NONE, LZ_IF, LZ_IFS, LZ_IFERROR, LZ_IFNA, LZ_CHOOSE, LZ_SWITCH, LZ_LET
 static int g_lzid[LZ_N];
 static const char *const lz_names[LZ_N] = { "", "IF", "IFS", "IFERROR", "IFNA", "CHOOSE", "SWITCH", "LET", "LAMBDA" };
 static const char **g_lift;       /* per function id: its mask (func_lift_spec) or NULL */
+/* (legacy formulas) the functions whose arguments Excel worked out as arrays even before dynamic
+   arrays, so a range in an expression there isn't cut to the formula's row: A an argument taken as
+   an array, - one that isn't, the last letter repeating */
+static const char *const legacy_array_spec[] = {
+  "SUMPRODUCT A", "MMULT A", "MINVERSE A", "MDETERM A", "TRANSPOSE A", "FREQUENCY A", "TREND A", "GROWTH A", "LINEST A", "LOGEST A",
+  "SUMX2MY2 A", "SUMX2PY2 A", "SUMXMY2 A", "CORREL A", "COVAR A", "COVARIANCE.P A", "COVARIANCE.S A", "PEARSON A", "RSQ A", "SLOPE A",
+  "INTERCEPT A", "STEYX A", "FORECAST -A", "FORECAST.LINEAR -A", "TTEST AA-", "T.TEST AA-", "CHITEST A", "CHISQ.TEST A", "FTEST A", "F.TEST A",
+  "PROB AA-", "LOOKUP -A", "MATCH -A-", "INDEX A-", "VLOOKUP -A-", "HLOOKUP -A-", "IRR A-", "MIRR A-", "XIRR AA-", "XNPV -AA", "NPV -A",
+  NULL
+};
+static const char **g_legacy;     /* per function id: its legacy_array_spec mask or NULL */
+static void lazy_init(void);
+static char mask_at(const char *m, int i);
+static int tok_pops(const Tok *t);
+/* for a formula from before dynamic arrays: which tokens are inside an argument taken as an array
+   (malloc'd, n bytes); NULL if none are */
+static u8 *legacy_mask(const Formula *f)
+{
+  int i, sp = 0, any = 0, *sub, *stack;
+  u8 *m;
+  lazy_init();
+  if (!g_legacy || f->n <= 0) return NULL;
+  for (i = 0; i < f->n; i++) if (f->t[i].op == T_FUNC && f->t[i].a < func_count && g_legacy[f->t[i].a]) any = 1;
+  if (!any) return NULL;
+  if (!(sub = (int *)malloc((size_t)f->n * 2 * sizeof(int)))) return NULL;
+  if (!(m = (u8 *)calloc((size_t)f->n, 1))) { free(sub); return NULL; }
+  stack = sub + f->n;
+  for (i = 0; i < f->n; i++) {
+    int k = tok_pops(&f->t[i]), st = i;
+    while (k-- > 0 && sp > 0) st = stack[--sp];
+    sub[i] = st;
+    stack[sp++] = st;
+  }
+  for (i = 0; i < f->n; i++) {
+    const Tok *t = &f->t[i];
+    int k, e = i;
+    if (t->op != T_FUNC || t->a >= func_count || !g_legacy[t->a]) continue;
+    /* its arguments from the last back: each ends where the next begins */
+    for (k = t->flags - 1; k >= 0 && e > 0; k--) {
+      int lo = sub[e - 1], j;
+      if (mask_at(g_legacy[t->a], k) == 'A') for (j = lo; j < e; j++) m[j] = 1;
+      e = lo;
+    }
+  }
+  free(sub);
+  return m;
+}
 static void lazy_init(void)
 {
   static int done;
@@ -941,6 +1014,17 @@ static void lazy_init(void)
       if (!n || n >= sizeof nm) continue;
       memcpy(nm, func_lift_spec[k], n); nm[n] = 0;
       if ((id = func_lookup(nm)) >= 0) g_lift[id] = sp + 1;
+    }
+  }
+  if ((g_legacy = (const char **)calloc((size_t)func_count + 1, sizeof *g_legacy))) {
+    for (k = 0; legacy_array_spec[k]; k++) {
+      char nm[64];
+      const char *sp = strchr(legacy_array_spec[k], ' ');
+      size_t n = sp ? (size_t)(sp - legacy_array_spec[k]) : 0;
+      int id;
+      if (!n || n >= sizeof nm) continue;
+      memcpy(nm, legacy_array_spec[k], n); nm[n] = 0;
+      if ((id = func_lookup(nm)) >= 0) g_legacy[id] = sp + 1;
     }
   }
 }
@@ -1050,7 +1134,7 @@ static int is_multi(const Value *v)
 }
 /* an argument a function of single values maps over: in a dynamic-array formula any array or
    range; in a formula from before dynamic arrays only arrays (a range meets the formula's row) */
-static int liftable(const Ctx *cx, const Value *v) { return is_multi(v) && (cx->dyn || v->t == V_ARR); }
+static int liftable(const Ctx *cx, const Value *v) { return is_multi(v) && (cx->dyn || v->t == V_ARR || in_array_arg(cx)); }
 static char mask_at(const char *m, int i) { size_t n = strlen(m); return n ? m[(size_t)i < n ? (size_t)i : n - 1] : 'a'; }
 /* a function of single values given arrays: called for each element (a single row or column
    stretching across, #N/A past the end of a shorter one) */
@@ -1329,8 +1413,10 @@ static Value eval_range(Ctx *cx, const Formula *f, int lo, int hi)
   int sp = 0, i, n = hi - lo;
   const int *head = f->lz && f->lz != &formula_lz_none ? f->lz + f->n : NULL, *next = head ? head + f->n : NULL;
   Value result;
+  const void *outer_f = cx->cur_f;
   if (n <= 0) return val_err(E_VALUE);
   if (n > 24 && !(st = (Value *)malloc((size_t)n * sizeof(Value)))) return val_err(E_NUM);
+  cx->cur_f = f;
   for (i = lo; i < hi; i++) {
     const Tok *t = &f->t[i];
     Value v = val_empty();
@@ -1363,7 +1449,8 @@ static Value eval_range(Ctx *cx, const Formula *f, int lo, int hi)
     case T_TABLE: v = table_ref_value(cx->b, cx->sheet, cx->row, cx->col, t->s ? t->s : ""); break;
     case T_NEG: case T_POS: case T_PCT:
       if (sp < 1) goto bad;
-      v = unop(cx, t->op, &st[sp - 1]);
+      cx->tok = i;
+      v = unop(cx, f, t->op, &st[sp - 1]);
       val_free(&st[--sp]);
       break;
     case T_AT: {
@@ -1403,6 +1490,7 @@ static Value eval_range(Ctx *cx, const Formula *f, int lo, int hi)
     case T_FUNC: {
       int argc = t->flags;
       if (sp < argc) goto bad;
+      cx->tok = i;
       if (t->a == 0xFFFF || t->a >= func_count) v = t->s ? call_named(cx, t->s, &st[sp - argc], argc) : val_err(E_NAME);
       else v = call_func(cx, t->a, &st[sp - argc], argc);
       while (argc-- > 0) val_free(&st[--sp]);
@@ -1415,7 +1503,8 @@ static Value eval_range(Ctx *cx, const Formula *f, int lo, int hi)
       break; }
     default:
       if (sp < 2) goto bad;
-      v = binop(cx, t->op, &st[sp - 2], &st[sp - 1]);
+      cx->tok = i;
+      v = binop_f(cx, f, t->op, &st[sp - 2], &st[sp - 1]);
       val_free(&st[--sp]); val_free(&st[--sp]);
       break;
     }
@@ -1424,10 +1513,12 @@ static Value eval_range(Ctx *cx, const Formula *f, int lo, int hi)
   if (sp != 1) goto bad;
   result = st[0];
   if (st != local) free(st);
+  cx->cur_f = outer_f;
   return result;
 bad:
   while (sp > 0) val_free(&st[--sp]);
   if (st != local) free(st);
+  cx->cur_f = outer_f;
   return val_err(E_VALUE);
 }
 

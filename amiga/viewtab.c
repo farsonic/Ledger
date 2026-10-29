@@ -11,6 +11,8 @@
  */
 #include <graphics/gfxmacros.h>
 #include "lxpriv.h"
+#include "uitab.h"
+#include "../core/splitpane.h"
 
 double ledger_now(void);
 
@@ -570,7 +572,7 @@ void vt_command(ULONG id, LONG v)
     if (k >= 0) arrange(k);
     break; }
   case ID_LX_SPLIT:
-    ask("OK", "%s", tr("Ledger can't split a window into panes that scroll on their own yet.\nFreeze Panes keeps rows and columns in sight; New Window shows two parts at once."));
+    ui_split_toggle();          /* (uitab.c) */
     break;
   case ID_LX_HIDEWIN: win_hide(); break;
   case ID_LX_UNHIDEWIN: unhide_window(); break;
@@ -595,7 +597,7 @@ int vt_bit(int b)
   case LXB_PBP: return v == PV_BREAKS;
   case LXB_PAGELAYOUT: return v == PV_LAYOUT;
   case LXB_RULER: return ruler_on;
-  case LXB_SPLIT: return 0;
+  case LXB_SPLIT: return sheet_is_split(cur_sheet());
   case LXB_SIDEBYSIDE: return side_on;
   case LXB_SYNC: return side_on && sync_on;
   case LXB_MANYWIN: { int sl[16]; return shown_windows(sl) > 1; }
