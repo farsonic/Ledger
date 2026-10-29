@@ -86,7 +86,16 @@ struct MUIP_Ribbon_State {
   int size;
   const char *numfmt;       /* the number format's name as the Number field shows it (Latin-1) */
   FontSet *fs;
+  ULONG ctx;                /* the contextual tabs' states: CBIT(CB_...) (tabletab.c) */
+  const char *ctxname;      /* the table's or pivot table's name the active cell is in (Latin-1) */
 };
+/* contextual states (Item.st and .en values from 32): the active cell is in a table or a pivot
+   table, and the options shown ticked on Table Design and PivotTable Design */
+enum {
+  CB_INTABLE = 32, CB_INPIVOT, CB_HEADER, CB_TOTALS, CB_BANDROWS, CB_BANDCOLS, CB_FIRSTCOL, CB_LASTCOL, CB_FILTERBTN,
+  CB_PVROWHEAD, CB_PVCOLHEAD, CB_PVBANDROWS, CB_PVBANDCOLS, CB_PVFIELD, CB_PVVALUE
+};
+#define CBIT(b) (1UL << ((b) - 32))
 struct MUI_CustomClass *ribbon_class(void);
 void ribbon_class_free(void);
 /* the font list: the usual families, then the installed ones (made once); one by number */

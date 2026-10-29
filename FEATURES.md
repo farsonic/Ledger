@@ -13,7 +13,7 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 7 | Data validation (drop-down lists, number/date limits, warnings) | yes | ⬜ |
 | 8 | Charts: column, bar, line, pie (drawn on the sheet, saved in .xlsx) | yes | ⬜ |
 | 9 | Charts: area, scatter, doughnut; chart title, legend, axis options | yes | ⬜ |
-| 10 | Format as Table (banded rows, header row, totals row) | yes | ⬜ |
+| 10 | Format as Table (banded rows, header row, totals row) | yes | ✅ |
 | 11 | Dynamic array formulas that spill (SEQUENCE, SORT, FILTER, UNIQUE...) | yes | ⬜ |
 | 12 | LET and LAMBDA | yes | ⬜ |
 | 13 | More functions (statistics, engineering, text, information: towards GridCraft's 500+) | 500+ | ⬜ |
@@ -21,7 +21,7 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 15 | Group and outline rows/columns; Subtotals | yes | ⬜ |
 | 16 | Protect sheet (locked cells can't be changed) | yes | ⬜ |
 | 17 | Sparklines (line, column) | yes | ⬜ |
-| 18 | Pivot tables | yes | ⬜ |
+| 18 | Pivot tables | yes | ✅ |
 | 19 | Old Excel .xls files (values, formulas, number formats) | yes | ⬜ |
 | 20 | OpenDocument .ods import | yes | ⬜ |
 | 21 | Pictures on the sheet (PNG/JPEG) | yes | ⬜ |
