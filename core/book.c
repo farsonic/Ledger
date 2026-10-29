@@ -5,6 +5,7 @@
 #include "book.h"
 #include "calc.h"
 #include "cond.h"
+#include "pagesetup.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -530,7 +531,7 @@ static FilterCol *fcols_copy(const FilterCol *f, int n)
 static void notes_free(Note *n, int k)
 {
   int i;
-  for (i = 0; i < k; i++) { free(n[i].author); free(n[i].text); }
+  for (i = 0; i < k; i++) { free(n[i].author); free(n[i].text); free(n[i].replies); }
   free(n);
 }
 static Note *notes_copy(const Note *n, int k)
@@ -538,7 +539,7 @@ static Note *notes_copy(const Note *n, int k)
   Note *c;
   int i;
   if (!k || !(c = (Note *)calloc((size_t)k, sizeof *c))) return NULL;
-  for (i = 0; i < k; i++) { c[i] = n[i]; c[i].author = str_dup(n[i].author ? n[i].author : ""); c[i].text = str_dup(n[i].text ? n[i].text : ""); }
+  for (i = 0; i < k; i++) { c[i] = n[i]; c[i].author = str_dup(n[i].author ? n[i].author : ""); c[i].text = str_dup(n[i].text ? n[i].text : ""); c[i].replies = n[i].replies ? str_dup(n[i].replies) : NULL; }
   return c;
 }
 /* links given back, and copied */
@@ -574,6 +575,7 @@ static void sheet_free(Sheet *s)
   cond_free_all(s->cfs, s->ncfs);
   notes_free(s->notes, s->nnotes);
   links_free(s->links, s->nlinks);
+  page_free(s->page);
   free(s);
 }
 /* a deep copy of a sheet, for undo (NULL out of memory) */
@@ -593,6 +595,7 @@ static Sheet *sheet_clone(const Sheet *s)
   if (!c->notes) c->nnotes = 0;
   c->links = links_copy(s->links, s->nlinks);
   if (!c->links) c->nlinks = 0;
+  c->page = page_copy(s->page);
   if (s->nrows && !(c->rows = (Row **)calloc((size_t)s->nrows, sizeof(Row *)))) goto fail;
   c->nrows = s->nrows;
   for (r = 0; r < s->nrows; r++) {
@@ -777,6 +780,7 @@ void book_free(Book *b)
   undo_free_list(b->undo);
   undo_free_list(b->redo);
   undo_free_list(b->open);
+  lx_free(b->lx);
   free(b);
 }
 int book_find_sheet(Book *b, const char *name)
@@ -1672,8 +1676,8 @@ static void move_extras(Sheet *s, int rows, i32 at, i32 n)
   for (i = k = 0; i < s->nnotes; i++) {
     Note nt = s->notes[i];
     i32 *a = rows ? &nt.r : &nt.c;
-    if (n > 0) { if (*a >= at) *a += n; if (*a >= (rows ? MAXROW : MAXCOL)) { free(nt.author); free(nt.text); continue; } }
-    else if (*a >= at && *a < at - n) { free(nt.author); free(nt.text); continue; }
+    if (n > 0) { if (*a >= at) *a += n; if (*a >= (rows ? MAXROW : MAXCOL)) { free(nt.author); free(nt.text); free(nt.replies); continue; } }
+    else if (*a >= at && *a < at - n) { free(nt.author); free(nt.text); free(nt.replies); continue; }
     else if (*a >= at - n) *a += n;
     s->notes[k++] = nt;
   }
@@ -1719,6 +1723,7 @@ static int insdel(Book *b, int sheet, int rows, i32 at, i32 n)
   if (rows) move_rows(s, at, n); else move_cols(s, at, n);
   move_extras(s, rows, at, n);
   cond_shift_areas(s, rows, at, n);
+  page_shift(s, rows, at, n);
   sh.target = sheet; sh.rows = rows; sh.at = at; sh.n = n;
   each_formula(b, shift_formula, &sh);
   book_end(b);
@@ -1894,7 +1899,7 @@ int book_set_note(Book *b, int sheet, i32 r, i32 c, const char *text, const char
   book_begin(b);
   undo_sheet(b, sheet);
   if (!text || !*text) {
-    free(s->notes[i].author); free(s->notes[i].text);
+    free(s->notes[i].author); free(s->notes[i].text); free(s->notes[i].replies);
     s->notes[i] = s->notes[--s->nnotes];
   } else if (i < s->nnotes) {
     char *t = str_dup(text);
@@ -1904,6 +1909,7 @@ int book_set_note(Book *b, int sheet, i32 r, i32 c, const char *text, const char
     Note *nn = (Note *)realloc(s->notes, (size_t)(s->nnotes + 1) * sizeof *nn);
     if (nn) {
       s->notes = nn;
+      memset(&nn[s->nnotes], 0, sizeof *nn);
       nn[s->nnotes].r = r; nn[s->nnotes].c = c;
       nn[s->nnotes].text = str_dup(text);
       nn[s->nnotes].author = str_dup(author ? author : "");
