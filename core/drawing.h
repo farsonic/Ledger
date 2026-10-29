@@ -21,7 +21,7 @@
 /* ------------------------------------------------------------------ objects */
 typedef struct { i32 r, c; i32 dy, dx; } DCorner;     /* a cell, and pixels down and across into it (at 100%) */
 enum { AN_TWOCELL, AN_ONECELL, AN_ABSOLUTE };          /* move and size with cells, move only, neither */
-enum { OB_CHART, OB_PICTURE, OB_SHAPE };
+enum { OB_CHART, OB_PICTURE, OB_SHAPE, OB_SLICER };
 enum { SK_RECT, SK_ROUNDRECT, SK_ELLIPSE, SK_TRIANGLE, SK_LINE, SK_ARROW, SK_TEXTBOX, SK_ICON, SK_INK, SK_N };
 enum { PIC_NONE, PIC_PNG, PIC_JPEG };
 
@@ -32,6 +32,7 @@ Blob *blob_ref(Blob *b);
 void  blob_free(Blob *b);
 
 typedef struct Chart Chart;
+struct Slicer;                     /* slicer.h */
 
 typedef struct {
   u8 kind, shape, anchor;          /* OB_, SK_ (shapes), AN_ */
@@ -48,6 +49,7 @@ typedef struct {
   u32 tcolor;                      /* text colour, FILL_ON | rgb (0: automatic) */
   Blob *pic; u8 pictype;           /* OB_PICTURE: the file (PNG or JPEG) */
   Chart *chart;                    /* OB_CHART */
+  struct Slicer *slicer;           /* OB_SLICER (slicer.h) */
 } DObj;
 
 /* Ledger's own icons for Insert > Icons (SK_ICON shapes): drawn on a 16 x 16 grid by commands
@@ -96,6 +98,7 @@ struct Chart {
   CAxis va, ha;                    /* the value axis, and scatter's X axis */
   u32 efill[CE_N], eline[CE_N];    /* Format tab: fill and outline of chart area, plot area, title, legend (0 automatic) */
   CSeries *s; int ns;
+  char *pivot;                     /* a PivotChart: its pivot table ("Sheet2!PivotTable1"), whose report gives the series; NULL none */
 };
 
 /* ------------------------------------------------------------------ sparklines */

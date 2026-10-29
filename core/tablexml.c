@@ -164,13 +164,25 @@ static void write_table(Book *b, int si, LTable *t, int id, FileFormulaFn ff, Bu
 }
 
 /* ------------------------------------------------------------------ writing: pivot tables */
-/* a cache field: its source column's shared items (when itemized) and what kinds of value it has */
+/* a cache field: a source column's shared items (when itemized) and what kinds of value it has; or
+   a grouping field (dates' coarser levels, items grouped by hand) or a calculated field. As in
+   GridCraft's writer, a date column's finest level groups the column's own field and the coarser
+   levels are fields of their own chained through par */
+enum { GK_NONE, GK_DATE, GK_RANGE, GK_DISCRETE };
 typedef struct {
   char *name;
+  int col;                          /* source column, -1 not a database field */
   int itemized;
   char **lab; Value *val; int n, cap;
   int blank, text, number, nonint, boolean, error;
   double mn, mx;
+  u8 gk, level;                     /* GK_, PG_ */
+  int base, par;                    /* grouping: the column's field, the next coarser level (-1) */
+  double gstart, gend, gstep;
+  char **gi; int ngi;               /* group items */
+  int *disc;                        /* GK_DISCRETE: each base item's group item */
+  const PivotField *pf;             /* the field whose grouping this is */
+  char *formula;                    /* a calculated field's */
 } CField;
 static int cf_index(CField *f, const char *lab)
 {
@@ -196,6 +208,25 @@ static int cf_add(CField *f, const char *lab, const Value *v)
   f->val[f->n] = val_copy(v);
   return f->n++;
 }
+static void gi_add(CField *f, const char *lab)
+{
+  char **n = (char **)realloc(f->gi, (size_t)(f->ngi + 1) * sizeof(char *));
+  if (!n) return;
+  f->gi = n;
+  n[f->ngi++] = str_dup(lab);
+}
+static void iso_date(double serial, char *out)
+{
+  int y, m, d;
+  serial_ymd(floor(serial), &y, &m, &d);
+  sprintf(out, "%04d-%02d-%02dT00:00:00", y, m, d);
+}
+static void mdy_date(double serial, char *out)
+{
+  int y, m, d;
+  serial_ymd(floor(serial), &y, &m, &d);
+  sprintf(out, "%d/%d/%d", m, d, y);
+}
 static void item_xml(Buf *o, const Value *v)
 {
   switch (v->t) {
@@ -218,10 +249,66 @@ static int in_area(const PivotField *f, int n, const char *name)
   for (i = 0; i < n; i++) if (str_ieq(f[i].name, name)) return i;
   return -1;
 }
-/* a sheet name as a worksheetSource writes it (31 characters at most) */
+static const char *const groupby[PG_N] = { "", "years", "quarters", "months", "days", "range" };
+/* a date grouping's items: <start, the levels' items, >end (as Excel lists them) */
+static void date_items(CField *f, double start, double end)
+{
+  char t[64];
+  int y, m, d, y1;
+  mdy_date(start, t + 1); t[0] = '<'; gi_add(f, t);
+  switch (f->level) {
+  case PG_YEARS:
+    serial_ymd(floor(start), &y, &m, &d); serial_ymd(floor(end) - 1, &y1, &m, &d);
+    for (; y <= y1 && f->ngi < 10000; y++) { sprintf(t, "%d", y); gi_add(f, t); }
+    break;
+  case PG_QUARTERS: for (y = 1; y <= 4; y++) { sprintf(t, "Qtr%d", y); gi_add(f, t); } break;
+  case PG_MONTHS: { PivotField pf; Value v; memset(&pf, 0, sizeof pf); pf.group = PG_MONTHS; for (m = 1; m <= 12; m++) { v = val_num(date_serial(2000, m, 1)); pivot_field_label(NULL, &pf, &v, t, sizeof t); gi_add(f, t); } break; }
+  default: { PivotField pf; Value v; memset(&pf, 0, sizeof pf); pf.group = PG_DAYS; for (d = 0; d < 366; d++) { v = val_num(date_serial(2000, 1, 1 + d)); pivot_field_label(NULL, &pf, &v, t, sizeof t); gi_add(f, t); } break; }
+  }
+  mdy_date(end, t + 1); t[0] = '>'; gi_add(f, t);
+}
+static void range_items(CField *f)
+{
+  PivotField pf;
+  Value v;
+  char t[96];
+  double x;
+  long k = 0;
+  memset(&pf, 0, sizeof pf);
+  pf.group = PG_RANGE; pf.gstart = f->gstart; pf.gend = f->gend; pf.gstep = f->gstep;
+  v = val_num(f->gstart - 1); pivot_field_label(NULL, &pf, &v, t, sizeof t); gi_add(f, t);
+  for (x = f->gstart; x <= f->gend && k < 10000; x = f->gstart + (++k) * f->gstep) { v = val_num(x); pivot_field_label(NULL, &pf, &v, t, sizeof t); gi_add(f, t); }
+  v = val_num(f->gend + 1); pivot_field_label(NULL, &pf, &v, t, sizeof t); gi_add(f, t);
+}
+static CField *cf_new(CField **cf, int *n, const char *name)
+{
+  CField *nc = (CField *)realloc(*cf, (size_t)(*n + 1) * sizeof(CField));
+  if (!nc) return NULL;
+  *cf = nc;
+  memset(&nc[*n], 0, sizeof(CField));
+  nc[*n].name = str_dup(name);
+  nc[*n].col = -1; nc[*n].base = -1; nc[*n].par = -1;
+  return &nc[(*n)++];
+}
+static int cf_named(CField *cf, int n, const char *name) { int i; for (i = 0; i < n; i++) if (str_ieq(cf[i].name, name)) return i; return -1; }
+/* the cache field an area's field is written as */
+static int axis_cf(CField *cf, int ncf, int nf, const PivotField *f)
+{
+  int k, i;
+  for (k = 0; k < nf && !str_ieq(cf[k].name, f->name); k++) ;
+  if (k == nf) return -1;
+  if (f->group >= PG_YEARS && f->group <= PG_DAYS) {
+    for (i = 0; i < ncf; i++) if ((i == k || cf[i].base == k) && cf[i].gk == GK_DATE && cf[i].level == f->group) return i;
+  } else if (f->nmg && f->group == PG_NONE) {
+    for (i = nf; i < ncf; i++) if (cf[i].base == k && cf[i].gk == GK_DISCRETE) return i;
+  }
+  return k;
+}
+/* the labels of a cache field's items (what <item x> counts) */
+static char **cf_labels(CField *f, int *n) { if (f->gk != GK_NONE) { *n = f->ngi; return f->gi; } *n = f->n; return f->lab; }
 static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
 {
-  int ss, nf, k, i, nrec = 0;
+  int ss, nf, ncf, k, i, nrec = 0;
   Rect src;
   char **names = NULL, path[96], ref[40];
   CField *cf;
@@ -231,9 +318,11 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
   if (!pivot_source(b, p, &ss, &src)) return;
   nf = pivot_fields(b, p, &names);
   if (!nf || !(cf = (CField *)calloc((size_t)nf, sizeof(CField)))) { pivot_strings_free(names, nf); return; }
+  ncf = nf;
   for (k = 0; k < nf; k++) {
-    cf[k].name = names[k];
-    cf[k].itemized = in_area(p->rows, p->nrows, names[k]) >= 0 || in_area(p->cols, p->ncols, names[k]) >= 0 || in_area(p->filters, p->nfilters, names[k]) >= 0;
+    cf[k].name = str_dup(names[k]); cf[k].col = k; cf[k].base = -1; cf[k].par = -1;
+    cf[k].itemized = in_area(p->rows, p->nrows, names[k]) >= 0 || in_area(p->cols, p->ncols, names[k]) >= 0 || in_area(p->filters, p->nfilters, names[k]) >= 0
+                     || in_area(p->sfilters, p->nsfilters, names[k]) >= 0;
   }
   /* kinds of value, and text fields itemized too */
   for (r = src.r1 + 1; r <= src.r2; r++)
@@ -253,6 +342,53 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
       }
     }
   for (k = 0; k < nf; k++) if (cf[k].text || cf[k].boolean || cf[k].error) cf[k].itemized = 1;
+  /* groupings: each column's date levels (finest on its own field), intervals, groups by hand */
+  for (k = 0; k < nf; k++) {
+    unsigned lv = 0;
+    const PivotField *rangef = NULL, *discf = NULL;
+    int g, prev;
+    for (i = 0; i < p->nrows + p->ncols; i++) {
+      const PivotField *f = i < p->nrows ? &p->rows[i] : &p->cols[i - p->nrows];
+      if (!str_ieq(f->name, names[k])) continue;
+      if (f->group >= PG_YEARS && f->group <= PG_DAYS) lv |= 1u << f->group;
+      else if (f->group == PG_RANGE) rangef = f;
+      else if (f->nmg) discf = f;
+    }
+    if (lv && cf[k].number && !cf[k].text) {
+      prev = k;
+      for (g = PG_DAYS; g >= PG_YEARS; g--) {
+        CField *t;
+        if (!(lv & (1u << g))) continue;
+        if (prev == k && cf[k].gk == GK_NONE) t = &cf[k];
+        else {
+          char nm[300];
+          int s2 = 2;
+          static const char *const lvn[] = { "", "Years", "Quarters", "Months", "Days" };
+          snprintf(nm, sizeof nm, "%s", lvn[g]);
+          while (cf_named(cf, ncf, nm) >= 0) snprintf(nm, sizeof nm, "%s%d", lvn[g], s2++);
+          if (!(t = cf_new(&cf, &ncf, nm))) break;
+          cf[prev].par = ncf - 1;
+          prev = ncf - 1;
+        }
+        t->gk = GK_DATE; t->level = (u8)g; t->base = k;
+        t->gstart = floor(cf[k].mn); t->gend = floor(cf[k].mx) + 1;
+        date_items(t, t->gstart, t->gend);
+        if (t == &cf[k]) prev = k;
+      }
+      cf[k].itemized = 0;
+    } else if (rangef && cf[k].number && !cf[k].text) {
+      cf[k].gk = GK_RANGE; cf[k].base = k; cf[k].gstart = rangef->gstart; cf[k].gend = rangef->gend; cf[k].gstep = rangef->gstep;
+      range_items(&cf[k]);
+      cf[k].itemized = 0;
+    } else if (discf) {
+      char nm[300];
+      int s2 = 2;
+      CField *t;
+      snprintf(nm, sizeof nm, "%s%d", names[k], s2++);
+      while (cf_named(cf, ncf, nm) >= 0) snprintf(nm, sizeof nm, "%s%d", names[k], s2++);
+      if ((t = cf_new(&cf, &ncf, nm))) { t->gk = GK_DISCRETE; t->base = k; t->pf = discf; cf[k].itemized = 1; }
+    }
+  }
   /* the records (rows not wholly empty), shared items as they come */
   buf_init(&rec);
   for (r = src.r1 + 1; r <= src.r2; r++) {
@@ -266,10 +402,34 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
         char lab[256];
         pivot_item_label(b, v, lab, sizeof lab);
         buf_printf(&rec, "<x v=\"%d\"/>", cf_add(&cf[k], lab, v));
-      } else item_xml(&rec, v);
+      } else if (cf[k].gk == GK_DATE && v->t == V_NUM) { char t[40]; iso_date(v->n, t); buf_printf(&rec, "<d v=\"%s\"/>", t); }
+      else item_xml(&rec, v);
     }
     buf_adds(&rec, "</r>");
     nrec++;
+  }
+  /* groups by hand: the group names, then the items in no group, each base item's group */
+  for (k = nf; k < ncf; k++) {
+    CField *t = &cf[k], *bf;
+    int j, g;
+    if (t->gk != GK_DISCRETE) continue;
+    bf = &cf[t->base];
+    for (g = 0; g < t->pf->nmg; g++) gi_add(t, t->pf->mg[g].name);
+    t->disc = (int *)calloc((size_t)bf->n + 1, sizeof(int));
+    for (j = 0; j < bf->n && t->disc; j++) {
+      char lab[256];
+      int x;
+      pivot_field_label(b, t->pf, &bf->val[j], lab, sizeof lab);
+      for (x = 0; x < t->ngi && !str_ieq(t->gi[x], lab); x++) ;
+      if (x == t->ngi) gi_add(t, lab);
+      t->disc[j] = x;
+    }
+  }
+  /* calculated fields last */
+  for (i = 0; i < p->ncalcs; i++) {
+    CField *t;
+    if (cf_named(cf, ncf, p->calcs[i].name) >= 0 || !(t = cf_new(&cf, &ncf, p->calcs[i].name))) continue;
+    t->formula = str_dup(p->calcs[i].formula);
   }
   /* the cache definition */
   buf_init(&o);
@@ -284,28 +444,68 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
     esc(&o, sn);
     buf_adds(&o, "\"/>");
   }
-  buf_printf(&o, "</cacheSource><cacheFields count=\"%d\">", nf);
-  for (k = 0; k < nf; k++) {
+  buf_printf(&o, "</cacheSource><cacheFields count=\"%d\">", ncf);
+  for (k = 0; k < ncf; k++) {
     CField *f = &cf[k];
     int strings = f->text || f->boolean || f->error;
-    buf_adds(&o, "<cacheField name=\""); esc(&o, f->name); buf_adds(&o, "\" numFmtId=\"0\"><sharedItems");
-    if (!strings && !f->blank) buf_adds(&o, " containsSemiMixedTypes=\"0\"");
-    if (!strings) buf_adds(&o, " containsString=\"0\"");
-    if (f->blank) buf_adds(&o, " containsBlank=\"1\"");
-    if (strings && f->number) buf_adds(&o, " containsMixedTypes=\"1\"");
-    if (f->number) {
-      buf_adds(&o, " containsNumber=\"1\"");
-      if (!f->nonint) buf_adds(&o, " containsInteger=\"1\"");
-      buf_adds(&o, " minValue=\""); num(&o, f->mn); buf_adds(&o, "\" maxValue=\""); num(&o, f->mx); buf_adds(&o, "\"");
+    buf_adds(&o, "<cacheField name=\""); esc(&o, f->name);
+    buf_printf(&o, "\" numFmtId=\"%d\"", f->gk == GK_DATE ? 14 : 0);
+    if (f->formula) { buf_adds(&o, " formula=\""); esc(&o, f->formula); buf_adds(&o, "\""); }
+    if (f->col < 0) buf_adds(&o, " databaseField=\"0\"");
+    buf_adds(&o, ">");
+    if (f->col >= 0) {
+      buf_adds(&o, "<sharedItems");
+      if (f->gk == GK_DATE) {
+        char a[40], z[40];
+        iso_date(f->mn, a); iso_date(f->mx, z);
+        buf_adds(&o, " containsSemiMixedTypes=\"0\" containsNonDate=\"0\" containsDate=\"1\" containsString=\"0\"");
+        if (f->blank) buf_adds(&o, " containsBlank=\"1\"");
+        buf_printf(&o, " minDate=\"%s\" maxDate=\"%s\"", a, z);
+      } else {
+        if (!strings && !f->blank) buf_adds(&o, " containsSemiMixedTypes=\"0\"");
+        if (!strings) buf_adds(&o, " containsString=\"0\"");
+        if (f->blank) buf_adds(&o, " containsBlank=\"1\"");
+        if (strings && f->number) buf_adds(&o, " containsMixedTypes=\"1\"");
+        if (f->number) {
+          buf_adds(&o, " containsNumber=\"1\"");
+          if (!f->nonint) buf_adds(&o, " containsInteger=\"1\"");
+          buf_adds(&o, " minValue=\""); num(&o, f->mn); buf_adds(&o, "\" maxValue=\""); num(&o, f->mx); buf_adds(&o, "\"");
+        }
+      }
+      if (f->itemized) {
+        buf_printf(&o, " count=\"%d\">", f->n);
+        for (i = 0; i < f->n; i++) item_xml(&o, &f->val[i]);
+        buf_adds(&o, "</sharedItems>");
+      } else buf_adds(&o, "/>");
     }
-    if (f->itemized) {
-      buf_printf(&o, " count=\"%d\">", f->n);
-      for (i = 0; i < f->n; i++) item_xml(&o, &f->val[i]);
-      buf_adds(&o, "</sharedItems>");
-    } else buf_adds(&o, "/>");
+    if (f->gk != GK_NONE) {
+      buf_adds(&o, "<fieldGroup");
+      if (f->par >= 0) buf_printf(&o, " par=\"%d\"", f->par);
+      buf_printf(&o, " base=\"%d\">", f->base);
+      if (f->gk == GK_DATE) {
+        char a[40], z[40];
+        iso_date(f->gstart, a); iso_date(f->gend, z);
+        buf_printf(&o, "<rangePr groupBy=\"%s\" startDate=\"%s\" endDate=\"%s\"/>", groupby[f->level], a, z);
+      } else if (f->gk == GK_RANGE) {
+        buf_adds(&o, "<rangePr autoStart=\"0\" autoEnd=\"0\" startNum=\""); num(&o, f->gstart);
+        buf_adds(&o, "\" endNum=\""); num(&o, f->gend); buf_adds(&o, "\" groupInterval=\""); num(&o, f->gstep); buf_adds(&o, "\"/>");
+      } else if (f->disc) {
+        CField *bf = &cf[f->base];
+        buf_printf(&o, "<discretePr count=\"%d\">", bf->n);
+        for (i = 0; i < bf->n; i++) buf_printf(&o, "<x v=\"%d\"/>", f->disc[i]);
+        buf_adds(&o, "</discretePr>");
+      }
+      buf_printf(&o, "<groupItems count=\"%d\">", f->ngi);
+      for (i = 0; i < f->ngi; i++) { buf_adds(&o, "<s v=\""); esc(&o, f->gi[i]); buf_adds(&o, "\"/>"); }
+      buf_adds(&o, "</groupItems></fieldGroup>");
+    }
     buf_adds(&o, "</cacheField>");
   }
-  buf_adds(&o, "</cacheFields></pivotCacheDefinition>");
+  buf_adds(&o, "</cacheFields>");
+  /* (an id slicers' caches name the cache by) */
+  buf_printf(&o, "<extLst><ext uri=\"{725AE2AE-9491-48be-B2B4-4EB974FC3084}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">"
+                 "<x14:pivotCacheDefinition pivotCacheId=\"%d\"/></ext></extLst>", id);
+  buf_adds(&o, "</pivotCacheDefinition>");
   sprintf(path, "xl/pivotCache/pivotCacheDefinition%d.xml", id);
   zip_add(w, path, o.data, o.len);
   o.len = 0;
@@ -323,16 +523,22 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
   /* the pivot table */
   o.len = 0;
   {
-    int R = 0, C = 0, V = 0, compact = p->layout == PL_COMPACT, fdr, fdc, *rowf, *colf, *pagef, np = 0;
+    int R = 0, C = 0, V = 0, compact = p->layout == PL_COMPACT, fdr, fdc, *rowf, *colf, *pagef, np = 0, *fieldof;
+    const PivotField **afield;      /* each cache field's area field (axis or page), or a slicer's filter */
+    u8 *axis;                       /* 1 row 2 column 3 page 4 slicer filter */
     Rect loc;
     rowf = (int *)malloc(((size_t)p->nrows + 1) * sizeof(int));
     colf = (int *)malloc(((size_t)p->ncols + 1) * sizeof(int));
     pagef = (int *)malloc(((size_t)p->nfilters + 1) * sizeof(int));
-    if (!rowf || !colf || !pagef) { free(rowf); free(colf); free(pagef); goto done; }
-    for (i = 0; i < p->nrows; i++) { int x = -1; for (k = 0; k < nf; k++) if (str_ieq(names[k], p->rows[i].name)) x = k; if (x >= 0) rowf[R++] = x; }
-    for (i = 0; i < p->ncols; i++) { int x = -1; for (k = 0; k < nf; k++) if (str_ieq(names[k], p->cols[i].name)) x = k; if (x >= 0) colf[C++] = x; }
-    for (i = 0; i < p->nfilters; i++) { int x = -1; for (k = 0; k < nf; k++) if (str_ieq(names[k], p->filters[i].name)) x = k; if (x >= 0) pagef[np++] = x; }
-    for (i = 0; i < p->nvals; i++) for (k = 0; k < nf; k++) if (str_ieq(names[k], p->vals[i].name)) { V++; break; }
+    fieldof = (int *)malloc(((size_t)p->nvals + 1) * sizeof(int));
+    afield = (const PivotField **)calloc((size_t)ncf + 1, sizeof(PivotField *));
+    axis = (u8 *)calloc((size_t)ncf + 1, 1);
+    if (!rowf || !colf || !pagef || !fieldof || !afield || !axis) { free(rowf); free(colf); free(pagef); free(fieldof); free(afield); free(axis); goto done; }
+    for (i = 0; i < p->nrows; i++) { int x = axis_cf(cf, ncf, nf, &p->rows[i]); if (x >= 0 && !axis[x]) { rowf[R++] = x; axis[x] = 1; afield[x] = &p->rows[i]; } }
+    for (i = 0; i < p->ncols; i++) { int x = axis_cf(cf, ncf, nf, &p->cols[i]); if (x >= 0 && !axis[x]) { colf[C++] = x; axis[x] = 2; afield[x] = &p->cols[i]; } }
+    for (i = 0; i < p->nfilters; i++) { int x = axis_cf(cf, ncf, nf, &p->filters[i]); if (x >= 0 && !axis[x]) { pagef[np++] = x; axis[x] = 3; afield[x] = &p->filters[i]; } }
+    for (i = 0; i < p->nsfilters; i++) { int x = cf_named(cf, nf, p->sfilters[i].name); if (x >= 0 && !axis[x] && p->sfilters[i].nhidden) { axis[x] = 4; afield[x] = &p->sfilters[i]; } }
+    for (i = 0; i < p->nvals; i++) { fieldof[i] = cf_named(cf, ncf, p->vals[i].name); if (fieldof[i] >= 0 && (cf[fieldof[i]].col >= 0 || cf[fieldof[i]].formula)) V++; else fieldof[i] = -1; }
     buf_adds(&o, XMLDECL "<pivotTableDefinition xmlns=\"" NS_MAIN "\" name=\"");
     esc(&o, p->name);
     buf_printf(&o, "\" cacheId=\"%d\" applyNumberFormats=\"0\" applyBorderFormats=\"0\" applyFontFormats=\"0\" applyPatternFormats=\"0\" applyAlignmentFormats=\"0\" "
@@ -352,45 +558,41 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
     fdc = (!R && !C) ? 0 : compact ? 1 : (R ? R : 1);
     buf_printf(&o, "<location ref=\"%s\" firstHeaderRow=\"1\" firstDataRow=\"%d\" firstDataCol=\"%d\"", ref, fdr, fdc);
     if (np) buf_printf(&o, " rowPageCount=\"%d\" colPageCount=\"1\"", np);
-    buf_printf(&o, "/><pivotFields count=\"%d\">", nf);
-    for (k = 0; k < nf; k++) {
+    buf_printf(&o, "/><pivotFields count=\"%d\">", ncf);
+    for (k = 0; k < ncf; k++) {
       CField *f = &cf[k];
-      const PivotField *af = NULL;
-      const char *axis = NULL;
-      int isdata = 0, *ord = NULL;
-      for (i = 0; i < p->nrows; i++) if (str_ieq(p->rows[i].name, f->name)) { axis = "axisRow"; af = &p->rows[i]; }
-      for (i = 0; i < p->ncols; i++) if (str_ieq(p->cols[i].name, f->name)) { axis = "axisCol"; af = &p->cols[i]; }
-      for (i = 0; i < p->nfilters; i++) if (str_ieq(p->filters[i].name, f->name)) { axis = "axisPage"; af = &p->filters[i]; }
-      for (i = 0; i < p->nvals; i++) if (str_ieq(p->vals[i].name, f->name)) isdata = 1;
+      const PivotField *af = afield[k];
+      const char *ax = axis[k] == 1 ? "axisRow" : axis[k] == 2 ? "axisCol" : axis[k] == 3 ? "axisPage" : NULL;
+      int isdata = 0, nl, *ord = NULL;
+      char **labs = cf_labels(f, &nl);
+      for (i = 0; i < p->nvals; i++) if (fieldof[i] == k) isdata = 1;
       buf_adds(&o, "<pivotField");
-      if (axis) buf_printf(&o, " axis=\"%s\"", axis);
+      if (ax) buf_printf(&o, " axis=\"%s\"", ax);
       if (isdata) buf_adds(&o, " dataField=\"1\"");
+      if (f->formula) buf_adds(&o, " dragToRow=\"0\" dragToCol=\"0\" dragToPage=\"0\"");
       if (p->layout == PL_OUTLINE) buf_adds(&o, " compact=\"0\"");
       else if (p->layout == PL_TABULAR) buf_adds(&o, " compact=\"0\" outline=\"0\"");
-      if (axis && af && af->nhidden && !strcmp(axis, "axisPage")) buf_adds(&o, " multipleItemSelectionAllowed=\"1\"");
+      if (f->gk == GK_DATE) buf_adds(&o, " numFmtId=\"14\"");
+      if (af && af->nhidden && axis[k] == 3) buf_adds(&o, " multipleItemSelectionAllowed=\"1\"");
       buf_adds(&o, " showAll=\"0\"");
-      if (af && strcmp(axis, "axisPage")) buf_adds(&o, af->sort == PO_DESC ? " sortType=\"descending\"" : af->sort == PO_ASC ? " sortType=\"ascending\"" : "");
-      if (!p->subtotals) buf_adds(&o, " defaultSubtotal=\"0\"");
+      if (af && axis[k] <= 2) buf_adds(&o, af->sort == PO_DESC ? " sortType=\"descending\"" : af->sort == PO_ASC ? " sortType=\"ascending\"" : "");
+      if (!p->subtotals || f->formula) buf_adds(&o, " defaultSubtotal=\"0\"");
       if (p->subtotals && !p->subtop) buf_adds(&o, " subtotalTop=\"0\"");
-      if (p->blankrows && axis && !strcmp(axis, "axisRow")) buf_adds(&o, " insertBlankRow=\"1\"");
-      if (!axis) { buf_adds(&o, "/>"); continue; }
-      /* the items in report order, those filtered out hidden */
-      ord = f->n ? (int *)malloc((size_t)f->n * sizeof(int)) : NULL;
-      buf_printf(&o, "><items count=\"%d\">", f->n + (p->subtotals ? 1 : 0));
+      if (p->blankrows && axis[k] == 1) buf_adds(&o, " insertBlankRow=\"1\"");
+      if (!ax && !(axis[k] == 4 && f->itemized)) { buf_adds(&o, "/>"); continue; }
+      /* the items in report order, those filtered out hidden, those collapsed sd="0" */
+      ord = nl ? (int *)malloc((size_t)nl * sizeof(int)) : NULL;
+      buf_printf(&o, "><items count=\"%d\">", nl + (p->subtotals ? 1 : 0));
       if (ord) {
-        char **items;
-        int ni = pivot_items(b, p, f->name, &items), j, shown = 0;
-        for (i = 0; i < f->n; i++) ord[i] = i;
-        /* pivot_items is in report order: follow it */
-        {
-          int m = 0;
-          for (j = 0; j < ni; j++) { int x = cf_index(f, items[j]); if (x >= 0) ord[m++] = x; }
-          for (i = 0; i < f->n && m < f->n; i++) { int seen = 0; for (j = 0; j < m; j++) if (ord[j] == i) seen = 1; if (!seen) ord[m++] = i; }
-        }
-        for (i = 0; i < f->n; i++) if (!(af && hidden_of(af, f->lab[ord[i]]))) shown++;
-        for (i = 0; i < f->n; i++) {
+        char **items = NULL;
+        int ni = f->gk == GK_NONE && af ? pivot_field_items_of(b, p, af->name, axis[k] == 4 ? NULL : af, &items) : 0, j, shown = 0, m = 0;
+        for (j = 0; j < ni; j++) { int x; for (x = 0; x < nl && !str_ieq(labs[x], items[j]); x++) ; if (x < nl) { int seen = 0, q; for (q = 0; q < m; q++) if (ord[q] == x) seen = 1; if (!seen) ord[m++] = x; } }
+        for (i = 0; i < nl && m < nl; i++) { int seen = 0; for (j = 0; j < m; j++) if (ord[j] == i) seen = 1; if (!seen) ord[m++] = i; }
+        for (i = 0; i < nl; i++) if (!(af && hidden_of(af, labs[ord[i]]))) shown++;
+        for (i = 0; i < nl; i++) {
           buf_printf(&o, "<item x=\"%d\"", ord[i]);
-          if (shown && af && hidden_of(af, f->lab[ord[i]])) buf_adds(&o, " h=\"1\"");
+          if (shown && af && hidden_of(af, labs[ord[i]])) buf_adds(&o, " h=\"1\"");
+          if (af && axis[k] <= 2 && pivot_is_collapsed(af, labs[ord[i]])) buf_adds(&o, " sd=\"0\"");
           buf_adds(&o, "/>");
         }
         pivot_strings_free(items, ni);
@@ -411,30 +613,34 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
       buf_printf(&o, "<pageFields count=\"%d\">", np);
       for (i = 0; i < np; i++) {
         CField *f = &cf[pagef[i]];
-        int j, shown = 0, last = -1;
-        for (j = 0; j < f->n; j++) if (!hidden_of(&p->filters[i], f->lab[j])) { shown++; last = j; }
+        const PivotField *pf = afield[pagef[i]];
+        int j, shown = 0, last = -1, nl;
+        char **labs = cf_labels(f, &nl);
+        for (j = 0; j < nl; j++) if (!hidden_of(pf, labs[j])) { shown++; last = j; }
         buf_printf(&o, "<pageField fld=\"%d\"", pagef[i]);
-        if (p->filters[i].nhidden && shown == 1) buf_printf(&o, " item=\"%d\"", last);
+        if (pf->nhidden && shown == 1) buf_printf(&o, " item=\"%d\"", last);
         buf_adds(&o, " hier=\"-1\"/>");
       }
       buf_adds(&o, "</pageFields>");
     }
     if (V) {
       static const char *const sub[PF_N] = { "sum", "count", "average", "max", "min", "product", "countNums", "stdDev", "stdDevp", "var", "varp" };
-      static const char *const showas[PS_N] = { "", "percentOfTotal", "percentOfCol", "percentOfRow" };
+      static const char *const showas[PS_N] = { "", "percentOfTotal", "percentOfCol", "percentOfRow", "runTotal", "" };
+      int basef = R ? rowf[0] : C ? colf[0] : 0;
       buf_printf(&o, "<dataFields count=\"%d\">", V);
       for (i = 0; i < p->nvals; i++) {
-        int x = -1;
         char cap[300];
-        for (k = 0; k < nf; k++) if (str_ieq(names[k], p->vals[i].name)) x = k;
-        if (x < 0) continue;
+        int sa = p->vals[i].showas;
+        if (fieldof[i] < 0) continue;
         pivot_caption(&p->vals[i], cap, sizeof cap);
-        buf_adds(&o, "<dataField name=\""); esc(&o, cap); buf_printf(&o, "\" fld=\"%d\"", x);
+        buf_adds(&o, "<dataField name=\""); esc(&o, cap); buf_printf(&o, "\" fld=\"%d\"", fieldof[i]);
         if (p->vals[i].func != PF_SUM && p->vals[i].func < PF_N) buf_printf(&o, " subtotal=\"%s\"", sub[p->vals[i].func]);
-        if (p->vals[i].showas > PS_NORMAL && p->vals[i].showas < PS_N) buf_printf(&o, " showDataAs=\"%s\"", showas[p->vals[i].showas]);
-        buf_adds(&o, " baseField=\"0\" baseItem=\"0\"");
-        if (p->vals[i].showas != PS_NORMAL) buf_adds(&o, " numFmtId=\"10\"");
-        buf_adds(&o, "/>");
+        if (sa > PS_NORMAL && sa < PS_N && showas[sa][0]) buf_printf(&o, " showDataAs=\"%s\"", showas[sa]);
+        buf_printf(&o, " baseField=\"%d\" baseItem=\"0\"", sa == PS_RUNTOTAL || sa == PS_RANK ? basef : 0);
+        if (sa >= PS_PCT_GRAND && sa <= PS_PCT_ROW) buf_adds(&o, " numFmtId=\"10\"");
+        if (sa == PS_RANK) buf_adds(&o, "><extLst><ext uri=\"{E15A36E0-9728-4e99-A89B-3F7291B0FE68}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">"
+                                        "<x14:dataField pivotShowAs=\"rankDescending\"/></ext></extLst></dataField>");
+        else buf_adds(&o, "/>");
       }
       buf_adds(&o, "</dataFields>");
     }
@@ -442,7 +648,7 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
     if (p->style[0]) { buf_adds(&o, " name=\""); esc(&o, p->style); buf_adds(&o, "\""); }
     buf_printf(&o, " showRowHeaders=\"%d\" showColHeaders=\"%d\" showRowStripes=\"%d\" showColStripes=\"%d\" showLastColumn=\"1\"/></pivotTableDefinition>",
                p->rowheaders, p->colheaders, p->bandrows, p->bandcols);
-    free(rowf); free(colf); free(pagef);
+    free(rowf); free(colf); free(pagef); free(fieldof); free(afield); free(axis);
   }
   sprintf(path, "xl/pivotTables/pivotTable%d.xml", id);
   zip_add(w, path, o.data, o.len);
@@ -453,9 +659,10 @@ static void write_pivot(Book *b, int si, LPivot *p, int id, ZipWriter *w)
   zip_add(w, path, o.data, o.len);
 done:
   buf_free(&o);
-  for (k = 0; k < nf; k++) {
+  for (k = 0; k < ncf; k++) {
     for (i = 0; i < cf[k].n; i++) { free(cf[k].lab[i]); val_free(&cf[k].val[i]); }
-    free(cf[k].lab); free(cf[k].val);
+    for (i = 0; i < cf[k].ngi; i++) free(cf[k].gi[i]);
+    free(cf[k].lab); free(cf[k].val); free(cf[k].gi); free(cf[k].disc); free(cf[k].name); free(cf[k].formula);
   }
   free(cf);
   pivot_strings_free(names, nf);
@@ -645,26 +852,51 @@ static void read_table(Book *b, ZipReader *z, const char *path, int sheet)
   s->tables = nt;
   s->tables[s->ntables++] = t;
 }
-/* a pivot cache: the source and its fields' names and shared items' labels */
-typedef struct { char source[256]; char **names; int nf; char ***items; int *nitems; } Cache;
+/* a pivot cache: the source and its fields' names, shared items' labels, groupings and formulas */
+typedef struct {
+  char *formula;                  /* a calculated field's */
+  int base, par;                  /* a grouping's column field (-1 none) */
+  u8 gk, level;                   /* GK_, PG_ */
+  double gstart, gend, gstep;
+  char **gi; int ngi;             /* group items */
+  int *disc; int ndisc;           /* discretePr */
+} CacheF;
+typedef struct { char source[256]; char **names; int nf; char ***items; int *nitems; CacheF *cf; int cacheid; } Cache;
 static void cache_free(Cache *c)
 {
   int k;
-  for (k = 0; k < c->nf; k++) { pivot_strings_free(c->items[k], c->nitems[k]); free(c->names[k]); }
-  free(c->names); free(c->items); free(c->nitems);
+  for (k = 0; k < c->nf; k++) {
+    pivot_strings_free(c->items[k], c->nitems[k]); free(c->names[k]);
+    if (c->cf) { free(c->cf[k].formula); pivot_strings_free(c->cf[k].gi, c->cf[k].ngi); free(c->cf[k].disc); }
+  }
+  free(c->names); free(c->items); free(c->nitems); free(c->cf);
+}
+static void strs_push(char ***v, int *n, const char *s)
+{
+  char **nv = (char **)realloc(*v, (size_t)(*n + 1) * sizeof(char *));
+  if (!nv) return;
+  *v = nv;
+  nv[(*n)++] = str_dup(s);
+}
+static int level_of(const char *g)
+{
+  int i;
+  for (i = PG_YEARS; i < PG_N; i++) if (!strcmp(g, groupby[i])) return i;
+  return PG_NONE;
 }
 static int read_cache(Book *b, ZipReader *z, const char *path, Cache *c)
 {
   size_t len;
   u8 *d = part(z, path, &len);
   Xml x;
-  int cur = -1, insh = 0;
+  int cur = -1, insh = 0, ingi = 0;
   char sheet[64] = "", ref[64] = "";
   memset(c, 0, sizeof *c);
   if (!d) return 0;
   xml_init(&x, (const char *)d, len);
   while (xml_next(&x) != XT_EOF) {
     if (x.type == XT_END && !strcmp(x.name, "sharedItems")) { insh = 0; continue; }
+    if (x.type == XT_END && !strcmp(x.name, "groupItems")) { ingi = 0; continue; }
     if (x.type != XT_START) continue;
     if (!strcmp(x.name, "worksheetSource")) {
       const char *nm = xml_attr(&x, "name"), *r = xml_attr(&x, "ref"), *sh = xml_attr(&x, "sheet");
@@ -672,27 +904,48 @@ static int read_cache(Book *b, ZipReader *z, const char *path, Cache *c)
       if (r) snprintf(ref, sizeof ref, "%s", r);
       if (sh) snprintf(sheet, sizeof sheet, "%s", sh);
     } else if (!strcmp(x.name, "cacheField")) {
-      const char *nm = xml_attr(&x, "name");
+      const char *nm = xml_attr(&x, "name"), *fo = xml_attr(&x, "formula");
       char **nn = (char **)realloc(c->names, (size_t)(c->nf + 1) * sizeof(char *));
       char ***ni;
       int *nc;
+      CacheF *ncf;
       if (!nn) continue;
       c->names = nn;
       if (!(ni = (char ***)realloc(c->items, (size_t)(c->nf + 1) * sizeof(char **)))) continue;
       c->items = ni;
       if (!(nc = (int *)realloc(c->nitems, (size_t)(c->nf + 1) * sizeof(int)))) continue;
       c->nitems = nc;
+      if (!(ncf = (CacheF *)realloc(c->cf, (size_t)(c->nf + 1) * sizeof(CacheF)))) continue;
+      c->cf = ncf;
       cur = c->nf++;
       c->names[cur] = str_dup(nm ? nm : "");
       c->items[cur] = NULL; c->nitems[cur] = 0;
+      memset(&c->cf[cur], 0, sizeof(CacheF));
+      c->cf[cur].base = c->cf[cur].par = -1;
+      if (fo) c->cf[cur].formula = str_dup(fo);
     } else if (!strcmp(x.name, "sharedItems")) insh = !x.pending_end;
-    else if (insh && cur >= 0 && (!strcmp(x.name, "s") || !strcmp(x.name, "n") || !strcmp(x.name, "b") || !strcmp(x.name, "e") || !strcmp(x.name, "m") || !strcmp(x.name, "d"))) {
+    else if (!strcmp(x.name, "groupItems")) ingi = !x.pending_end;
+    else if (!strcmp(x.name, "fieldGroup") && cur >= 0) {
+      const char *ba = xml_attr(&x, "base"), *pa = xml_attr(&x, "par");
+      c->cf[cur].base = ba ? atoi(ba) : cur;
+      if (pa) c->cf[cur].par = atoi(pa);
+    } else if (!strcmp(x.name, "rangePr") && cur >= 0) {
+      const char *g = xml_attr(&x, "groupBy"), *s1 = xml_attr(&x, "startNum"), *e1 = xml_attr(&x, "endNum"), *gi = xml_attr(&x, "groupInterval");
+      int lv = g ? level_of(g) : PG_RANGE;
+      if (lv >= PG_YEARS && lv <= PG_DAYS) { c->cf[cur].gk = GK_DATE; c->cf[cur].level = (u8)lv; }
+      else if (lv == PG_RANGE) {
+        c->cf[cur].gk = GK_RANGE; c->cf[cur].level = PG_RANGE;
+        c->cf[cur].gstart = s1 ? strtod(s1, NULL) : 0; c->cf[cur].gend = e1 ? strtod(e1, NULL) : 0; c->cf[cur].gstep = gi ? strtod(gi, NULL) : 1;
+      }
+    } else if (!strcmp(x.name, "discretePr") && cur >= 0) c->cf[cur].gk = GK_DISCRETE;
+    else if (!strcmp(x.name, "x") && cur >= 0 && c->cf[cur].gk == GK_DISCRETE && !ingi) {
+      const char *v = xml_attr(&x, "v");
+      int *nd = (int *)realloc(c->cf[cur].disc, (size_t)(c->cf[cur].ndisc + 1) * sizeof(int));
+      if (nd) { c->cf[cur].disc = nd; nd[c->cf[cur].ndisc++] = v ? atoi(v) : 0; }
+    } else if ((insh || ingi) && cur >= 0 && (!strcmp(x.name, "s") || !strcmp(x.name, "n") || !strcmp(x.name, "b") || !strcmp(x.name, "e") || !strcmp(x.name, "m") || !strcmp(x.name, "d"))) {
       const char *v = xml_attr(&x, "v");
       char lab[256];
-      char **nl = (char **)realloc(c->items[cur], (size_t)(c->nitems[cur] + 1) * sizeof(char *));
       Value val = val_empty();
-      if (!nl) continue;
-      c->items[cur] = nl;
       if (x.name[0] == 's') val = val_str(v ? v : "");
       else if (x.name[0] == 'n') val = val_num(v ? strtod(v, NULL) : 0);
       else if (x.name[0] == 'b') val = val_bool(v && (!strcmp(v, "1") || !strcmp(v, "true")));
@@ -700,7 +953,11 @@ static int read_cache(Book *b, ZipReader *z, const char *path, Cache *c)
       else if (x.name[0] == 'd' && v) { int y = 0, m = 0, dd = 0; sscanf(v, "%d-%d-%d", &y, &m, &dd); val = val_num(date_serial(y, m, dd)); }
       pivot_item_label(b, &val, lab, sizeof lab);
       val_free(&val);
-      nl[c->nitems[cur]++] = str_dup(lab);
+      if (ingi) strs_push(&c->cf[cur].gi, &c->cf[cur].ngi, lab);
+      else strs_push(&c->items[cur], &c->nitems[cur], lab);
+    } else if (!strcmp(x.name, "pivotCacheDefinition")) {
+      const char *id = xml_attr(&x, "pivotCacheId");
+      if (id) c->cacheid = atoi(id);
     }
   }
   xml_free(&x);
@@ -725,12 +982,49 @@ static int read_cache(Book *b, ZipReader *z, const char *path, Cache *c)
   }
   return c->source[0] != 0;
 }
+/* the labels <item x> counts in cache field k */
+static char **cache_labels(Cache *c, int k, int *n)
+{
+  if (c->cf[k].gk != GK_NONE && c->cf[k].ngi) { *n = c->cf[k].ngi; return c->cf[k].gi; }
+  *n = c->nitems[k]; return c->items[k];
+}
 static void add_hidden(PivotField *f, const char *lab)
 {
   char **nh = (char **)realloc(f->hidden, (size_t)(f->nhidden + 1) * sizeof(char *));
   if (!nh) return;
   f->hidden = nh;
   f->hidden[f->nhidden++] = str_dup(lab);
+}
+/* cache field k as a field of area: the column it groups and how */
+static int add_cache_field(LPivot *p, Cache *c, int area, int k)
+{
+  CacheF *f = &c->cf[k];
+  int base = f->base >= 0 && f->base < c->nf ? f->base : k, ok;
+  PivotField *pf;
+  int n;
+  if (f->gk == GK_DATE) ok = pivot_def_add_level(p, area, c->names[base], f->level);
+  else ok = area == PA_FILTERS ? pivot_def_add(p, area, c->names[base], 0) : pivot_def_add_level(p, area, c->names[base], PG_NONE);
+  if (!ok) return 0;
+  n = area == PA_ROWS ? p->nrows : area == PA_COLS ? p->ncols : p->nfilters;
+  pf = &(area == PA_ROWS ? p->rows : area == PA_COLS ? p->cols : p->filters)[n - 1];
+  if (f->gk == GK_RANGE) { pf->group = PG_RANGE; pf->gstart = f->gstart; pf->gend = f->gend; pf->gstep = f->gstep > 0 ? f->gstep : 1; }
+  else if (f->gk == GK_DISCRETE && base != k) {
+    /* groups by hand: a group item holding base items other than itself */
+    int g, j;
+    for (g = 0; g < f->ngi; g++) {
+      char *its[1];
+      for (j = 0; j < f->ndisc && j < c->nitems[base]; j++)
+        if (f->disc[j] == g && !str_ieq(c->items[base][j], f->gi[g])) { its[0] = c->items[base][j]; pivot_group_items(p, area, n - 1, f->gi[g], its, 1); }
+      for (j = 0; j < f->ndisc && j < c->nitems[base]; j++)
+        if (f->disc[j] == g && str_ieq(c->items[base][j], f->gi[g])) {
+          /* (an item named as its group, alongside others) */
+          int i2, has = 0;
+          for (i2 = 0; i2 < pf->nmg; i2++) if (str_ieq(pf->mg[i2].name, f->gi[g])) has = 1;
+          if (has) { its[0] = c->items[base][j]; pivot_group_items(p, area, n - 1, f->gi[g], its, 1); }
+        }
+    }
+  }
+  return 1;
 }
 static void read_pivot(Book *b, ZipReader *z, const char *path, int sheet)
 {
@@ -740,9 +1034,10 @@ static void read_pivot(Book *b, ZipReader *z, const char *path, int sheet)
   char cpath[300];
   Cache c;
   LPivot p, *np;
-  int fi = -1, area = 0, i, *ax = NULL, nax = 0, subdef = 1, subtopdef = 1, blank = 0;
-  char ***hid = NULL;      /* (per cache field: hidden item labels, gathered then given to the fields) */
-  int *nhid = NULL, *sortv = NULL;
+  int fi = -1, area = 0, i, *ax = NULL, subdef = 1, subtopdef = 1, blank = 0, lastval = -1;
+  char ***hid = NULL, ***col = NULL;   /* (per cache field: hidden and collapsed item labels, given to the fields after) */
+  int *nhid = NULL, *ncol = NULL, *sortv = NULL;
+  int *rowk = NULL, *colk = NULL, *pagek = NULL;   /* each area field's cache field */
   Sheet *s = b->sh[sheet];
   if (!rel_target(z, path, "pivotCacheDefinition", cpath, sizeof cpath) || !read_cache(b, z, cpath, &c)) return;
   if (!(d = part(z, path, &len))) { cache_free(&c); return; }
@@ -751,10 +1046,23 @@ static void read_pivot(Book *b, ZipReader *z, const char *path, int sheet)
   p.layout = PL_COMPACT; p.subtotals = 1; p.subtop = 1; p.grandrows = 1; p.grandcols = 1; p.rowheaders = 1; p.colheaders = 1;
   ax = (int *)calloc((size_t)c.nf + 1, sizeof(int));
   hid = (char ***)calloc((size_t)c.nf + 1, sizeof(char **));
+  col = (char ***)calloc((size_t)c.nf + 1, sizeof(char **));
   nhid = (int *)calloc((size_t)c.nf + 1, sizeof(int));
+  ncol = (int *)calloc((size_t)c.nf + 1, sizeof(int));
   sortv = (int *)calloc((size_t)c.nf + 1, sizeof(int));
-  if (!ax || !hid || !nhid || !sortv) goto out;
+  rowk = (int *)calloc(17, sizeof(int)); colk = (int *)calloc(17, sizeof(int)); pagek = (int *)calloc(17, sizeof(int));
+  if (!ax || !hid || !col || !nhid || !ncol || !sortv || !rowk || !colk || !pagek) goto out;
   snprintf(p.source, sizeof p.source, "%s", c.source);
+  /* calculated fields */
+  for (i = 0; i < c.nf; i++)
+    if (c.cf[i].formula && c.cf[i].formula[0]) {
+      PivotCalc *nc = (PivotCalc *)realloc(p.calcs, (size_t)(p.ncalcs + 1) * sizeof(PivotCalc));
+      if (!nc) continue;
+      p.calcs = nc;
+      nc[p.ncalcs].name = str_dup(c.names[i]);
+      nc[p.ncalcs].formula = str_dup(c.cf[i].formula[0] == '=' ? c.cf[i].formula + 1 : c.cf[i].formula);
+      p.ncalcs++;
+    }
   xml_init(&x, (const char *)d, len);
   while (xml_next(&x) != XT_EOF) {
     if (x.type != XT_START) continue;
@@ -773,7 +1081,7 @@ static void read_pivot(Book *b, ZipReader *z, const char *path, int sheet)
       fi++;
       if (fi >= c.nf) continue;
       ax[fi] = !axis ? 0 : !strcmp(axis, "axisRow") ? 1 : !strcmp(axis, "axisCol") ? 2 : !strcmp(axis, "axisPage") ? 3 : 0;
-      sortv[fi] = st && !strcmp(st, "descending") ? PO_DESC : st && !strcmp(st, "ascending") ? PO_ASC : PO_ASC;
+      sortv[fi] = st && !strcmp(st, "descending") ? PO_DESC : PO_ASC;
       if (ax[fi] && ax[fi] != 3) {
         if (!attr1(&x, "defaultSubtotal", 1)) subdef = 0;
         if (!attr1(&x, "subtotalTop", 1)) subtopdef = 0;
@@ -781,39 +1089,50 @@ static void read_pivot(Book *b, ZipReader *z, const char *path, int sheet)
       }
     } else if (!strcmp(x.name, "item") && fi >= 0 && fi < c.nf) {
       const char *xi = xml_attr(&x, "x");
-      int k = xi ? atoi(xi) : -1;
-      if (attr1(&x, "h", 0) && k >= 0 && k < c.nitems[fi]) {
-        char **nh = (char **)realloc(hid[fi], (size_t)(nhid[fi] + 1) * sizeof(char *));
-        if (nh) { hid[fi] = nh; hid[fi][nhid[fi]++] = c.items[fi][k]; }
+      int k = xi ? atoi(xi) : -1, nl;
+      char **labs = cache_labels(&c, fi, &nl);
+      if (k >= 0 && k < nl) {
+        if (attr1(&x, "h", 0)) { char **nh = (char **)realloc(hid[fi], (size_t)(nhid[fi] + 1) * sizeof(char *)); if (nh) { hid[fi] = nh; hid[fi][nhid[fi]++] = labs[k]; } }
+        if (xml_attr(&x, "sd") && !attr1(&x, "sd", 1)) { char **nh = (char **)realloc(col[fi], (size_t)(ncol[fi] + 1) * sizeof(char *)); if (nh) { col[fi] = nh; col[fi][ncol[fi]++] = labs[k]; } }
       }
     } else if (!strcmp(x.name, "rowFields")) area = 1;
     else if (!strcmp(x.name, "colFields")) area = 2;
     else if (!strcmp(x.name, "field") && (area == 1 || area == 2)) {
       const char *xi = xml_attr(&x, "x");
       int k = xi ? atoi(xi) : -1;
-      if (k >= 0 && k < c.nf) {
-        pivot_def_add(&p, area == 1 ? PA_ROWS : PA_COLS, c.names[k], 0);
-        nax++;
+      if (k >= 0 && k < c.nf && !c.cf[k].formula) {
+        int n0 = area == 1 ? p.nrows : p.ncols;
+        if (n0 < 16 && add_cache_field(&p, &c, area == 1 ? PA_ROWS : PA_COLS, k)) (area == 1 ? rowk : colk)[n0] = k;
       }
     } else if (!strcmp(x.name, "pageField")) {
       const char *f = xml_attr(&x, "fld"), *it = xml_attr(&x, "item");
-      int k = f ? atoi(f) : -1;
-      if (k >= 0 && k < c.nf && pivot_def_add(&p, PA_FILTERS, c.names[k], 0) && it) {
-        /* one item chosen: the others hidden */
-        int one = atoi(it), j;
-        PivotField *pf = &p.filters[p.nfilters - 1];
-        for (j = 0; j < c.nitems[k]; j++) if (j != one) add_hidden(pf, c.items[k][j]);
+      int k = f ? atoi(f) : -1, n0 = p.nfilters;
+      if (k >= 0 && k < c.nf && n0 < 16 && add_cache_field(&p, &c, PA_FILTERS, k)) {
+        pagek[n0] = k;
+        if (it) {
+          /* one item chosen: the others hidden */
+          int one = atoi(it), j, nl;
+          char **labs = cache_labels(&c, k, &nl);
+          PivotField *pf = &p.filters[p.nfilters - 1];
+          for (j = 0; j < nl; j++) if (j != one) add_hidden(pf, labs[j]);
+        }
       }
     } else if (!strcmp(x.name, "dataField")) {
       const char *f = xml_attr(&x, "fld"), *nm = xml_attr(&x, "name"), *sub = xml_attr(&x, "subtotal"), *sa = xml_attr(&x, "showDataAs");
       static const char *const subs[PF_N] = { "sum", "count", "average", "max", "min", "product", "countNums", "stdDev", "stdDevp", "var", "varp" };
       int k = f ? atoi(f) : -1, fn = PF_SUM;
+      const char *ps = xml_attr(&x, "pivotShowAs");
+      /* (x14:dataField, inside the last one's extLst: names have no prefixes here) */
+      if (!f && ps && lastval >= 0) { if (!strncmp(ps, "rank", 4)) p.vals[lastval].showas = PS_RANK; continue; }
+      lastval = -1;
       if (k < 0 || k >= c.nf) continue;
       if (sub) for (i = 0; i < PF_N; i++) if (!strcmp(sub, subs[i])) fn = i;
       if (pivot_def_add(&p, PA_VALUES, c.names[k], fn)) {
         PivotValue *v = &p.vals[p.nvals - 1];
         char def[300];
-        if (sa) v->showas = (u8)(!strcmp(sa, "percentOfTotal") ? PS_PCT_GRAND : !strcmp(sa, "percentOfCol") ? PS_PCT_COL : !strcmp(sa, "percentOfRow") ? PS_PCT_ROW : PS_NORMAL);
+        lastval = p.nvals - 1;
+        if (sa) v->showas = (u8)(!strcmp(sa, "percentOfTotal") ? PS_PCT_GRAND : !strcmp(sa, "percentOfCol") ? PS_PCT_COL : !strcmp(sa, "percentOfRow") ? PS_PCT_ROW
+                                 : !strcmp(sa, "runTotal") ? PS_RUNTOTAL : PS_NORMAL);
         pivot_caption(v, def, sizeof def);
         if (nm && strcmp(nm, def)) v->caption = str_dup(nm);
       }
@@ -828,20 +1147,32 @@ static void read_pivot(Book *b, ZipReader *z, const char *path, int sheet)
   }
   xml_free(&x);
   p.subtotals = (u8)subdef; p.subtop = (u8)subtopdef; p.blankrows = (u8)blank;
-  /* hidden items and sorting to the fields they belong to */
-  for (i = 0; i < c.nf; i++) {
-    int k, j;
-    PivotField *lists[3] = { p.rows, p.cols, p.filters };
-    int counts[3] = { p.nrows, p.ncols, p.nfilters }, a;
-    for (a = 0; a < 3; a++)
-      for (k = 0; k < counts[a]; k++)
-        if (str_ieq(lists[a][k].name, c.names[i])) {
-          lists[a][k].sort = (u8)sortv[i];
-          if (lists[a][k].nhidden) continue;     /* (a page field's one item already says) */
-          for (j = 0; j < nhid[i]; j++) add_hidden(&lists[a][k], hid[i][j]);
-        }
+  /* hidden items, collapsed ones and sorting to the fields they came from */
+  {
+    int a, j;
+    for (a = 0; a < 3; a++) {
+      PivotField *l = a == 0 ? p.rows : a == 1 ? p.cols : p.filters;
+      int n = a == 0 ? p.nrows : a == 1 ? p.ncols : p.nfilters, *kk = a == 0 ? rowk : a == 1 ? colk : pagek;
+      for (i = 0; i < n && i < 16; i++) {
+        int k = kk[i];
+        if (a < 2) l[i].sort = (u8)sortv[k];
+        for (j = 0; j < ncol[k] && a < 2; j++) pivot_set_collapsed(&l[i], col[k][j], 1);
+        if (l[i].nhidden) continue;     /* (a page field's one item already says) */
+        for (j = 0; j < nhid[k]; j++) add_hidden(&l[i], hid[k][j]);
+      }
+    }
+    /* items hidden in a field on no axis: a slicer's filter */
+    for (i = 0; i < c.nf; i++)
+      if (!ax[i] && nhid[i] && !c.cf[i].formula && c.cf[i].gk == GK_NONE) {
+        PivotField *nf = (PivotField *)realloc(p.sfilters, (size_t)(p.nsfilters + 1) * sizeof(PivotField));
+        if (!nf) continue;
+        p.sfilters = nf;
+        memset(&nf[p.nsfilters], 0, sizeof(PivotField));
+        nf[p.nsfilters].name = str_dup(c.names[i]);
+        for (j = 0; j < nhid[i]; j++) add_hidden(&nf[p.nsfilters], hid[i][j]);
+        p.nsfilters++;
+      }
   }
-  if (p.nfilters && p.r >= p.nfilters + 1) { /* the filters sit above the location already */ }
   if ((np = (LPivot *)realloc(s->pivots, (size_t)(s->npivots + 1) * sizeof(LPivot)))) {
     s->pivots = np;
     s->pivots[s->npivots++] = p;
@@ -850,10 +1181,10 @@ static void read_pivot(Book *b, ZipReader *z, const char *path, int sheet)
 out:
   pivot_free1(&p);
   for (i = 0; hid && i < c.nf; i++) free(hid[i]);
-  free(hid); free(nhid); free(ax); free(sortv);
+  for (i = 0; col && i < c.nf; i++) free(col[i]);
+  free(hid); free(col); free(nhid); free(ncol); free(ax); free(sortv); free(rowk); free(colk); free(pagek);
   free(d);
   cache_free(&c);
-  (void)nax;
 }
 void tablexml_read_rel(Book *b, ZipReader *z, const char *type, const char *target, int sheet)
 {

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "drawing.h"
+#include "slicer.h"
 
 /* ------------------------------------------------------------------ pictures' bytes */
 Blob *blob_new(const u8 *data, u32 len)
@@ -23,7 +24,7 @@ void blob_free(Blob *b)
 }
 
 /* ------------------------------------------------------------------ objects */
-static const char *const kind_names[] = { "Chart", "Picture", "Shape" };
+static const char *const kind_names[] = { "Chart", "Picture", "Shape", "Slicer" };
 
 Drawing *drw_of(Sheet *s)
 {
@@ -46,11 +47,11 @@ DObj *drw_new(Sheet *s, int kind)
   o->id = d->nextid++;
   /* "Chart 2": one more than the highest number of its kind */
   for (i = 0; i < d->n - 1; i++) {
-    const char *nm = d->o[i].name, *base = kind_names[kind < 3 ? kind : 2];
+    const char *nm = d->o[i].name, *base = kind_names[kind < 4 ? kind : 2];
     size_t bl = strlen(base);
     if (!strncmp(nm, base, bl) && nm[bl] == ' ') { int v = atoi(nm + bl + 1); if (v > k) k = v; }
   }
-  snprintf(o->name, sizeof o->name, "%s %d", kind_names[kind < 3 ? kind : 2], k + 1);
+  snprintf(o->name, sizeof o->name, "%s %d", kind_names[kind < 4 ? kind : 2], k + 1);
   o->from.r = o->from.c = 0;
   o->to.r = 15; o->to.c = 8;
   return o;
@@ -60,6 +61,7 @@ void dobj_clear(DObj *o)
   free(o->descr); free(o->text);
   blob_free(o->pic);
   chart_free(o->chart);
+  slicer_free(o->slicer);
   memset(o, 0, sizeof *o);
 }
 int dobj_copy(DObj *dst, const DObj *src)
@@ -69,7 +71,8 @@ int dobj_copy(DObj *dst, const DObj *src)
   dst->text = src->text ? str_dup(src->text) : NULL;
   dst->pic = blob_ref(src->pic);
   dst->chart = src->chart ? chart_copy(src->chart) : NULL;
-  if ((src->descr && !dst->descr) || (src->text && !dst->text) || (src->chart && !dst->chart)) { dobj_clear(dst); return 0; }
+  dst->slicer = src->slicer ? slicer_copy(src->slicer) : NULL;
+  if ((src->descr && !dst->descr) || (src->text && !dst->text) || (src->chart && !dst->chart) || (src->slicer && !dst->slicer)) { dobj_clear(dst); return 0; }
   return 1;
 }
 void drw_remove(Sheet *s, int i)
