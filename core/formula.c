@@ -26,6 +26,7 @@ typedef struct {
   int errpos;
   const char *scope[64];          /* LET and LAMBDA parameter names in force */
   int nscope;
+  int lambdarg;                   /* parsing an argument of LAMBDA (where [x] is an optional parameter) */
 } P;
 int formula_file_mode;
 int formula_lz_none;              /* Formula.lz for a formula without lazy functions (calc.c) */
@@ -190,7 +191,7 @@ static void parse_call(P *ps, const char *name, size_t len)
     int start = ps->f->n;
     skip_ws(ps);
     if (*ps->p == ',' || *ps->p == ')') emit_op(ps, T_MISSING);
-    else parse_expr(ps);
+    else { int la = ps->lambdarg; ps->lambdarg = binder == 2; parse_expr(ps); ps->lambdarg = la; }
     if (ps->err) return;
     argc++;
     skip_ws(ps);
@@ -292,6 +293,16 @@ static int parse_trimref(P *ps)
   return 1;
 }
 /* a structured reference: the table's name (len characters at name, perhaps none) and its brackets at ps->p */
+/* [name] followed by a comma: LAMBDA's optional parameter */
+static int optional_param(const char *p)
+{
+  p++;
+  while (isalnum((u8)*p) || *p == '_' || *p == '.' || (u8)*p >= 0x80) p++;
+  if (*p != ']') return 0;
+  p++;
+  while (*p == ' ') p++;
+  return *p == ',';
+}
 static void parse_tref(P *ps, const char *name, size_t len)
 {
   int n = table_ref_scan(ps->p);
@@ -334,8 +345,8 @@ static void parse_primary(P *ps)
     parse_postfix_call(ps);
     return;
   }
-  /* [name]: an optional LAMBDA parameter */
-  if (*ps->p == '[') {
+  /* [name]: an optional LAMBDA parameter (elsewhere [Col] is a structured reference to the formula's table) */
+  if (*ps->p == '[' && ps->lambdarg && optional_param(ps->p)) {
     const char *st = ++ps->p;
     while (isalnum((u8)*ps->p) || *ps->p == '_' || *ps->p == '.' || (u8)*ps->p >= 0x80) ps->p++;
     if (ps->p == st || *ps->p != ']') { fail(ps); return; }

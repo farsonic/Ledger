@@ -1138,7 +1138,7 @@ static void tables(void)
     LTable *u = &c->sh[0]->tables[0];
     ok("table xlsx: name, range, options", !strcmp(u->name, "Table1") && u->r.r1 == 0 && u->r.r2 == 9 && u->r.c2 == 4 && u->header && u->totals && u->bandrows && !strcmp(u->style, "TableStyleMedium2"));
     ok("table xlsx: columns and totals", u->ncols == 5 && !strcmp(u->cols[2].name, "Revenue") && u->cols[2].totfn == TF_AVERAGE && u->cols[0].totlabel && !strcmp(u->cols[0].totlabel, "Total"));
-    ok("table xlsx: calculated column", u->cols[4].calcformula && !strcmp(u->cols[4].calcformula, "[@Revenue]/[@Units]"));
+    ok("table xlsx: calculated column", u->ncols == 5 && u->cols[4].calcformula && !strcmp(u->cols[4].calcformula, "[@Revenue]/[@Units]"));
     ok("table xlsx: formulas", text_at(c, "F1", "=SUM(Table1[Revenue])") && num_at(c, "F1") == 665 && text_at(c, "E3", "=[@Revenue]/[@Units]") && num_at(c, "E3") == 12.5);
   }
   if (c) book_free(c);
