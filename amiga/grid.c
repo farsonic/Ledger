@@ -34,6 +34,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "layout.h"
 #include "../core/calc.h"
 #include "../core/ops.h"
 #include "../core/cond.h"
@@ -50,7 +51,7 @@
 #define EMAX 2000                /* the editor's text, bytes */
 
 /* where the mouse is dragging */
-enum { DR_NONE, DR_CELLS, DR_COLW, DR_ROWH, DR_COLS, DR_ROWS, DR_FILL, DR_POINT };
+enum { DR_NONE, DR_CELLS, DR_COLW, DR_ROWH, DR_COLS, DR_ROWS, DR_FILL, DR_POINT, DR_LAYOUT };
 
 struct Data {
   Object *obj;
@@ -320,6 +321,7 @@ static void layout(struct Data *d, LONG w, LONG h)
   for (r = s->top; r < MAXROW && d->nvr < MAXVR && y < h; r++) {
     LONG rh = rowh(d, r);
     if (!rh) continue;
+    y += lx_gap_before(d->book, SI(d), 1, r, zoom(d));
     d->vr[d->nvr] = r; d->vy[d->nvr++] = y; y += rh;
   }
   d->vy[d->nvr] = y;
@@ -334,6 +336,7 @@ static void layout(struct Data *d, LONG w, LONG h)
   for (c = s->left; c < MAXCOL && d->nvc < MAXVC && x < w; c++) {
     LONG cw = colw(d, c);
     if (!cw) continue;
+    x += lx_gap_before(d->book, SI(d), 0, c, zoom(d));
     d->vc[d->nvc] = c; d->vx[d->nvc++] = x; x += cw;
   }
   d->vx[d->nvc] = x;
@@ -1015,12 +1018,18 @@ static void draw_notes(struct Data *d, struct RastPort *rp)
     draw_box(d, rp, d->hover_r, d->hover_c, NULL, t);
   }
 }
+static LONG pen_cb(void *pd, ULONG rgb) { return pen_for((struct Data *)pd, rgb); }
 static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
 {
+  GridGeom g;
   layout(d, w, h);
   draw_cells(d, rp);
   draw_headings(d, rp);
   draw_filters(d, rp);
+  /* (layout.h) page breaks, page numbers and tracer arrows over the cells */
+  g.obj = d->obj; g.book = d->book; g.sheet = SI(d); g.zoom = zoom(d); g.hw = d->hw; g.hh = d->hh; g.w = d->w; g.h = d->h;
+  g.nvr = d->nvr; g.nvc = d->nvc; g.vr = d->vr; g.vy = d->vy; g.vc = d->vc; g.vx = d->vx; g.pen = pen_cb; g.pd = d;
+  lx_grid_draw(rp, &g);
   draw_marks(d, rp);
   draw_notes(d, rp);
   draw_editor(d, rp, 0, 0);
@@ -1384,7 +1393,8 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   case 0x41: edit_begin(d, "", 1); return 1;                    /* Backspace: the cell cleared and typed into */
   case 0x51: edit_begin(d, NULL, 2); return 1;                  /* F2 */
   case 0x45: if (d->copied) { d->copied = 0; redraw(d); } return 1;   /* Esc: the copied outline goes */
-  case 0x58: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_CALCNOW); return 1;   /* F9 */
+  case 0x58: DoMethod(_app(obj), MUIM_Application_ReturnID, shift ? ID_LX_CALCSHEET : ID_CALCNOW); return 1;   /* F9, Shift-F9 */
+  case 0x56: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_LX_SPELLING); return 1;   /* F7 */
   case 0x7A: case 0x7B: scroll_rows(d, code == 0x7A ? -3 : 3); return 1;             /* the mouse wheel */
   }
   /* Shift-F3 Insert Function, Shift-F11 a new sheet, Alt-= AutoSum, Ctrl-` show formulas */
@@ -1587,6 +1597,7 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
   x = im->MouseX - _mleft(obj); y = im->MouseY - _mtop(obj);
   inside = x >= 0 && y >= 0 && x < _mwidth(obj) && y < _mheight(obj);
   if (im->Class == IDCMP_MOUSEMOVE || im->Class == IDCMP_INTUITICKS) {
+    if (d->drag == DR_LAYOUT) { lx_grid_mouse(obj, 1, x, y); return MUI_EventHandlerRC_Eat; }
     if (d->drag) { drag_to(d, obj, x, y); return MUI_EventHandlerRC_Eat; }
     if (im->Class == IDCMP_MOUSEMOVE) { hover_edge(d, obj, x, y, inside); return 0; }
     if (im->Class == IDCMP_INTUITICKS) {
@@ -1600,8 +1611,10 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
     return 0;
   }
   if (im->Class != IDCMP_MOUSEBUTTONS) return 0;
+  if (im->Code == SELECTUP && d->drag == DR_LAYOUT) { d->drag = DR_NONE; events_set(d, obj, EV_IDLE); lx_grid_mouse(obj, 2, x, y); return MUI_EventHandlerRC_Eat; }
   if (im->Code == SELECTUP) { if (d->drag) { drag_end(d, obj); return MUI_EventHandlerRC_Eat; } return 0; }
   if (im->Code != SELECTDOWN || !inside) return 0;
+  if (!d->editing && lx_grid_mouse(obj, 0, x, y)) { d->drag = DR_LAYOUT; events_set(d, obj, EV_DRAG); return MUI_EventHandlerRC_Eat; }
   {
     Sheet *s = SH(d);
     i32 r, c, e;

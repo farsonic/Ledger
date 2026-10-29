@@ -23,6 +23,7 @@
 #include "theme.h"
 #include "ids.h"
 #include "lang.h"
+#include "layout.h"
 #include "../core/template.h"     /* TPL_ */
 
 enum { BP_HOME, BP_NEW, BP_OPEN, BP_INFO, BP_EXPORT, BP_OPTIONS, BP_ABOUT };
@@ -39,7 +40,7 @@ static const Side side[] = {
 #define MAXR 10
 #define MAXHOT 40
 typedef struct { WORD x0, y0, x1, y1; } BBox;
-enum { H_NONE, H_BACK, H_SIDE, H_TEMPLATE, H_RECENT, H_BROWSE, H_PDF, H_TEXT, H_CM, H_IN, H_NAME, H_THEME, H_LANG, H_SIZE, H_WINDOW };
+enum { H_NONE, H_BACK, H_SIDE, H_TEMPLATE, H_RECENT, H_BROWSE, H_PDF, H_TEXT, H_CM, H_IN, H_NAME, H_THEME, H_LANG, H_SIZE, H_WINDOW, H_LX };
 typedef struct { BBox b; int kind, n; } Hot;
 /* the File page's instance data. hot: the clickable areas found while drawing, which the events
    look the pointer up in; editing: the name field has the keyboard; metric, dark, lang, large: the
@@ -273,11 +274,14 @@ static void back_draw(struct BData *d, Object *obj)
       } else text_fit(rp, theme_font(), x, y, line, r - x - 12, tpen(T_TEXT));
       y += fh() + 6;
     }
+    if (y + 2 * fh() + 20 < b) big_button(d, rp, x, y + 6, r - x - 16 < 320 ? r - x - 16 : 320, IC_INFO, "Edit Properties", "Title, subject, author, keywords, company and more", H_LX + 2);
     break; }
   case BP_EXPORT: {
     LONG w = r - x - 16 < 320 ? r - x - 16 : 320;
     y = big_button(d, rp, x, y, w, IC_SAVE, "Save as Excel workbook", "The whole workbook as an .xlsx file", H_PDF);
-    big_button(d, rp, x, y, w, IC_EXPORT, "Save as CSV", "This sheet's values, comma separated, for any program", H_TEXT);
+    y = big_button(d, rp, x, y, w, IC_EXPORT, "Save as CSV", "This sheet's values, comma separated, for any program", H_TEXT);
+    y = big_button(d, rp, x, y, w, IC_PDF, "Export to PDF", "The pages as Page Setup lays them out, fonts embedded", H_LX + 0);
+    big_button(d, rp, x, y, w, IC_WEB, "Export as Web Page", "The sheets as HTML tables, with their formatting", H_LX + 1);
     break; }
   case BP_OPTIONS: {
     static const char *const units[] = { "Day/Month/Year", "Month/Day/Year" }, *const themes[] = { "Light", "Dark" }, *const sizes[] = { "Normal", "Large" };
@@ -300,6 +304,8 @@ static void back_draw(struct BData *d, Object *obj)
       if (d->editing) theme_fill(rp, x + 6 + w, y + 3, x + 6 + w, y + fh() + 4, tpen(T_TEXT));
     }
     add_hot(d, x, y, x + bw - 1, y + fh() + 7, H_NAME, 0);
+    y += fh() + 18;
+    if (y + 2 * fh() + 14 < b) big_button(d, rp, x, y, r - x - 16 < 320 ? r - x - 16 : 320, IC_CALCOPTS, "Formulas", "Calculation: automatic or manual, iterative calculation", H_LX + 3);
     break; }
   case BP_ABOUT: {
     static const char *const lines[] = {
@@ -358,6 +364,10 @@ static ULONG back_events(struct IClass *cl, Object *obj, struct MUIP_HandleEvent
     case H_BROWSE: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_OPEN); break;
     case H_PDF: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_SAVEAS); break;
     case H_TEXT: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_SAVECSV); break;
+    case H_LX: case H_LX + 1: case H_LX + 2: case H_LX + 3: {
+      static const ULONG lx_ids[4] = { ID_LX_EXPORTPDF, ID_LX_EXPORTHTML, ID_LX_PROPS, ID_LX_CALCOPTS };
+      DoMethod(_app(obj), MUIM_Application_ReturnID, lx_ids[ht->kind - H_LX]);
+      break; }
     case H_CM: case H_THEME: case H_LANG: case H_SIZE:
       if (ht->kind == H_CM) d->metric = ht->n == 0;
       else if (ht->kind == H_THEME) d->dark = ht->n;
