@@ -15,7 +15,7 @@
 #     ALL-CAPS names such as function names, file and device names, the arguments of printf, strcmp
 #     and other calls that never show their text, gadget sizing samples (MUIA_FixWidthTxt ...)).
 # It also checks each row's translations keep the English's printf conversions (%s %d ...) in order,
-# its '|' requester buttons, its leading MUI escape (\33c) and its '_' shortcut marker, and it
+# its '|' requester buttons, no translation that is another row's English (tr() twice), its leading MUI escape (\33c) and its '_' shortcut marker, and it
 # flags a literal handed straight to a gadget (Label1("..."), QButton("..."), MUIA_ShortHelp ...)
 # without tr() (unless its line says "lang: as is"). After adding strings, run this, translate, then tools/mklang.py.
 import glob, os, re, sys
@@ -165,6 +165,13 @@ def main():
     probs = []
     for en, (n, v) in rows.items():
         for p in check_row(v): probs.append('lang/strings.txt:%d: %s' % (n, p))
+        # theme_text() translates what it is given, and some callers hand it words already translated:
+        # a translation that is another row's English must translate to itself there
+        for k in range(1, mklang.NLANG):
+            t = v[k]
+            if t != en and t in rows and rows[t][1][k] != t:
+                probs.append('lang/strings.txt:%d: %s "%s" is also the English of line %d (translated twice it becomes "%s")'
+                             % (n, 'de fr es it'.split()[k - 1], t, rows[t][0], rows[t][1][k]))
     if '--rows' in sys.argv:
         for t in missing: print('\t'.join([t.replace('\\', '\\\\').replace('\n', '\\n').replace('\t', '\\t')] * 5))
         return 1 if missing else 0

@@ -1081,7 +1081,7 @@ static void open_list_l(struct RData *d, Object *obj, int k, const List *l)
       utf8_to_latin1(pd->labels[i], (u32)strlen(pd->labels[i]), t, sizeof t);
       tw = f ? theme_preview_width(f, t, FONTPX * 64) : 0;
       if (!tw) tw = theme_textlen(_rp(obj), theme_font(), t);
-    } else tw = theme_textlen(_rp(obj), theme_font(), tr(pd->labels[i])) + (l->kind == PL_COLOR ? 20 : l->kind == PL_BORDER ? 24 : l->kind == PL_TSTYLE ? 40 : 0);
+    } else tw = theme_textlen(_rp(obj), theme_font(), pd->labels[i]) + (l->kind == PL_COLOR ? 20 : l->kind == PL_BORDER ? 24 : l->kind == PL_TSTYLE ? 40 : 0);
     if (tw + 16 > cw) cw = tw + 16;
   }
   if (l->kind == PL_FONTS) set(_win(obj), MUIA_Window_Sleep, FALSE);
@@ -1210,14 +1210,14 @@ static ULONG popdispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj,
         ribbon_cell_style(i, &fl, &co, &bold, &line, &size);
         if (fl) { fp = rgbpen(obj, fl); theme_fill(rp, x - 2, y + 1, x0 + cw - 4, y + pop_rowh(p) - 2, fp); }
         if (!(co & 0xFF000000UL)) cp = rgbpen(obj, co);
-        tw = theme_textlen(rp, bold ? theme_bold() : theme_font(), tr(p->labels[i]));
-        theme_text(rp, bold ? theme_bold() : theme_font(), x, y + (pop_rowh(p) - fh()) / 2, tr(p->labels[i]), cp >= 0 ? cp : tpen(T_TEXT));
+        tw = theme_textlen(rp, bold ? theme_bold() : theme_font(), p->labels[i]);
+        theme_text(rp, bold ? theme_bold() : theme_font(), x, y + (pop_rowh(p) - fh()) / 2, p->labels[i], cp >= 0 ? cp : tpen(T_TEXT));
         if (line) theme_fill(rp, x, y + pop_rowh(p) - 3, x + tw, y + pop_rowh(p) - 3 + (line == 2 ? 1 : 0), cp >= 0 ? cp : tpen(T_TEXT));
         if (fp >= 0) ReleasePen(cm, fp);
         if (cp >= 0) ReleasePen(cm, cp);
         continue;
       }
-      strncpy(t, tr(p->labels[i]), sizeof t - 1); t[sizeof t - 1] = 0;
+      strncpy(t, p->labels[i], sizeof t - 1); t[sizeof t - 1] = 0;
       if (p->l->kind == PL_TSTYLE) { tabletab_preview(obj, rp, i, x - 2, y + 2, 34, pop_rowh(p) - 5); x += 36; }
       if (p->l->kind == PL_BORDER) { border_picture(rp, i, x, y + 3, pop_rowh(p) - 7); x += pop_rowh(p) + 2; }
       if (p->l->kind == PL_COLOR) {

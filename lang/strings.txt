@@ -174,7 +174,7 @@ Select	Markieren	Sélectionner	Seleccionar	Seleziona
 Pictures	Bilder	Images	Imágenes	Immagini
 Size	Größe	Taille	Tamaño	Dimensioni
 Comment	Kommentar	Commentaire	Comentario	Commento
-Date	Datum	Date	Fecha	Data
+Date	Datum	Date	Fecha	Data odierna
 Symbol	Symbol	Symbole	Símbolo	Simbolo
 Margins	Seitenränder	Marges	Márgenes	Margini
 Orientation	Ausrichtung	Orientation	Orientación	Orientamento
@@ -241,7 +241,7 @@ Save As	Speichern unter	Enregistrer sous	Guardar como	Salva con nome
 Print	Drucken	Imprimer	Imprimir	Stampa
 Export	Exportieren	Exporter	Exportar	Esporta
 Options	Optionen	Options	Opciones	Opzioni
-About	Info	À propos	Acerca de	Informazioni
+About	Info über Ledger	À propos	Acerca de	Informazioni
 Blank	Leer	Vide	En blanco	Vuoto
 Recent	Zuletzt verwendet	Récents	Recientes	Recenti
 Browse	Durchsuchen	Parcourir	Examinar	Sfoglia
@@ -1087,7 +1087,7 @@ The active cell has no formula that refers to other cells.	Die aktive Zelle enth
 Blanks	Leerzellen	Cellules vides	Celdas en blanco	Celle vuote
 Constants	Konstanten	Constantes	Constantes	Costanti
 Formulas	Formeln	Formules	Fórmulas	Formule
-Notes	Notizen	Notes	Notas	Note
+Notes	Notizen	Notes	Notas	Annotazioni
 Last cell	Letzte Zelle	Dernière cellule	Última celda	Ultima cella
 Current region	Aktueller Bereich	Zone en cours	Región actual	Area corrente
 Visible cells only	Nur sichtbare Zellen	Cellules visibles seulement	Solo celdas visibles	Solo celle visibili

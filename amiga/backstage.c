@@ -188,14 +188,14 @@ static LONG choices(struct BData *d, struct RastPort *rp, LONG x, LONG y, const 
 {
   LONG bx = x, bw;
   int i;
-  theme_text(rp, theme_bold(), x, y, tr(title), tpen(T_TEXT));
+  theme_text(rp, theme_bold(), x, y, title, tpen(T_TEXT));
   y += fh() + 6;
   for (i = 0; i < n; i++) {
     int on = i == cur;
-    bw = theme_textlen(rp, theme_font(), tr(labs[i])) + 20;
+    bw = theme_textlen(rp, theme_font(), labs[i]) + 20;
     theme_fill(rp, bx, y, bx + bw - 1, y + fh() + 7, tpen(on ? T_CHECKED : is_over(d, kind, i) ? T_HOVER : T_WHITE));
     theme_rect(rp, bx, y, bx + bw - 1, y + fh() + 7, tpen(on ? T_ACCENT : T_BORDER2));
-    theme_text(rp, theme_font(), bx + 10, y + 4, tr(labs[i]), tpen(on ? T_ACCENT : T_TEXT));
+    theme_text(rp, theme_font(), bx + 10, y + 4, labs[i], tpen(on ? T_ACCENT : T_TEXT));
     add_hot(d, bx, y, bx + bw - 1, y + fh() + 7, kind, i);
     bx += bw + 6;
   }
@@ -211,7 +211,7 @@ static void back_draw(struct BData *d, Object *obj)
   static const char *const titles[] = { "Home", "New", "Open", "Info", "Export", "Options", "About" };
   LONG sbw = 104;
   d->nhot = 0;
-  for (i = 0; i < NSIDE; i++) { LONG w = theme_textlen(rp, theme_font(), tr(side[i].label)) + 42; if (w > sbw) sbw = w; }
+  for (i = 0; i < NSIDE; i++) { LONG w = theme_textlen(rp, theme_font(), side[i].label) + 42; if (w > sbw) sbw = w; }
   /* the column */
   theme_fill(rp, l, t, l + SBW - 1, b, tpen(T_ACCENT));
   if (is_over(d, H_BACK, 0)) theme_fill(rp, l + 6, t + 6, l + 30, t + 28, tpen(T_ACCENTHOVER));
@@ -228,7 +228,7 @@ static void back_draw(struct BData *d, Object *obj)
     else if (is_over(d, H_SIDE, i)) theme_fill(rp, l, iy, l + SBW - 1, iy + ih - 1, tpen(T_ACCENTHOVER));
     if (sel) theme_fill(rp, l, iy, l + 2, iy + ih - 1, tpen(T_ONACCENT));
     theme_icon_pen(rp, side[i].icon, l + 12, iy + (ih - 14) / 2, 14, tpen(T_ONACCENT));
-    theme_text(rp, theme_font(), l + 32, iy + (ih - fh()) / 2, tr(side[i].label), tpen(T_ONACCENT));
+    theme_text(rp, theme_font(), l + 32, iy + (ih - fh()) / 2, side[i].label, tpen(T_ONACCENT));
     add_hot(d, l, iy, l + SBW - 1, iy + ih - 1, H_SIDE, i);
     y += ih;
   }
@@ -236,13 +236,13 @@ static void back_draw(struct BData *d, Object *obj)
   theme_fill(rp, l + SBW, t, r, b, tpen(T_RIBBON));
   x = l + SBW + 20;
   y = t + 12;
-  theme_text(rp, theme_big(), x, y, tr(titles[d->page]), tpen(T_TEXT));
+  theme_text(rp, theme_big(), x, y, titles[d->page], tpen(T_TEXT));
   y += theme_big()->tf_YSize + 12;
   switch (d->page) {
   case BP_HOME:
-    theme_text(rp, theme_bold(), x, y, tr("New"), tpen(T_TEXT));
+    theme_text(rp, theme_bold(), x, y, "New", tpen(T_TEXT));
     y = cards(d, rp, x, y + fh() + 8, r - 12, 84) + 6;
-    theme_text(rp, theme_bold(), x, y, tr("Recent"), tpen(T_TEXT));
+    theme_text(rp, theme_bold(), x, y, "Recent", tpen(T_TEXT));
     SetAPen(rp, tpen(T_BORDER)); Move(rp, x, y + fh() + 3); Draw(rp, r - 16, y + fh() + 3);
     recent_list(d, rp, x, y + fh() + 9, r - 16, b - 6);
     break;
@@ -252,14 +252,14 @@ static void back_draw(struct BData *d, Object *obj)
     break;
   case BP_OPEN:
     y = big_button(d, rp, x, y, (r - x - 16 < 300 ? r - x - 16 : 300), IC_OPEN, "Browse", "Open a workbook (.xlsx) or a CSV file", H_BROWSE) + 6;
-    theme_text(rp, theme_bold(), x, y, tr("Recent"), tpen(T_TEXT));
+    theme_text(rp, theme_bold(), x, y, "Recent", tpen(T_TEXT));
     SetAPen(rp, tpen(T_BORDER)); Move(rp, x, y + fh() + 3); Draw(rp, r - 16, y + fh() + 3);
     recent_list(d, rp, x, y + fh() + 9, r - 16, b - 6);
     break;
   case BP_INFO: {
     /* the lines main.c gave: "label\tvalue" */
     const char *p = d->info;
-    theme_text(rp, theme_bold(), x, y, tr("Properties"), tpen(T_TEXT));
+    theme_text(rp, theme_bold(), x, y, "Properties", tpen(T_TEXT));
     y += fh() + 8;
     while (*p && y + fh() < b) {
       char line[200], *tab;
@@ -292,7 +292,7 @@ static void back_draw(struct BData *d, Object *obj)
     y = choices(d, rp, x, y, "Language", ui_languages, UI_NLANG, d->lang, H_LANG);
     y -= 14;
     y += fh() + 20;
-    theme_text(rp, theme_bold(), x, y, tr("Your name"), tpen(T_TEXT));
+    theme_text(rp, theme_bold(), x, y, "Your name", tpen(T_TEXT));
     y += fh() + 2;
     text_fit(rp, theme_font(), x, y, tr("Saved as the author of the workbooks you make."), r - x - 12, tpen(T_DIM));
     y += fh() + 6;

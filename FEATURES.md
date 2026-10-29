@@ -26,7 +26,7 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 20 | OpenDocument .ods import | yes | ✅ |
 | 21 | Pictures on the sheet (PNG/JPEG) | yes | ✅ |
 | 22 | Spelling check | yes | ✅ |
-| 23 | Interface languages (German, French, Spanish, Italian, as Quill) | yes | ⬜ |
+| 23 | Interface languages (German, French, Spanish, Italian, as Quill) | yes | ✅ |
 | 24 | PDF export | yes | ✅ |
 | 25 | Flash Fill | yes | ✅ |
 | 26 | Printing, page setup, Page Break Preview | yes | ✅ page setup, Page Break Preview, Page Layout view (printing itself ➖ left out, as for Quill) |
