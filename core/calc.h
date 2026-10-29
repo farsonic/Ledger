@@ -7,11 +7,17 @@
 #include "book.h"
 
 /* where a formula is being evaluated */
+typedef struct Env Env;
 typedef struct {
   Book *b;
   int sheet;
   i32 row, col;
-  int depth;                      /* nesting of names and cell evaluations */
+  int depth;                      /* nesting of names, cell evaluations and LAMBDA calls */
+  int dyn;                        /* dynamic-array evaluation: functions of single values map over
+                                     arrays and ranges given to them (0: a formula from before
+                                     dynamic arrays, where a range meets the formula's row/column) */
+  Env *env;                       /* the LET and LAMBDA names in scope */
+  u8 *arrayish;                   /* set to 1 when the evaluation worked on arrays (may be NULL) */
 } Ctx;
 
 /* a function: args are as evaluated (references stay references, missing arguments are V_EMPTY
@@ -33,6 +39,22 @@ Value num_or_err(double d);          /* #NUM! for NaN and infinities */
 int   dcmp(const void *a, const void *b);   /* qsort order of doubles */
 
 #define IS_MISSING(v) ((v)->t == V_EMPTY && (v)->e == 1)
+
+/* LAMBDA values (calc.c): call one with argc arguments; a function given by name (SUM) is one too.
+   Returns a new value (#VALUE! if f isn't a LAMBDA or the arguments don't fit) */
+Value calc_call(Ctx *cx, const Value *f, Value *args, int argc);
+int   calc_is_lambda(const Value *v);
+/* a union of references, (A1:B2,D4): an array of V_REF values (each_value walks them all) */
+int   calc_is_union(const Value *v);
+/* a range given by reference with its blank outer rows/columns off: mode 1 leading, 2 trailing, 3 both
+   (func_array.c: TRIMRANGE and the trim reference operators) */
+Value calc_trim(Ctx *cx, const Value *v, int rows, int cols);
+/* a new array value of rows by cols (elements empty); V_ERR #NUM! if too big */
+Value arr_value(int rows, int cols);
+/* the spill table: which arguments of a function take single values and so map over arrays in
+   dynamic-array formulas ("NAME mask", mask letters s = single value, a = anything, the last letter
+   repeating); func_array.c */
+extern const char *const func_lift_spec[];
 
 /* a reference or array element by element: the value of each cell (computed when needed) */
 const Value *ref_cell(Ctx *cx, int sheet, i32 r, i32 c);

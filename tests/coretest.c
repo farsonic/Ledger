@@ -789,6 +789,147 @@ static void templates(void)
   book_free(b);
 }
 
+/* dynamic arrays, LET/LAMBDA, the array and lookup functions (core/func_array.c, calc.c) */
+static int is_err(Book *b, const char *ref, int e) { return num_at(b, ref) == -1000 - e; }
+static int spills(Book *b, const char *ref, const char *want)
+{
+  u16 sh; Rect r, a; u8 fl;
+  char t[32];
+  int blocked = 0, got;
+  parse_ref(b, ref, &sh, &r, &fl);
+  got = book_spill_range(b, 0, r.r1, r.c1, &a, &blocked);
+  if (!got) { if (*want) printf("   %s: no spill (want %s)\n", ref, want); return !*want; }
+  rect_text(a, t);
+  if (strcmp(t, want)) printf("   %s spills over %s (want %s)\n", ref, t, want);
+  return !strcmp(t, want);
+}
+static void dynarrays(void)
+{
+  Book *b = book_new(), *c;
+  size_t n;
+  u8 *data;
+  char err[200];
+  /* spilling */
+  put(b, "A1", "=SEQUENCE(4)");
+  ok("spill: SEQUENCE fills below", num_at(b, "A1") == 1 && num_at(b, "A4") == 4 && spills(b, "A1", "A1:A4") && spills(b, "A3", "A1:A4"));
+  put(b, "C1", "=SUM(A1#)"); put(b, "C1", ""); put(b, "D10", "=SUM(A1#)");
+  ok("spill: A1# is the spill range", num_at(b, "D10") == 10);
+  put(b, "A3", "x");
+  ok("spill: blocked is #SPILL!", is_err(b, "A1", E_SPILL) && is_err(b, "D10", E_SPILL));
+  put(b, "A3", "");
+  ok("spill: unblocked spills again", num_at(b, "A3") == 3 && num_at(b, "D10") == 10);
+  put(b, "A1", "=SEQUENCE(2,3,10,10)");
+  ok("spill: shrinks and grows", num_at(b, "A3") == -999999 && num_at(b, "C2") == 60 && spills(b, "B2", "A1:C2"));
+  ok("spill: the old cells are gone", sheet_cell(b->sh[0], 3, 0) == NULL);
+  put(b, "E1", "=A1:A2*{1,2}");
+  ok("spill: arithmetic broadcasts", num_at(b, "E1") == 10 && num_at(b, "F2") == 80);
+  put(b, "E4", "={1,2}+{10;20}");
+  ok("spill: row plus column", num_at(b, "E4") == 11 && num_at(b, "F5") == 22);
+  put(b, "H1", "=LEN({\"a\",\"bb\",\"ccc\"})");
+  ok("spill: functions map over arrays", num_at(b, "J1") == 3);
+  put(b, "H3", "=@A1:A2");
+  ok("@: implicit intersection", num_at(b, "H3") == 10 || is_err(b, "H3", E_VALUE));
+  put(b, "H4", "=ROW(A1:A3)");
+  ok("ROW of a range spills", num_at(b, "H6") == 3);
+  put(b, "K1", "=IF({1,0},\"y\",\"n\")");
+  ok("IF over an array", text_at(b, "K1", "=IF({1,0},\"y\",\"n\")") && sheet_cell(b->sh[0], 0, 11) && cell_value(b, 0, 0, 11)->t == V_STR);
+  book_free(b);
+
+  b = book_new();
+  /* lazy functions don't evaluate the other branch */
+  ok("IF short-circuits", evn(b, "IF(TRUE,1,1/0)") == 1 && evn(b, "IF(FALSE,1/0,2)") == 2);
+  ok("IFERROR short-circuits", evn(b, "IFERROR(5,1/0)") == 5 && evn(b, "IFERROR(1/0,7)") == 7);
+  ok("CHOOSE evaluates only its pick", evn(b, "CHOOSE(2,1/0,3)") == 3);
+  ok("SWITCH evaluates only the match", evn(b, "SWITCH(2,1,1/0,2,9)") == 9);
+  ok("IFS", evn(b, "IFS(FALSE,1/0,TRUE,4)") == 4);
+  /* LET and LAMBDA */
+  ok("LET", evn(b, "LET(x,2,y,x*3,x+y)") == 8);
+  ok("LET shadows", evn(b, "LET(x,1,LET(x,5,x)+x)") == 6);
+  ok("LAMBDA called inline", evn(b, "LAMBDA(x,x+1)(2)") == 3);
+  ok("LAMBDA in LET", evn(b, "LET(f,LAMBDA(a,b,a*b),f(3,4))") == 12);
+  ok("LAMBDA closure", evn(b, "LET(k,10,f,LAMBDA(x,x+k),f(1))") == 11);
+  ok("LAMBDA arg count", evn(b, "LAMBDA(a,b,a+b)(2)") == -1000 - E_VALUE);
+  ok("ISOMITTED", evs(b, "LAMBDA(x,[y],IF(ISOMITTED(y),\"none\",x+y))(1)", "none") && evn(b, "LAMBDA(x,[y],IF(ISOMITTED(y),0,x+y))(1,2)") == 3);
+  ok("MAP", evn(b, "SUM(MAP({1,2,3},LAMBDA(x,x*x)))") == 14);
+  ok("REDUCE", evn(b, "REDUCE(0,{1,2,3},LAMBDA(a,v,a+v))") == 6);
+  ok("SCAN", evn(b, "INDEX(SCAN(0,{1,2,3},LAMBDA(a,v,a+v)),1,3)") == 6);
+  ok("BYROW", evn(b, "INDEX(BYROW({1,2;3,4},LAMBDA(r,SUM(r))),2)") == 7);
+  ok("BYCOL", evn(b, "INDEX(BYCOL({1,2;3,4},LAMBDA(c,SUM(c))),1,2)") == 6);
+  ok("MAKEARRAY", evn(b, "SUM(MAKEARRAY(2,3,LAMBDA(r,c,r*c)))") == 18);
+  ok("function given by name", evn(b, "INDEX(BYROW({1,2;3,4},SUM),2)") == 7 && evn(b, "REDUCE(0,{1,-2},SUM)") == -1);
+  ok("a lambda left in a cell is #CALC!", evn(b, "LAMBDA(x,x)") == -1000 - E_CALC);
+  ok("recursion stops", evn(b, "LET(f,LAMBDA(g,n,g(g,n)),f(f,1))") == -1000 - E_NUM);
+  book_define_name(b, "ADDPAIR", "LAMBDA(a,b,a+b)", SHEET_SELF);
+  book_define_name(b, "FACTR", "LAMBDA(n,IF(n<=1,1,n*FACTR(n-1)))", SHEET_SELF);
+  ok("named LAMBDA", evn(b, "ADDPAIR(2,3)") == 5 && evn(b, "FACTR(5)") == 120);
+  ok("formula text of LET/LAMBDA", ftext(b, "LET(x,1,LAMBDA(y,[z],x+y)(2))", "LET(x,1,LAMBDA(y,[z],x+y)(2))"));
+  ok("formula text of @, # and trim refs", ftext(b, "@A1:A3+SUM(B1#)+SUM(A1:.C9)+ROWS(A1.:.C9)", "@A1:A3+SUM(B1#)+SUM(A1:.C9)+ROWS(A1.:.C9)"));
+  ok("formula text of unions", ftext(b, "AREAS((A1:B2,C3))", "AREAS((A1:B2,C3))"));
+  /* array functions */
+  ok("SEQUENCE", evn(b, "SUM(SEQUENCE(3,2,1,2))") == 36);
+  ok("FILTER", evn(b, "SUM(FILTER({1;2;3;4},{1;0;1;0}))") == 4 && evs(b, "FILTER({1;2},{0;0},\"none\")", "none") &&
+     evn(b, "FILTER({1;2},{0;0})") == -1000 - E_CALC);
+  ok("SORT", evn(b, "INDEX(SORT({3;1;2}),1)") == 1 && evn(b, "INDEX(SORT({3;1;2},1,-1),1)") == 3 &&
+     evn(b, "INDEX(SORT({1,9;2,8;3,7},2),1,1)") == 3);
+  ok("SORTBY", evs(b, "INDEX(SORTBY({\"a\";\"b\";\"c\"},{3;1;2}),1)", "b"));
+  ok("UNIQUE", evn(b, "ROWS(UNIQUE({1;2;2;3;1}))") == 3 && evn(b, "ROWS(UNIQUE({1;2;2;3;1},,TRUE))") == 1 &&
+     evn(b, "ROWS(UNIQUE({\"a\";\"A\"}))") == 1);
+  ok("TAKE and DROP", evn(b, "SUM(TAKE({1;2;3;4},2))") == 3 && evn(b, "SUM(TAKE({1;2;3;4},-1))") == 4 && evn(b, "SUM(DROP({1;2;3;4},1))") == 9);
+  ok("CHOOSEROWS/COLS", evn(b, "SUM(CHOOSEROWS({1;2;3},1,-1))") == 4 && evn(b, "SUM(CHOOSECOLS({1,2,3},{2,3}))") == 5);
+  ok("VSTACK/HSTACK", evn(b, "ROWS(VSTACK({1,2},{3,4}))") == 2 && evn(b, "COLUMNS(HSTACK({1;2},{3;4},5))") == 3 &&
+     evn(b, "ISNA(INDEX(HSTACK({1;2},5),2,2))") == 1);
+  ok("TOCOL/TOROW", evn(b, "ROWS(TOCOL({1,2;3,4}))") == 4 && evn(b, "INDEX(TOCOL({1,2;3,4},0,TRUE),2)") == 3 && evn(b, "COLUMNS(TOROW({1,2;3,4}))") == 4);
+  ok("WRAPROWS/WRAPCOLS", evn(b, "ROWS(WRAPROWS({1,2,3,4,5},2))") == 3 && evn(b, "ISNA(INDEX(WRAPROWS({1,2,3},2),2,2))") == 1 &&
+     evn(b, "INDEX(WRAPCOLS({1,2,3,4},2),2,1)") == 2);
+  ok("EXPAND", evn(b, "INDEX(EXPAND({1},2,2,0),2,2)") == 0 && evn(b, "ROWS(EXPAND({1;2},3))") == 3);
+  ok("XMATCH", evn(b, "XMATCH(3,{1;3;5})") == 2 && evn(b, "XMATCH(4,{1;3;5},-1)") == 2 && evn(b, "XMATCH(4,{1;3;5},1)") == 3 &&
+     evn(b, "XMATCH(\"b*\",{\"a\";\"bc\"},2)") == 2 && evn(b, "XMATCH(3,{3;1;3},0,-1)") == 3);
+  ok("XLOOKUP returns a row", evn(b, "SUM(XLOOKUP(2,{1;2},{1,2;3,4}))") == 7);
+  ok("INDEX of an array's column", evn(b, "SUM(INDEX({1,2;3,4},0,2))") == 6);
+  ok("INDEX of a union", evn(b, "AREAS((A1:B2,C3))") == 2);
+  ok("RANDARRAY", evn(b, "ROWS(RANDARRAY(3,2))") == 3 && evn(b, "AND(RANDARRAY(5,1,1,3,TRUE)>=1)") == 1);
+  ok("SHEET and SHEETS", evn(b, "SHEET()") == 1 && evn(b, "SHEETS()") == 1);
+  book_free(b);
+
+  /* sheets for SUBTOTAL, AGGREGATE, CELL, FORMULATEXT, TRIMRANGE */
+  b = book_new();
+  put(b, "A1", "1"); put(b, "A2", "2"); put(b, "A3", "=SUBTOTAL(9,A1:A2)"); put(b, "A4", "4"); put(b, "A5", "=1/0");
+  put(b, "B1", "=SUBTOTAL(9,A1:A4)");
+  ok("SUBTOTAL leaves out subtotals", num_at(b, "B1") == 7 && num_at(b, "A3") == 3);
+  book_hide_rows(b, 0, 1, 1, 1);
+  put(b, "B2", "=SUBTOTAL(109,A1:A4)"); put(b, "B3", "=SUBTOTAL(9,A1:A4)");
+  ok("SUBTOTAL 109 leaves out hidden rows", num_at(b, "B2") == 5 && num_at(b, "B3") == 7);
+  put(b, "B4", "=AGGREGATE(9,6,A1:A5)"); put(b, "B5", "=AGGREGATE(9,7,A1:A5)"); put(b, "B6", "=AGGREGATE(14,6,A1:A5,2)");
+  put(b, "B7", "=AGGREGATE(9,4,A1:A5)");
+  ok("AGGREGATE ignores errors and hidden rows", num_at(b, "B4") == 10 && num_at(b, "B5") == 8 && num_at(b, "B6") == 3 && is_err(b, "B7", E_DIV0));
+  put(b, "C1", "=FORMULATEXT(B4)"); put(b, "C2", "=CELL(\"address\",B4)"); put(b, "C3", "=CELL(\"row\",B4)"); put(b, "C4", "=CELL(\"type\",Z9)");
+  ok("FORMULATEXT and CELL", text_at(b, "C1", "=FORMULATEXT(B4)") && cell_value(b, 0, 0, 2)->t == V_STR && !strcmp(cell_value(b, 0, 0, 2)->s, "=AGGREGATE(9,6,A1:A5)") &&
+     !strcmp(cell_value(b, 0, 1, 2)->s, "$B$4") && num_at(b, "C3") == 4 && !strcmp(cell_value(b, 0, 3, 2)->s, "b"));
+  put(b, "E3", "5"); put(b, "F5", "6");
+  put(b, "H1", "=ROWS(TRIMRANGE(D1:G9))"); put(b, "H2", "=COLUMNS(D1:.G9)"); put(b, "H3", "=ROWS(D1.:.G9)");
+  ok("TRIMRANGE and trim references", num_at(b, "H1") == 3 && num_at(b, "H2") == 3 && num_at(b, "H3") == 3);
+  put(b, "J1", "=(A1:A2,A4)");
+  put(b, "J2", "=SUM((A1:A2,A4))");
+  ok("unions", num_at(b, "J2") == 7);
+  /* dynamic arrays through .xlsx */
+  put(b, "L1", "=SEQUENCE(3)*2");
+  put(b, "M1", "=SUM(L1#)");
+  put(b, "N1", "=LET(x,{1,2,3},SUM(x*x))");
+  put(b, "N2", "=SUM(IF(L1:L3>2,1,0))");
+  data = xlsx_save(b, &n);
+  c = data ? xlsx_load(data, n, err, sizeof err) : NULL;
+  ok("xlsx: dynamic array loaded back", c && num_at(c, "L3") == 6 && num_at(c, "M1") == 12 && spills(c, "L2", "L1:L3") && num_at(c, "N1") == 14 && num_at(c, "N2") == 2);
+  ok("xlsx: dynamic formulas written", data && n > 0);
+  if (c) {
+    Cell *x = sheet_cell(c->sh[0], 1, 11);
+    ok("xlsx: spilled cells come back as spilled", x && x->spill && !x->f);
+    ok("xlsx: formulas keep their text", text_at(c, "M1", "=SUM(L1#)") && text_at(c, "N1", "=LET(x,{1,2,3},SUM(x*x))"));
+    book_free(c);
+  }
+  free(data);
+  book_free(b);
+}
+
 int main(void)
 {
   values_dates();
@@ -803,6 +944,7 @@ int main(void)
   condfmt();
   notes();
   links();
+  dynarrays();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }

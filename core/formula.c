@@ -23,7 +23,18 @@ typedef struct {
   int depth;
   int err;                        /* set on the first error */
   int errpos;
+  const char *scope[64];          /* LET and LAMBDA parameter names in force */
+  int nscope;
 } P;
+int formula_file_mode;
+int formula_lz_none;              /* Formula.lz for a formula without lazy functions (calc.c) */
+static int in_scope(P *ps, const char *name, size_t len)
+{
+  int i;
+  for (i = ps->nscope - 1; i >= 0; i--) if (strlen(ps->scope[i]) == len && !strncasecmp(ps->scope[i], name, len)) return 1;
+  return 0;
+}
+static void parse_postfix_call(P *ps);
 
 static int emit(P *ps, const Tok *t)
 {
@@ -159,40 +170,125 @@ static int parse_array(P *ps)
 static void parse_call(P *ps, const char *name, size_t len)
 {
   char nm[64];
-  int argc = 0, id;
+  int argc = 0, id, local = 0, binder, saved = ps->nscope;
   Tok t;
   if (len > 63) { fail(ps); return; }
   memcpy(nm, name, len); nm[len] = 0;
-  /* Excel writes newer functions with _xlfn. in files */
+  /* Excel writes newer functions with _xlfn. in files (and _xlws. for FILTER and SORT), and LET
+     names called as functions with _xlpm. */
   if (!strncasecmp(nm, "_xlfn.", 6)) memmove(nm, nm + 6, strlen(nm + 6) + 1);
   if (!strncasecmp(nm, "_xlws.", 6)) memmove(nm, nm + 6, strlen(nm + 6) + 1);
+  if (!strncasecmp(nm, "_xlpm.", 6)) { memmove(nm, nm + 6, strlen(nm + 6) + 1); local = 1; }
+  if (in_scope(ps, nm, strlen(nm))) local = 1;
+  binder = local ? 0 : str_ieq(nm, "LET") ? 1 : str_ieq(nm, "LAMBDA") ? 2 : 0;
   ps->p++;                                   /* ( */
   if (++ps->depth > MAXDEPTH) { fail(ps); return; }
   skip_ws(ps);
   if (*ps->p == ')') ps->p++;
   else for (;;) {
+    int start = ps->f->n;
     skip_ws(ps);
     if (*ps->p == ',' || *ps->p == ')') emit_op(ps, T_MISSING);
     else parse_expr(ps);
     if (ps->err) return;
     argc++;
     skip_ws(ps);
+    /* LET(name, value, ..., body) and LAMBDA(param, ..., body): a lone name followed by more
+       arguments is a parameter; the arguments after it see it */
+    if (binder && *ps->p == ',' && ps->f->n == start + 1 && ps->f->t[start].op == T_NAME && (binder == 2 || argc % 2 == 1)) {
+      ps->f->t[start].flags |= TN_LOCAL;
+      if (ps->nscope < 64) ps->scope[ps->nscope++] = ps->f->t[start].s;
+    }
     if (*ps->p == ',') { ps->p++; if (argc >= 255) { fail(ps); return; } continue; }
     if (*ps->p == ')') { ps->p++; break; }
     fail(ps);
     return;
   }
+  ps->nscope = saved;
   ps->depth--;
+  /* the file forms of @ and # */
+  if (argc == 1 && !local && str_ieq(nm, "SINGLE")) { emit_op(ps, T_AT); return; }
+  if (argc == 1 && !local && str_ieq(nm, "ANCHORARRAY")) { emit_op(ps, T_SPILL); return; }
   memset(&t, 0, sizeof t);
   t.op = T_FUNC;
   t.flags = (u8)argc;
-  id = func_lookup(nm);
+  id = local ? -1 : func_lookup(nm);
   if (id < 0) {
-    /* unknown: kept by name, #NAME? when evaluated */
+    /* unknown: kept by name; a LET or defined name holding a LAMBDA when evaluated, else #NAME? */
     t.a = 0xFFFF;
     t.s = str_dup(nm);
+    t.r1 = local;
   } else t.a = (u16)id;
   if (!emit(ps, &t)) free(t.s);
+  parse_postfix_call(ps);
+}
+/* a call of what came before: LAMBDA(x,x+1)(2) */
+static void parse_postfix_call(P *ps)
+{
+  while (!ps->err && *ps->p == '(') {
+    int argc = 0;
+    Tok t;
+    ps->p++;
+    if (++ps->depth > MAXDEPTH) { fail(ps); return; }
+    skip_ws(ps);
+    if (*ps->p == ')') ps->p++;
+    else for (;;) {
+      skip_ws(ps);
+      if (*ps->p == ',' || *ps->p == ')') emit_op(ps, T_MISSING);
+      else parse_expr(ps);
+      if (ps->err) return;
+      argc++;
+      skip_ws(ps);
+      if (*ps->p == ',') { ps->p++; if (argc >= 254) { fail(ps); return; } continue; }
+      if (*ps->p == ')') { ps->p++; break; }
+      fail(ps);
+      return;
+    }
+    ps->depth--;
+    memset(&t, 0, sizeof t);
+    t.op = T_CALL;
+    t.flags = (u8)argc;
+    emit(ps, &t);
+  }
+}
+/* a trim reference: A1.:E10 (leading blanks off), A1:.E10 (trailing), A1.:.E10 (both); 1 if one was read */
+static int parse_trimref(P *ps)
+{
+  char tmp[260];
+  const char *p = ps->p;
+  int n = 0, i, q = 0, mode = 0, colon = -1, len, removed = 0, lastdot = -1;
+  u16 sheet;
+  Rect r;
+  u8 flags;
+  Tok t;
+  for (i = 0; p[i] && i < 256; i++) {
+    char ch = p[i];
+    if (ch == '\'') { q = !q; tmp[n++] = ch; continue; }
+    if (q) { tmp[n++] = ch; continue; }
+    if (!(isalnum((u8)ch) || ch == '$' || ch == '!' || ch == '.' || ch == ':' || ch == '_' || (u8)ch >= 0x80)) break;
+    if (ch == ':' && colon < 0) {
+      colon = n;
+      if (n && tmp[n - 1] == '.') { n--; mode |= 1; removed++; lastdot = i - 1; }
+      tmp[n++] = ':';
+      if (p[i + 1] == '.') { mode |= 2; removed++; lastdot = ++i; }
+      continue;
+    }
+    tmp[n++] = ch;
+  }
+  tmp[n] = 0;
+  if (!mode || colon < 0) return 0;
+  len = parse_ref(ps->b, tmp, &sheet, &r, &flags);
+  if (len <= colon) return 0;
+  if (len + removed <= lastdot) return 0;
+  memset(&t, 0, sizeof t);
+  t.op = T_AREA; t.flags = flags; t.a = sheet;
+  t.r1 = r.r1; t.c1 = r.c1; t.r2 = r.r2; t.c2 = r.c2;
+  emit(ps, &t);
+  memset(&t, 0, sizeof t);
+  t.op = T_TRIM; t.flags = (u8)mode;
+  emit(ps, &t);
+  ps->p += len + removed;
+  return 1;
 }
 static void parse_primary(P *ps)
 {
@@ -204,16 +300,31 @@ static void parse_primary(P *ps)
   skip_ws(ps);
   memset(&t, 0, sizeof t);
   if (!*ps->p) { fail(ps); return; }
+  if (parse_trimref(ps)) return;
   if (parse_num(ps) || parse_string(ps) || parse_array(ps)) return;
   if (*ps->p == '(') {
     ps->p++;
     if (++ps->depth > MAXDEPTH) { fail(ps); return; }
     parse_expr(ps);
     skip_ws(ps);
+    /* (A1:B2,D4): the union of references */
+    while (!ps->err && *ps->p == ',') { ps->p++; parse_expr(ps); emit_op(ps, T_UNION); skip_ws(ps); }
     if (*ps->p != ')') { fail(ps); return; }
     ps->p++;
     ps->depth--;
     emit_op(ps, T_PAREN);
+    parse_postfix_call(ps);
+    return;
+  }
+  /* [name]: an optional LAMBDA parameter */
+  if (*ps->p == '[') {
+    const char *st = ++ps->p;
+    while (isalnum((u8)*ps->p) || *ps->p == '_' || *ps->p == '.' || (u8)*ps->p >= 0x80) ps->p++;
+    if (ps->p == st || *ps->p != ']') { fail(ps); return; }
+    t.op = T_NAME; t.flags = TN_OPT | TN_LOCAL;
+    t.s = str_ndup(st, (size_t)(ps->p - st));
+    ps->p++;
+    if (!t.s || !emit(ps, &t)) { free(t.s); fail(ps); }
     return;
   }
   if (*ps->p == '#' && (n = 0, err_parse(ps->p, &n))) {
@@ -238,6 +349,7 @@ static void parse_primary(P *ps)
     t.r1 = r.r1; t.c1 = r.c1; t.r2 = r.r2; t.c2 = r.c2;
     ps->p += n;
     emit(ps, &t);
+    if (t.op == T_REF && *ps->p == '#') { ps->p++; emit_op(ps, T_SPILL); }   /* A1#: its spill range */
     return;
   }
   /* a name: a function (followed by "("), TRUE/FALSE, or a defined name */
@@ -250,6 +362,10 @@ static void parse_primary(P *ps)
     if (len == 4 && !strncasecmp(st, "TRUE", 4)) { t.op = T_BOOL; t.a = 1; emit(ps, &t); return; }
     if (len == 5 && !strncasecmp(st, "FALSE", 5)) { t.op = T_BOOL; t.a = 0; emit(ps, &t); return; }
     t.op = T_NAME;
+    /* files: _xlpm.x is a LET/LAMBDA name, _xleta.SUM a function given by name */
+    if (len > 6 && !strncasecmp(st, "_xlpm.", 6)) { st += 6; len -= 6; t.flags = TN_LOCAL; }
+    else if (len > 7 && !strncasecmp(st, "_xleta.", 7)) { st += 7; len -= 7; }
+    if (in_scope(ps, st, len)) t.flags |= TN_LOCAL;
     t.s = str_ndup(st, len);
     if (!t.s || !emit(ps, &t)) { free(t.s); fail(ps); }
     return;
@@ -272,6 +388,7 @@ static void parse_range(P *ps)
 static void parse_unary(P *ps)
 {
   skip_ws(ps);
+  if (*ps->p == '@') { ps->p++; if (++ps->depth > MAXDEPTH) { fail(ps); return; } parse_unary(ps); ps->depth--; emit_op(ps, T_AT); return; }
   if (*ps->p == '-') { ps->p++; if (++ps->depth > MAXDEPTH) { fail(ps); return; } parse_unary(ps); ps->depth--; emit_op(ps, T_NEG); return; }
   if (*ps->p == '+') { ps->p++; if (++ps->depth > MAXDEPTH) { fail(ps); return; } parse_unary(ps); ps->depth--; emit_op(ps, T_POS); return; }
   parse_range(ps);
@@ -342,6 +459,7 @@ void formula_free(Formula *f)
   if (!f) return;
   for (i = 0; i < f->n; i++) { free(f->t[i].s); arr_free(f->t[i].arr); }
   free(f->t);
+  if (f->lz != &formula_lz_none) free(f->lz);
   free(f);
 }
 Formula *formula_copy(const Formula *f)
@@ -350,6 +468,8 @@ Formula *formula_copy(const Formula *f)
   int i;
   if (!c) return NULL;
   c->volatile_ = f->volatile_;
+  c->legacy = f->legacy; c->cse = f->cse; c->arrayeval = f->arrayeval;
+  c->arows = f->arows; c->acols = f->acols; c->sr = f->sr; c->sc = f->sc;
   if (f->n && !(c->t = (Tok *)malloc((size_t)f->n * sizeof(Tok)))) { free(c); return NULL; }
   for (i = 0; i < f->n; i++) {
     c->t[i] = f->t[i];
@@ -382,7 +502,8 @@ Formula *formula_parse(Book *b, int sheet, const char *text, int *errpos)
     switch (t->op) {
     case T_ADD: case T_SUB: case T_MUL: case T_DIV: case T_POW: case T_CAT: case T_EQ: case T_NE: case T_LT:
     case T_GT: case T_LE: case T_GE: case T_RANGE: case T_UNION: case T_ISECT: depth--; break;
-    case T_NEG: case T_POS: case T_PCT: case T_PAREN: break;
+    case T_NEG: case T_POS: case T_PCT: case T_PAREN: case T_AT: case T_SPILL: case T_TRIM: break;
+    case T_CALL: depth -= t->flags; break;
     case T_FUNC: depth -= t->flags - 1; if (t->a != 0xFFFF && func_volatile(t->a)) ps.f->volatile_ = 1; break;
     default: depth++;
     }
@@ -497,6 +618,14 @@ void val_literal(const Value *v, Buf *out)
   default: break;
   }
 }
+/* a defined name of that name (so SUM is a name, not the function given by name) */
+static int book_has_name(Book *b, const char *name)
+{
+  int i;
+  if (!b) return 0;
+  for (i = 0; i < b->nnames; i++) if (str_ieq(b->names[i].name, name)) return 1;
+  return 0;
+}
 /* see book.h: the printer runs the postfix sequence with a stack of texts and their precedence */
 void formula_text(Book *b, int sheet, const Formula *f, Buf *out)
 {
@@ -516,7 +645,13 @@ void formula_text(Book *b, int sheet, const Formula *f, Buf *out)
     case T_BOOL: buf_adds(&tb, t->a ? "TRUE" : "FALSE"); break;
     case T_ERR: buf_adds(&tb, err_name(t->a)); break;
     case T_REF: case T_AREA: ref_tok_text(b, sheet, t, &tb); break;
-    case T_NAME: buf_adds(&tb, t->s); break;
+    case T_NAME:
+      if (t->flags & TN_OPT) buf_addc(&tb, '[');
+      if (formula_file_mode && (t->flags & TN_LOCAL)) buf_adds(&tb, "_xlpm.");
+      else if (formula_file_mode && func_lookup(t->s) >= 0 && !book_has_name(b, t->s)) buf_adds(&tb, "_xleta.");
+      buf_adds(&tb, t->s);
+      if (t->flags & TN_OPT) buf_addc(&tb, ']');
+      break;
     case T_MISSING: break;
     case T_ARRAY: {
       int r, c;
@@ -532,6 +667,44 @@ void formula_text(Book *b, int sheet, const Formula *f, Buf *out)
       buf_addc(&tb, '('); buf_adds(&tb, st[sp - 1].s); buf_addc(&tb, ')');
       free(st[--sp].s);
       break;
+    case T_AT: case T_SPILL: case T_TRIM:
+      if (sp < 1) { ok = 0; break; }
+      if (formula_file_mode) {
+        buf_adds(&tb, t->op == T_AT ? "_xlfn.SINGLE(" : t->op == T_SPILL ? "_xlfn.ANCHORARRAY(" : "_xlfn.TRIMRANGE(");
+        buf_adds(&tb, st[sp - 1].s);
+        if (t->op == T_TRIM) buf_printf(&tb, ",%d,%d", t->flags, t->flags);
+        buf_addc(&tb, ')');
+      } else if (t->op == T_AT) {
+        pr = 7;
+        buf_addc(&tb, '@');
+        if (st[sp - 1].prec < pr) { buf_addc(&tb, '('); buf_adds(&tb, st[sp - 1].s); buf_addc(&tb, ')'); }
+        else buf_adds(&tb, st[sp - 1].s);
+      } else if (t->op == T_SPILL) {
+        buf_adds(&tb, st[sp - 1].s);
+        buf_addc(&tb, '#');
+      } else {
+        /* the dots go round the colon of the range */
+        const char *x = st[sp - 1].s, *colon = strrchr(x, ':');
+        if (!colon) buf_adds(&tb, x);
+        else {
+          buf_add(&tb, x, (size_t)(colon - x));
+          buf_adds(&tb, t->flags & 1 ? ".:" : ":");
+          if (t->flags & 2) buf_addc(&tb, '.');
+          buf_adds(&tb, colon + 1);
+        }
+      }
+      free(st[--sp].s);
+      break;
+    case T_CALL: {
+      int k, argc = t->flags;
+      if (sp < argc + 1) { ok = 0; break; }
+      buf_adds(&tb, st[sp - argc - 1].s);
+      free(st[sp - argc - 1].s);
+      buf_addc(&tb, '(');
+      for (k = sp - argc; k < sp; k++) { if (k > sp - argc) buf_addc(&tb, ','); buf_adds(&tb, st[k].s); free(st[k].s); }
+      sp -= argc + 1;
+      buf_addc(&tb, ')');
+      break; }
     case T_NEG: case T_POS: case T_PCT:
       if (sp < 1) { ok = 0; break; }
       pr = prec(t->op);
@@ -544,6 +717,8 @@ void formula_text(Book *b, int sheet, const Formula *f, Buf *out)
     case T_FUNC: {
       int k, argc = t->flags;
       if (sp < argc) { ok = 0; break; }
+      if (formula_file_mode && t->a == 0xFFFF && t->r1) buf_adds(&tb, "_xlpm.");
+      if (formula_file_mode && t->a != 0xFFFF && (!strcmp(func_name(t->a), "FILTER") || !strcmp(func_name(t->a), "SORT"))) buf_adds(&tb, "_xlfn._xlws.");
       buf_adds(&tb, t->a == 0xFFFF ? (t->s ? t->s : "?") : func_name(t->a));
       buf_addc(&tb, '(');
       for (k = sp - argc; k < sp; k++) { if (k > sp - argc) buf_addc(&tb, ','); buf_adds(&tb, st[k].s); free(st[k].s); }
