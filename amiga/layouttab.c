@@ -129,6 +129,7 @@ RList lx_lists[LXL_LAST - LXL_FIRST] = {
   { orients, N(orients), 0, NULL }, { paperlabels, 0, 0, NULL }, { areas, N(areas), 0, NULL }, { breaks, N(breaks), 0, NULL },
   { fitw, N(fitw), 0, NULL }, { fitw, N(fitw), 0, NULL }, { scales, N(scales), 0, NULL }, { nothing, 1, 0, NULL }, { nothing, 1, 0, NULL },
   { removes, N(removes), 0, NULL }, { calcopts, N(calcopts), 0, NULL }, { nothing, 1, 0, NULL }, { textorient, N(textorient), 0, NULL },
+  { nothing, 1, 0, NULL },
 };
 static void lists_init(void)
 {
@@ -899,10 +900,36 @@ static void text_orient(LONG v)
   book_restyle(book, cur_index(), cur_sel(), fx_one, &a);
   refresh_all();
 }
-/* New Cell Style: the active cell's look added to the Cell Styles list under a name (kept while Ledger runs) */
+/* New Cell Style: the active cell's look kept under a name (while Ledger runs), in the My Styles list */
+static struct { char name[32]; Style st; Font f; } mystyles[16];
+static int nmystyles;
+static const char *mylabels[18];
+static void mystyles_list(void)
+{
+  int i;
+  for (i = 0; i < nmystyles; i++) mylabels[i] = mystyles[i].name;
+  mylabels[i] = tr("New Cell Style...");
+  mylabels[i + 1] = NULL;
+  lx_lists[LXL_MYSTYLES - LXL_FIRST].labels = mylabels;
+  lx_lists[LXL_MYSTYLES - LXL_FIRST].n = i + 1;
+}
 static void new_cell_style(void)
 {
-  ask("OK", "%s", tr("Ledger's cell styles are a fixed set (Home > Cell Styles).\nTo reuse a look, pick it up with the Format Painter."));
+  char nm[32];
+  const Style *st = &book->styles[sheet_cell_style(cur_sheet(), cur_sheet()->cur_r, cur_sheet()->cur_c)];
+  sprintf(nm, "Style %d", nmystyles + 1);
+  if (nmystyles >= 16) { ask("OK", "%s", tr("Ledger keeps up to 16 styles of your own.")); return; }
+  if (!ask_string("New Cell Style", "Style name (the active cell's look):", nm, sizeof nm) || !nm[0]) return;
+  strcpy(mystyles[nmystyles].name, nm);
+  mystyles[nmystyles].st = *st;
+  mystyles[nmystyles].f = book->fonts[st->font];
+  nmystyles++;
+  mystyles_list();
+}
+static void my_style(LONG v)
+{
+  if (v < 0 || v >= nmystyles) { new_cell_style(); return; }
+  apply_style(&mystyles[v].st, &mystyles[v].f, SM_NUMFMT | SM_HALIGN | SM_VALIGN | SM_WRAP | SM_INDENT | SM_FONT | SM_BORDER | SM_FILL);
 }
 
 /* ------------------------------------------------------------------ the Page Layout tab's commands */
@@ -970,6 +997,7 @@ void lt_command(ULONG id, LONG v)
     if (v >= 0) text_orient(v);
     break;
   case ID_LX_NEWCELLSTYLE: new_cell_style(); break;
+  case ID_LX_MYSTYLEDD: my_style(v); break;
   case ID_LX_SUPER: case ID_LX_SUB: {
     FxArg a;
     const Style *st = &book->styles[sheet_cell_style(cur_sheet(), cur_sheet()->cur_r, cur_sheet()->cur_c)];
@@ -988,8 +1016,8 @@ void lx_command(ULONG id)
   LONG v = -1;
   if (id == ID_LX_THEMEDD || id == ID_LX_COLORSDD || id == ID_LX_FONTSDD || id == ID_LX_MARGINSDD || id == ID_LX_ORIENTDD || id == ID_LX_SIZEDD ||
       id == ID_LX_AREADD || id == ID_LX_BREAKSDD || id == ID_LX_FITWDD || id == ID_LX_FITHDD || id == ID_LX_SCALEDD || id == ID_LX_RECENTDD ||
-      id == ID_LX_USENAMEDD || id == ID_LX_REMOVEDD || id == ID_LX_CALCOPTDD || id == ID_LX_SWITCHDD || id == ID_LX_TEXTORIENTDD) v = lx_value();
-  if (id <= ID_LX_SAVEPDF || (id >= ID_LX_GOTOSPECIAL && id <= ID_LX_SUB && id != ID_LX_GOTOSPECIAL)) lt_command(id, v);
+      id == ID_LX_USENAMEDD || id == ID_LX_REMOVEDD || id == ID_LX_CALCOPTDD || id == ID_LX_SWITCHDD || id == ID_LX_TEXTORIENTDD || id == ID_LX_MYSTYLEDD) v = lx_value();
+  if (id <= ID_LX_SAVEPDF || (id >= ID_LX_GOTOSPECIAL && id <= ID_LX_MYSTYLEDD && id != ID_LX_GOTOSPECIAL)) lt_command(id, v);
   else if (id >= ID_LX_NORMAL && id <= ID_LX_ZOOMDLG) vt_command(id, v);
   else if (id == ID_LX_SCROLLED || id == ID_LX_REFRESH) vt_command(id, v);
   else ft_command(id, v);
@@ -1079,6 +1107,7 @@ void lx_update(void)
 void lx_init(void)
 {
   lists_init();
+  mystyles_list();
   ft_init();
 }
 void lx_cleanup(void) { ft_cleanup(); }

@@ -235,6 +235,7 @@ static const Item h_num[] = {
 static const Item h_styles[] = {
   { K_DROP, S_LARGE, IC_CONDFMT, L_CONDFMTS, "Conditional Formatting", ID_CONDDD, 0, 0, 0, 0, "Conditional formatting" },
   { K_DROP, S_LARGE, IC_CELLSTYLES, L_CELLSTYLES, "Cell Styles", ID_CELLSTYLEDD, 0, 0, 0, 0, "Cell styles" },
+  { K_DROP, S_SMALL, IC_NEWSTYLE, LXL_MYSTYLES, "My Styles", ID_LX_MYSTYLEDD, 0, 0, 0, 0, "Your own cell styles, and New Cell Style: the active cell's look under a name" },
 };
 static const Item h_cells[] = {
   { K_DROP, S_SMALL, IC_INSERTCELLS, L_INSERTS, "Insert", ID_INSERTDD, 0, 0, 0, 0, "Insert cells, rows, columns or a sheet" },

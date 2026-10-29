@@ -88,7 +88,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Manage Rules (Styles) `home.manageRules`
 - ⬜ Format as Table (Styles) `home.formatAsTable`
 - ✅ Cell Styles (Styles) `home.cellStyle`
-- ⬜ New Cell Style (Styles) `home.newCellStyle`
+- ✅ New Cell Style (Styles) `home.newCellStyle`
 - ✅ Insert Cells (Cells) `home.insertCells`
 - ✅ Insert Sheet Rows (Cells) `home.insertRows`
 - ✅ Insert Sheet Columns (Cells) `home.insertColumns`
@@ -138,7 +138,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Go To Special (Editing) `edit.goToSpecial`
 - ➖ Add-ins (Add-ins) `home.addIns`
 
-Not done on Home: New Cell Style (Ledger's cell styles are a fixed set; the Format Painter reuses a look). Format as Table, Flash Fill, Protect Sheet and Lock Cell are the table and data work's. Orientation sets and saves the angle; PDF export draws the text at its angle, the screen shows it upright. Draw Border (in the Borders list) draws on the next cells dragged over, one stroke at a time. Add-ins: Ledger has none.
+New Cell Style keeps the active cell's look under a name in Home > My Styles while Ledger runs (not saved in the file). Format as Table, Flash Fill, Protect Sheet and Lock Cell are the table and data work's. Orientation sets and saves the angle; PDF export draws the text at its angle, the screen shows it upright. Draw Border (in the Borders list) draws on the next cells dragged over, one stroke at a time. Add-ins: Ledger has none.
 
 ### Insert (2 of 17 by name)
 
