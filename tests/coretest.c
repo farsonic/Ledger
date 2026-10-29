@@ -840,6 +840,7 @@ static void fin_db(void)
   ok("computed criteria AND a field", near(evn(b, "DSUM(A5:E11,\"Profit\",H1:I2)"), 105));
   book_free(b);
 }
+#include "drawtest.c"
 
 static void templates(void)
 {
@@ -1289,6 +1290,7 @@ int main(void)
   links();
   tables();
   pivots();
+  drawings();
   layout_tests();
   dynarrays();
   printf("%d tests, %d failed\n", passed + failed, failed);

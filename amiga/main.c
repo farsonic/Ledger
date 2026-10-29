@@ -34,6 +34,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "charttab.h"
 #include "layout.h"
 #include "splash.h"
 #include "sysfonts.h"
@@ -121,6 +122,7 @@ static struct NewMenu menus[] = {
   T("Show All Notes", 0, ID_NOTESHOW), T("Formula Bar", 0, ID_FORMULABAR), T("Gridlines", 0, ID_GRIDLINES), T("Headings", 0, ID_HEADINGS), T("Show Formulas", 0, ID_SHOWFORMULAS), BAR,
   I("Zoom In", "+", ID_ZOOMIN), I("Zoom Out", "-", ID_ZOOMOUT), I("Zoom 100%", 0, ID_ZOOM100), I("Zoom to Selection", 0, ID_ZOOMSEL), BAR,
   I("Freeze Panes", 0, ID_FREEZE), I("Unfreeze Panes", 0, ID_UNFREEZE), BAR, T("Dark Mode", 0, ID_DARKUI),
+  CHART_MENUS,                     /* charts, pictures, shapes, ink, sparklines (charttab.h) */
   LX_MENUS
   { NM_END, 0, 0, 0, 0, 0 }
 };
@@ -552,6 +554,7 @@ void update_controls(void)
   rs.MethodID = MUIM_Ribbon_State;
   rs.on = on; rs.font = f->name; rs.size = f->size; rs.numfmt = numfmt_name(book_fmt_code(book, st->numfmt)); rs.fs = &fonts;
   tabletab_state(&rs.ctx, &rs.ctxname);     /* (Table Design, PivotTable Analyze and Design) */
+  rs.ext = chart_ribbon_state();   /* charttab.c: the chart, object and sparkline tabs */
   DoMethodA(ribbon, (Msg)&rs);
   /* the menus' ticks */
   menu_set(ID_GRIDLINES, MUIA_Menuitem_Checked, s->gridlines);
@@ -1905,6 +1908,7 @@ int main(int argc, char **argv)
     else if (id == ID_FILETAB || id == ID_BACKSTAGE || id == ID_TEMPLATE || id == ID_RECENT || id == ID_OPTIONS) backstage_command(id);
     else if ((id >= ID_FONTDD && id <= ID_FN_MORE)) ribbon_choice(id);
     else if (id >= ID_TBL_FIRST && id < ID_TBL_LAST) tabletab_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value));
+    else if (id >= ID_X_FIRST && id < ID_X_LAST) chart_command(id);     /* charttab.c */
     else if (id >= ID_LX_FIRST && id < ID_LX_LAST) { if (back_shown && id != ID_LX_REFRESH && id != ID_LX_SCROLLED) backstage_show(0, 0); lx_command(id); }
     else if (id) {
       if (back_shown && (id == ID_OPEN || id == ID_SAVE || id == ID_SAVEAS || id == ID_SAVECSV || id == ID_NEW)) backstage_show(0, 0);

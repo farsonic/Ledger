@@ -39,6 +39,7 @@
 #include "../core/calc.h"
 #include "../core/ops.h"
 #include "../core/cond.h"
+#include "chartview.h"
 
 #ifndef MUIM_GoActive
 #define MUIM_GoActive   0x8042491aUL
@@ -97,6 +98,7 @@ struct Data {
   int resize_ptr;                /* the resize pointer is showing: 1 columns, 2 rows */
   int show_notes;                /* every note shown, not just the one under the mouse */
   Object *ctxstrip;
+  ObjView *ov;                   /* charts, pictures, shapes, ink, sparklines (chartview.c) */
   struct MUI_EventHandlerNode ehn;
   struct MUI_InputHandlerNode ihn;
 };
@@ -458,6 +460,7 @@ static struct RastPort *back_rp(struct Data *d, Object *obj, LONG w, LONG h)
 }
 
 /* ------------------------------------------------------------------ drawing */
+static void gv_fill(struct Data *d, GridView *gv, struct RastPort *rp, LONG ox, LONG oy);
 static void fill(struct RastPort *rp, LONG x0, LONG y0, LONG x1, LONG y1, LONG pen)
 {
   if (x1 < x0 || y1 < y0) return;
@@ -699,6 +702,7 @@ static void draw_cells(struct Data *d, struct RastPort *rp)
   int i, j, k;
   LONG x1 = d->vx[d->nvc], y1 = d->vy[d->nvr];
   fill(rp, d->hw, d->hh, d->w - 1, d->h - 1, d->pen_cell);
+  if (d->ov && s->drw && s->drw->bg) { GridView gv; gv_fill(d, &gv, rp, 0, 0); ov_background(d->ov, &gv); }   /* (Page Layout > Background) */
   /* gridlines on each cell's right and bottom edge */
   if (s->gridlines) {
     for (j = 0; j < d->nvc; j++) vline(rp, d->vx[j + 1] - 1, d->hh, d->h - 1, d->pen_grid);
@@ -1056,12 +1060,30 @@ static void draw_notes(struct Data *d, struct RastPort *rp)
     draw_box(d, rp, d->hover_r, d->hover_c, NULL, t);
   }
 }
+static void redraw(struct Data *d);
+/* what chartview.c needs of the grid (its layout as last drawn) */
+static LONG gv_colx(void *g, i32 c) { return col_x((struct Data *)g, c); }
+static LONG gv_rowy(void *g, i32 r) { return row_y((struct Data *)g, r); }
+static int gv_cell(void *g, LONG x, LONG y, i32 *r, i32 *c) { return hit((struct Data *)g, x, y, r, c); }
+static LONG gv_pen(void *g, ULONG rgb) { return pen_for((struct Data *)g, rgb); }
+static void gv_notify(void *g, int ch) { struct Data *d = (struct Data *)g; if (ch) changed(d); else moved(d); }
+static void gv_redraw(void *g) { redraw((struct Data *)g); }
+static void gv_fill(struct Data *d, GridView *gv, struct RastPort *rp, LONG ox, LONG oy)
+{
+  gv->obj = d->obj; gv->rp = rp; gv->ox = ox; gv->oy = oy;
+  gv->book = d->book; gv->sheet = SI(d); gv->zoom = zoom(d);
+  gv->hw = d->hw; gv->hh = d->hh; gv->w = d->w; gv->h = d->h;
+  gv->g = d; gv->colx = gv_colx; gv->rowy = gv_rowy; gv->cell_at = gv_cell; gv->pen = gv_pen; gv->notify = gv_notify; gv->redraw = gv_redraw;
+}
 static LONG pen_cb(void *pd, ULONG rgb) { return pen_for((struct Data *)pd, rgb); }
 static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
 {
   GridGeom g;
+  GridView gv;
   layout(d, w, h);
   draw_cells(d, rp);
+  gv_fill(d, &gv, rp, 0, 0);
+  if (d->ov) ov_sparks(d->ov, &gv);
   draw_headings(d, rp);
   draw_filters(d, rp);
   /* (layout.h) page breaks, page numbers and tracer arrows over the cells */
@@ -1069,6 +1091,7 @@ static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
   g.nvr = d->nvr; g.nvc = d->nvc; g.vr = d->vr; g.vy = d->vy; g.vc = d->vc; g.vx = d->vx; g.pen = pen_cb; g.pd = d;
   lx_grid_draw(rp, &g);
   draw_marks(d, rp);
+  if (d->ov) ov_draw(d->ov, &gv);
   draw_notes(d, rp);
   draw_editor(d, rp, 0, 0);
 }
@@ -1400,6 +1423,7 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   if (q & (IEQUALIFIER_LCOMMAND | IEQUALIFIER_RCOMMAND)) return 0;      /* menu shortcuts */
   n = (code >= 0x50 && code <= 0x59) || code == 0x5F ? 0 : key_text(im, typed, sizeof typed);
   if (d->editing) return edit_key(d, code, q, typed, n);
+  if (ov_busy(d->ov)) { GridView gv; gv_fill(d, &gv, _rp(obj), _mleft(obj), _mtop(obj)); if (ov_key(d->ov, &gv, code, q)) return 1; }
   if (!shift) { r = s->cur_r; c = s->cur_c; }
   switch (code) {
   case 0x4C: case 0x4D: case 0x4E: case 0x4F: {
@@ -1634,6 +1658,12 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
   }
   x = im->MouseX - _mleft(obj); y = im->MouseY - _mtop(obj);
   inside = x >= 0 && y >= 0 && x < _mwidth(obj) && y < _mheight(obj);
+  if (d->ov && !d->editing && !d->drag && (im->Class == IDCMP_MOUSEBUTTONS || im->Class == IDCMP_MOUSEMOVE || im->Class == IDCMP_INTUITICKS)) {
+    /* objects over the cells take the mouse first */
+    GridView gv;
+    gv_fill(d, &gv, _rp(obj), _mleft(obj), _mtop(obj));
+    if (ov_mouse(d->ov, &gv, im, x, y)) { if (im->Class == IDCMP_MOUSEBUTTONS) { set(_win(obj), MUIA_Window_ActiveObject, (ULONG)obj); key_grab = NULL; } return MUI_EventHandlerRC_Eat; }
+  }
   if (im->Class == IDCMP_MOUSEMOVE || im->Class == IDCMP_INTUITICKS) {
     if (d->drag == DR_LAYOUT) { lx_grid_mouse(obj, 1, x, y); return MUI_EventHandlerRC_Eat; }
     if (d->drag) { drag_to(d, obj, x, y); return MUI_EventHandlerRC_Eat; }
@@ -1865,9 +1895,11 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
     d->click_r = -1;
     mset(d, obj, (struct opSet *)msg, 1);
     if ((d->ctxstrip = ctx_make())) set(obj, MUIA_ContextMenu, (ULONG)d->ctxstrip);
+    d->ov = ov_new();
     return (ULONG)obj;
   case OM_DISPOSE:
     d = INST_DATA(cl, obj);
+    ov_free(d->ov); d->ov = NULL;
     if (d->ctxstrip) { set(obj, MUIA_ContextMenu, 0); MUI_DisposeObject(d->ctxstrip); d->ctxstrip = NULL; }
     break;
   case OM_SET:
@@ -1887,6 +1919,7 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
     case MUIA_Grid_FilterCol: *g->opg_Storage = (ULONG)d->filter_col; return TRUE;
     case MUIA_Grid_Zoom: *g->opg_Storage = d->book ? (ULONG)zoom(d) : 100; return TRUE;
     case MUIA_Grid_Brush: *g->opg_Storage = (ULONG)d->brush; return TRUE;
+    case MUIA_Grid_ObjView: *g->opg_Storage = (ULONG)d->ov; return TRUE;
     }
     break;
   }
@@ -1914,6 +1947,7 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
     if (d->handlers) {
       DoMethod(_app(obj), MUIM_Application_RemInputHandler, (ULONG)&d->ihn);
       close_fonts(d);
+      ov_cleanup(d->ov, obj);
       free_pens(d, obj);
       back_free(d);
       theme_cleanup(obj);
@@ -2054,5 +2088,6 @@ void grid_class_free(void)
 {
   int i;
   if (cls) { MUI_DeleteCustomClass(cls); cls = NULL; }
+  ov_fonts_free();
   for (i = 0; i < 2; i++) if (ptr_chip[i]) { FreeVec(ptr_chip[i]); ptr_chip[i] = NULL; }
 }

@@ -287,8 +287,15 @@ static const Item i_links[] = {
 static const Item i_text[] = {
   { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
 };
-static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Functions", G_COLS, i_fn, N(i_fn) },
-                                { "Links", G_COLS, i_links, N(i_links) }, { "Names", G_COLS, i_names, N(i_names) }, { "Text", G_COLS, i_text, N(i_text) } };
+#include "chartrib.h"            /* charts, pictures, shapes, ink, sparklines (charttab.c does their commands) */
+static const Item i_textx[] = {
+  { K_BUTTON, S_LARGE, IC_TEXTBOX, 0, "Text Box", ID_X_TEXTBOX, 0, 0, 0, 0, "A box of text over the cells: drag on the sheet to draw it" },
+  { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
+};
+static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Illustrations", G_COLS, ix_illus, N(ix_illus) },
+                                { "Charts", G_COLS, ix_charts, N(ix_charts) }, { "Sparklines", G_COLS, ix_spark, N(ix_spark) },
+                                { "Functions", G_COLS, i_fn, N(i_fn) }, { "Links", G_COLS, i_links, N(i_links) }, { "Text", G_COLS, i_textx, N(i_textx) },
+                                { "Names", G_COLS, i_names, N(i_names) } };
 /* Page Layout: themes, the page setup (Ledger doesn't print, but PDF export, Page Break Preview and
    Excel use it), scaling, the sheet options, and Ledger's sheet tools */
 static const Item p_themes[] = {
@@ -302,6 +309,7 @@ static const Item p_setup[] = {
   { K_DROP, S_LARGE, IC_SIZE, LXL_PAPERS, "Size", ID_LX_SIZEDD, 0, 0, 0, 0, "Paper size" },
   { K_DROP, S_LARGE, IC_PRINTAREA, LXL_AREA, "Print Area", ID_LX_AREADD, 0, 0, 0, 0, "The cells that make the pages" },
   { K_DROP, S_LARGE, IC_BREAKS, LXL_BREAKS, "Breaks", ID_LX_BREAKSDD, 0, 0, 0, 0, "Page breaks above and left of the active cell" },
+  { K_BUTTON, S_LARGE, IC_PAGECOLOR, 0, "Background", ID_X_BACKGROUND, 0, 0, 0, 0, "A picture behind the cells, repeated across the sheet (again: take it off)" },
   { K_BUTTON, S_LARGE, IC_PRINTTITLES, 0, "Print Titles", ID_LX_TITLES, 0, 0, 0, 0, "Rows and columns repeated on every page" },
   { K_BUTTON, S_LARGE, IC_PAGESETUPDLG, 0, "Page Setup", ID_LX_PAGESETUP, 0, 0, 0, 0, "Page Setup: page, margins, header and footer, sheet" },
 };
@@ -330,6 +338,11 @@ static const Item p_arrange[] = {
   { K_BUTTON, S_SMALL, IC_ARROWLEFT, 0, "Move Left", ID_MOVESHEETL, 0, 0, 0, 0, "Move this sheet one place left" },
   { K_BUTTON, S_SMALL, IC_ARROWRIGHT, 0, "Move Right", ID_MOVESHEETR, 0, 0, 0, 0, "Move this sheet one place right" },
   { K_BUTTON, S_SMALL, IC_DELETECELLS, 0, "Delete", ID_DELSHEET, 0, 0, 0, 0, "Delete this sheet" },
+  { K_BUTTON, S_SMALL, IC_FORWARD, 0, "Bring Forward", ID_X_FORWARD, 0, RBX(RBX_OBJECT), F_NEWCOL, 0, "Bring the selected picture, shape or chart one step to the front" },
+  { K_BUTTON, S_SMALL, IC_BACKWARD, 0, "Send Backward", ID_X_BACKWARD, 0, RBX(RBX_OBJECT), 0, 0, "Send it one step back" },
+  { K_BUTTON, S_SMALL, IC_SELPANE, 0, "Selection Pane", ID_X_SELPANE, 0, 0, 0, 0, "The sheet's pictures, shapes and charts by name: select, rename, reorder" },
+  { K_DROP, S_SMALL, IC_ALIGNOBJ, LX_ALIGN, "Align", ID_X_ALIGNDD, 0, RBX(RBX_OBJECT), F_NEWCOL, 0, "Line the selected objects up with the first one selected" },
+  { K_BUTTON, S_SMALL, IC_ROTATE, 0, "Rotate", ID_X_ROTATE, 0, RBX(RBX_SHAPE), 0, 0, "Turn the selected shape a quarter turn" },
 };
 static const Group playout[] = { { "Themes", G_COLS, p_themes, N(p_themes) }, { "Page Setup", G_COLS, p_setup, N(p_setup) },
                                  { "Scale to Fit", G_COLS, p_fit, N(p_fit) }, { "Sheet Options", G_COLS, p_opts, N(p_opts) },
@@ -508,10 +521,11 @@ static const char *tip_for(UWORD id)
 }
 /* the tab strip, left to right. File isn't a tab of tools: a click on it opens the File page */
 static const Tab tabs[] = {
-  { "File", NULL, 0 }, { "Home", home, N(home) }, { "Insert", insert, N(insert) }, { "Page Layout", playout, N(playout) },
+  { "File", NULL, 0 }, { "Home", home, N(home) }, { "Insert", insert, N(insert) }, { "Draw", x_draw, N(x_draw) }, { "Page Layout", playout, N(playout) },
   { "Formulas", formulas, N(formulas) }, { "Data", data, N(data) }, { "Review", review, N(review) }, { "View", view, N(view) },
   /* contextual (TT_CONTEXT_FIRST on): shown while the active cell is in a table or a pivot table */
   { "Table Design", tdesign, N(tdesign) }, { "PivotTable Analyze", panalyze, N(panalyze) }, { "PivotTable Design", pdesign, N(pdesign) },
+  { "Chart Design", x_design, N(x_design) }, { "Format", x_format, N(x_format) }, { "Sparkline", x_spark, N(x_spark) },
 };
 #define NTABS N(tabs)
 /* (ledger.h) the label of entry v of the list of the item that returns id */
@@ -568,13 +582,24 @@ static int rowh(void) { return fh() + 7; }
 static int bodyh(void) { return 3 * rowh() + 4; }
 static int caph(void) { return fh() + 3; }
 
-static int bit_on(struct RData *d, int b) { return b >= CB_INTABLE ? (d->st.ctx & CBIT(b)) != 0 : b >= LXB_FIRST ? lx_bit(b) : (d->st.on & RBIT(b)) != 0; }
-/* a contextual tab is shown while the active cell is in a table (Table Design) or a pivot table */
-static int tab_shown(struct RData *d, int t) { return t < TT_CONTEXT_FIRST || bit_on(d, t == TT_CONTEXT_FIRST ? CB_INTABLE : CB_INPIVOT); }
+static int bit_on(struct RData *d, int b)
+{
+  if (b >= CB_INTABLE) return (d->st.ctx & CBIT(b)) != 0;
+  if (b >= RBX(0)) return (d->st.ext & (1UL << (b - RBX(0)))) != 0;
+  return b >= LXB_FIRST ? lx_bit(b) : (d->st.on & RBIT(b)) != 0;
+}
+/* a contextual tab is shown while the active cell is in a table (Table Design) or a pivot table,
+   or while a chart, an object or a sparkline is selected (charttab.c) */
+static int tab_shown(struct RData *d, int t)
+{
+  if (x_tab_hidden(tabs[t].groups, d->st.ext)) return 0;
+  if (t < TT_CONTEXT_FIRST || t >= TT_CONTEXT_FIRST + 3) return 1;
+  return bit_on(d, t == TT_CONTEXT_FIRST ? CB_INTABLE : CB_INPIVOT);
+}
 static const char *tab_name(struct RData *d, int t)
 {
   static const char *const shortnames[3] = { "Design", "Analyze", "Design" };
-  return t >= TT_CONTEXT_FIRST && d->shortctx ? shortnames[t - TT_CONTEXT_FIRST] : tabs[t].name;
+  return t >= TT_CONTEXT_FIRST && t < TT_CONTEXT_FIRST + 3 && d->shortctx ? shortnames[t - TT_CONTEXT_FIRST] : tabs[t].name;
 }
 static int item_on(struct RData *d, const Item *it) { return it->st && bit_on(d, it->st); }
 static int item_enabled(struct RData *d, const Item *it) { return !it->en || bit_on(d, it->en); }
@@ -649,13 +674,17 @@ static void layout_ribbon(struct RData *d, Object *obj)
   LONG gw[12];
   if (!tab_shown(d, d->tab)) d->tab = 1;
   {
-    LONG all = 0;
-    for (t = 0; t < NTABS; t++) if (tab_shown(d, t)) all += theme_textlen(rp, theme_font(), tabs[t].name) + 16;
-    d->shortctx = all > _mwidth(obj) - NQA * 24 - 8;
+    /* the padding shrinks, then the table tabs take short names, when they would run off the strip */
+    LONG all = 0, pad = 16;
+    int shown = 0;
+    for (t = 0; t < NTABS; t++) if (tab_shown(d, t)) { all += theme_textlen(rp, theme_font(), tabs[t].name); shown++; }
+    while (pad > 4 && all + pad * shown > _mwidth(obj) - NQA * 24 - 8) pad -= 2;
+    d->shortctx = all + pad * shown > _mwidth(obj) - NQA * 24 - 8;
+    for (t = 0; t < NTABS; t++) d->tabbox[t].x0 = (WORD)(tab_shown(d, t) ? pad : -1);
   }
   for (t = 0; t < NTABS; t++) {
-    LONG w = theme_textlen(rp, theme_font(), tab_name(d, t)) + 16;
-    if (!tab_shown(d, t)) { d->tabbox[t].x0 = d->tabbox[t].x1 = -1; continue; }
+    LONG w = theme_textlen(rp, theme_font(), tab_name(d, t)) + d->tabbox[t].x0;
+    if (d->tabbox[t].x0 < 0) { d->tabbox[t].x1 = -1; continue; }
     d->tabbox[t].x0 = (WORD)x; d->tabbox[t].x1 = (WORD)(x + w - 1);
     d->tabbox[t].y0 = (WORD)_mtop(obj); d->tabbox[t].y1 = (WORD)(_mtop(obj) + tabh() - 1);
     x += w;
@@ -762,6 +791,7 @@ static void field_text(struct RData *d, const Item *it, char *out, size_t cap)
   case ID_SIZEDD: sprintf(out, "%d%s", d->st.size / 10, d->st.size % 10 ? ".5" : ""); break;
   case ID_NUMFMTDD: strncpy(out, tr(d->st.numfmt ? d->st.numfmt : "General"), cap - 1); out[cap - 1] = 0; break;
   case ID_TBLNAME: case ID_PVNAME: strncpy(out, d->ctxname, cap - 1); out[cap - 1] = 0; break;
+  default: chartrib_field(it->id, out, cap); break;
   }
 }
 static void draw_item(struct RData *d, Object *obj, int k)
@@ -1368,7 +1398,7 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
   case MUIM_Ribbon_State: {
     struct MUIP_Ribbon_State *m = (struct MUIP_Ribbon_State *)msg;
     d = INST_DATA(cl, obj);
-    if (m->on == d->st.on && m->ctx == d->st.ctx && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt)
+    if (m->on == d->st.on && m->ctx == d->st.ctx && m->ext == d->st.ext && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt)
         && !strcmp(m->ctxname ? m->ctxname : "", d->ctxname) && lx_bits_hash() == d->lxhash) return 0;
     d->lxhash = lx_bits_hash();
     d->st = *m;

@@ -182,6 +182,7 @@ typedef struct {
   Link *links; int nlinks;        /* hyperlinks on cells, in no order */
   struct LTable *tables; int ntables;   /* tables (Format as Table), table.h */
   struct LPivot *pivots; int npivots;   /* pivot tables whose report is on this sheet, pivot.h */
+  struct Drawing *drw;            /* charts, pictures, shapes and sparklines (drawing.h), NULL none */
   u8 hidden, gridlines, headings, showzeros, rtl;
   i32 cur_r, cur_c;               /* where the cursor was, and the selection */
   Rect sel;
