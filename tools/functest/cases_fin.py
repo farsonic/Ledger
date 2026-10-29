@@ -164,3 +164,6 @@ C = [
  ('DCOUNT', R, [DB, '"Profit"', CR_MIX]), ('DAVERAGE', R, [DB, '"Profit"', CR_MIX]),
  ('DVAR', R, [DB, '"Height"', CR_H]), ('DVARP', R, [DB, '"Height"', CR_H]), ('DMAX', R, [DB, '"Height"', CR_W]),
 ]
+# YEARFRAC's basis 1 (actual/actual) over leap years and spans of more than a year
+C += [('YEARFRAC', ['DATE(2024,1,1)', 'DATE(2024,7,1)', '1']), ('YEARFRAC', ['DATE(2023,3,1)', 'DATE(2024,3,1)', '1']),
+      ('YEARFRAC', ['DATE(2022,6,15)', 'DATE(2025,2,10)', '1']), ('YEARFRAC', ['DATE(2023,1,31)', 'DATE(2023,2,28)', '0'])]

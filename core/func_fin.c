@@ -528,6 +528,14 @@ static int sec_args(Ctx *cx, Value *a, int n, double *x, double *yf)
   *yf = year_frac(s, m, b);
   return 0;
 }
+/* YEARFRAC, in place of the core's (whose basis 1 took every year as 365.25 days) */
+static Value f_yearfrac(Ctx *cx, Value *a, int n)
+{
+  double s1, s2;
+  int e, basis = 0;
+  if ((e = get_date(cx, a, n, 0, &s1)) || (e = get_date(cx, a, n, 1, &s2)) || (e = get_basis(cx, a, n, 2, &basis))) return val_err(e);
+  return num_or_err(year_frac(s1, s2, basis));
+}
 static Value f_disc(Ctx *cx, Value *a, int n) { double x[2], yf; int e = sec_args(cx, a, n, x, &yf); return e ? val_err(e) : num_or_err((1 - x[0] / x[1]) / yf); }
 static Value f_pricedisc(Ctx *cx, Value *a, int n) { double x[2], yf; int e = sec_args(cx, a, n, x, &yf); return e ? val_err(e) : num_or_err(x[1] * (1 - x[0] * yf)); }
 static Value f_yielddisc(Ctx *cx, Value *a, int n) { double x[2], yf; int e = sec_args(cx, a, n, x, &yf); return e ? val_err(e) : num_or_err((x[1] - x[0]) / x[0] / yf); }
@@ -1220,7 +1228,7 @@ const FuncDef func_fin_defs[] = {
   { "VDB", 5, 7, 0, f_vdb },
   { "XIRR", 2, 3, 0, f_xirr },
   { "XNPV", 3, 3, 0, f_xnpv },
-  { "YIELD", 6, 7, 0, f_yield },
+  { "YEARFRAC", 2, 3, 0, f_yearfrac }, { "YIELD", 6, 7, 0, f_yield },
   { "YIELDDISC", 4, 5, 0, f_yielddisc },
   { "YIELDMAT", 5, 6, 0, f_yieldmat },
 };
