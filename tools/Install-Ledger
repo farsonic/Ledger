@@ -1,0 +1,222 @@
+; $VER: Install-Ledger 0.2.2 (28.10.2026)
+;
+; Installer script for Ledger, the spreadsheet (Commodore's Installer 43 or later, or AROS's).
+; Started from its icon (default tool Installer). It installs or updates Ledger in a drawer of your
+; choosing, or removes it.
+;
+; Installs:  <where you choose>/Ledger: the program, README.md, the Fonts and TrueType drawers,
+;            the example workbooks (optional) and the source code (optional), all with their
+;            icons; the Ledger drawer gets Ledger's own icon. The example workbooks' icons are set
+;            to open in the Ledger just installed.
+; Keeps:     your settings (Ledger.prefs, Ledger.recent) when updating.
+; Needs:     a 68040 or better, MUI 3.8 or later (muimaster.library 19).
+;
+; The script runs in the drawer it was unpacked into (Ledger/), so its sources are relative to that.
+; Texts carry their own line breaks (AROS's Installer doesn't wrap them), and function names are
+; in lower case (AROS's Installer doesn't know "IN", only "in").
+
+(set @app-name "Ledger")
+(set #version "0.2.2")
+
+; ------------------------------------------------------------------ install or remove
+
+(set #mode
+  (askchoice
+    (prompt "Do you want to install Ledger,\nor remove an installed copy?")
+    (help "Install or update: copies Ledger into a drawer of\n"
+          "your choosing. Installing over an older Ledger updates\n"
+          "it and keeps your settings (Ledger.prefs) and recent\n"
+          "workbooks.\n\n"
+          "Remove: deletes an installed Ledger drawer, settings\n"
+          "and all. Your workbooks are not touched unless you\n"
+          "saved them inside the Ledger drawer.")
+    (choices "Install or update" "Remove")
+    (default 0)))
+
+(if (= #mode 1)
+(
+  ; ---------------------------------------------------------------- remove
+  (set #old
+    (askdir
+      (prompt "Which Ledger drawer should be removed?")
+      (help "Choose the Ledger drawer itself: the one holding\n"
+            "the Ledger program and its Fonts drawer.")
+      (default (if (exists "Work:Ledger" (noreq)) "Work:Ledger" "SYS:"))))
+  ; only a drawer that really is Ledger's
+  (if (not (and (exists (tackon #old "Ledger")) (exists (tackon #old "Fonts/QuillSans.font"))))
+    (abort (cat "\"" #old "\"\n"
+                "doesn't look like a Ledger drawer (there is no\n"
+                "Ledger program with a Fonts drawer in it),\n"
+                "so nothing was removed.")))
+  (if (askbool
+        (prompt (cat "Delete the whole drawer\n\n" #old "\n\n"
+                     "with everything in it, including your Ledger\n"
+                     "settings and any workbooks saved there?"))
+        (help "This can't be undone. Move any workbooks you\n"
+              "want to keep out of the drawer first.")
+        (default 0))
+  (
+    (set #parentinfo (cat #old ".info"))
+    (run (cat "C:Delete >NIL: \"" #old "\" ALL QUIET FORCE"))
+    (if (exists #parentinfo (noreq)) (delete #parentinfo))
+    (exit "Ledger has been removed." (quiet))
+  )
+  (exit "Nothing was removed." (quiet)))
+))
+
+; ------------------------------------------------------------------ checks
+
+(set #cpu (database "cpu"))
+(if (or (= #cpu "68000") (= #cpu "68010") (= #cpu "68020") (= #cpu "68030"))
+  (if (not (askbool
+             (prompt (cat "This Amiga has a " #cpu " processor.\n"
+                          "Ledger is built for a 68040 or better\n"
+                          "and will not run on it.\n\n"
+                          "Install anyway (for another Amiga, say)?"))
+             (help "Ledger uses the 68040's instructions and its\n"
+                   "floating-point unit for calculating. An\n"
+                   "accelerator card with a 68040 or 68060 is needed.")
+             (default 0)))
+    (abort "Ledger was not installed.")))
+
+(set #mui 0)
+(if (exists "LIBS:muimaster.library" (noreq))
+  (set #mui (/ (getversion "LIBS:muimaster.library") 65536)))
+(if (< #mui 19)
+  (if (not (askbool
+             (prompt (if (= #mui 0)
+                       (cat "MUI isn't installed (there is no\n"
+                            "LIBS:muimaster.library).\n\n"
+                            "Ledger needs MUI 3.8 or later. Install\n"
+                            "Ledger anyway and add MUI afterwards?")
+                       (cat "The MUI installed (muimaster.library " #mui ")\n"
+                            "is older than Ledger needs (version 19,\n"
+                            "MUI 3.8).\n\n"
+                            "Install Ledger anyway and update MUI\n"
+                            "afterwards?")))
+             (help "MUI is the user interface system Ledger is built\n"
+                   "with. It is on Aminet (dev/gui/mui38usr.lha) and\n"
+                   "at muidev.de (MUI 5). AROS and MorphOS have it\n"
+                   "built in.")
+             (default 1)))
+    (abort "Ledger was not installed.")))
+
+; ------------------------------------------------------------------ where
+
+(set #where
+  (askdir
+    (prompt "Where should Ledger go? A drawer called \"Ledger\"\n"
+            "is made there (or updated, if it is there already).")
+    (help "Choose the drawer or disk to put Ledger in, for\n"
+          "example Work:. Ledger goes into a drawer of its own,\n"
+          "Ledger, inside the one you choose. If an older Ledger\n"
+          "is there, it is updated and your settings are kept.")
+    (default (if (exists "Work:" (noreq)) "Work:" "SYS:"))
+    (disk)))
+(set #dest (tackon #where "Ledger"))
+(set @default-dest #dest)
+
+(set #update (exists (tackon #dest "Ledger") (noreq)))
+
+; the parts
+(set #parts
+  (askoptions
+    (prompt "Which parts should be installed?")
+    (help "Ledger itself (the program, its screen fonts and\n"
+          "the fonts it draws cells with) is always installed.\n\n"
+          "Example workbooks: Excel workbooks showing\n"
+          "what Ledger can do (a few KB).\n\n"
+          "Source code: Ledger's C source, for programmers\n"
+          "(about 1 MB).")
+    (choices "Example workbooks" "Source code")
+    (default 1)))
+
+; ------------------------------------------------------------------ copy
+
+; the same drawer it was unpacked in: nothing to copy, only the icons to point at it
+(set #here (expandpath ""))
+(set #same (if (exists #dest (noreq)) (= (expandpath #dest) #here) 0))
+
+(if (not #same)
+(
+  (if (not (exists #dest (noreq)))
+    (makedir #dest
+      (prompt "Making the Ledger drawer")
+      (help @makedir-help)))
+  ; the drawer's own icon (next to the unpacked drawer), else a plain one
+  (if (exists "/Ledger.info" (noreq))
+    (copyfiles (source "/Ledger.info") (dest #where) (nogauge))
+    (if (not (exists (cat #dest ".info") (noreq)))
+      (run (cat "C:Copy >NIL: \"ENVARC:Sys/def_drawer.info\" \"" #dest ".info\""))))
+
+  (complete 5)
+  (copyfiles
+    (prompt "Copying Ledger")
+    (help @copyfiles-help)
+    (source "Ledger")
+    (dest #dest)
+    (infos))
+  (copyfiles
+    (source "README.md")
+    (dest #dest)
+    (infos)
+    (nogauge))
+  (complete 10)
+  (copyfiles
+    (prompt "Copying Ledger's screen fonts")
+    (help @copyfiles-help)
+    (source "Fonts")
+    (dest (tackon #dest "Fonts"))
+    (all))
+  (if (exists "Fonts.info" (noreq)) (copyfiles (source "Fonts.info") (dest #dest) (nogauge)))
+  (complete 55)
+  (copyfiles
+    (prompt "Copying the fonts Ledger draws cells with")
+    (help @copyfiles-help)
+    (source "TrueType")
+    (dest (tackon #dest "TrueType"))
+    (all))
+  (if (exists "TrueType.info" (noreq)) (copyfiles (source "TrueType.info") (dest #dest) (nogauge)))
+  (complete 80)
+  (complete 85)
+
+  (if (in #parts 0)
+    (copyfiles
+      (prompt "Copying the example workbooks")
+      (help @copyfiles-help)
+      (source "")
+      (dest #dest)
+      (pattern "#?.(xlsx|csv)")
+      (infos)))
+  (complete 90)
+  (if (in #parts 1)
+  (
+    (copyfiles
+      (prompt "Copying the source code")
+      (help @copyfiles-help)
+      (source "Source")
+      (dest (tackon #dest "Source"))
+      (all))
+    (if (exists "Source.info" (noreq)) (copyfiles (source "Source.info") (dest #dest) (nogauge)))
+  ))
+))
+
+; ------------------------------------------------------------------ icons
+
+; the example workbooks open in the Ledger just installed
+(set #tool (tackon #dest "Ledger"))
+(foreach #dest "#?.(xlsx|csv)"
+  (if (exists (tackon #dest (cat @each-name ".info")) (noreq))
+    (tooltype
+      (dest (tackon #dest @each-name))
+      (setdefaulttool #tool))))
+(complete 100)
+
+(exit
+  (cat "Ledger " #version " is "
+       (if #same "ready in" (if #update "updated in" "installed in"))
+       "\n\n" #dest "\n\n"
+       "Double-click the Ledger icon to start it, or a\n"
+       "workbook whose icon has Ledger as its default\n"
+       "tool. README.md tells you what it can do and\n"
+       "how to use it."))

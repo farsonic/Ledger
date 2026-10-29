@@ -1,0 +1,4 @@
+*.lha
+/Ledger
+*.o
+__pycache__/

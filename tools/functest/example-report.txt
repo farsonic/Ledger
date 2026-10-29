@@ -1,0 +1,3 @@
+FunctionTests.xlsx: 715 tests of 187 functions (376 cases, each with arguments typed in and in cells where it takes any)
+Ledger's core: 715 PASS, 0 FAIL
+LibreOffice: 673 PASS, 42 FAIL (42 of them the rows noted as Excel's answer, 0 others)
