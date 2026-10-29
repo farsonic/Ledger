@@ -392,6 +392,7 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
   CondRule *cr = NULL; int *cprio = NULL; int ncr = 0, curc = -1, nformula = 0, ncfvo = 0, ncolor = 0;
   Rect *careas = NULL; int ncareas = 0;
   if (!d) return;
+  page_xml_sheet_in(rd->b, sheet);
   xml_init(&x, (const char *)d, len);
   while (xml_next(&x) != XT_EOF) {
     const char *n = x.name;
@@ -841,6 +842,8 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
       strncpy(ents[nents].rid, rid, 31); ents[nents].rid[31] = 0;
       ents[nents].hidden = st && strcmp(st, "visible");
       nents++;
+    } else if (!strcmp(x.name, "customWorkbookView")) {
+      page_xml_book_view(b, &x);
     } else if (!strcmp(x.name, "workbookPr")) {
       const char *v = xml_attr(&x, "date1904");
       if (v && (!strcmp(v, "1") || !strcmp(v, "true"))) b->date1904 = 1;
@@ -1348,6 +1351,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
       buf_adds(o, "</autoFilter>");
     }
   }
+  page_write_sheet_views(b, si, o);
   if (s->nmerges) {
     buf_printf(o, "<mergeCells count=\"%d\">", s->nmerges);
     for (i = 0; i < s->nmerges; i++) { rect_text(s->merges[i], ref); buf_printf(o, "<mergeCell ref=\"%s\"/>", ref); }
@@ -1542,7 +1546,9 @@ u8 *xlsx_save(Book *b, size_t *len)
   }
   buf_adds(&o, "<calcPr calcId=\"191029\"");
   page_write_calcpr(b, &o);
-  buf_adds(&o, "/></workbook>");
+  buf_adds(&o, "/>");
+  page_write_book_views(b, &o);
+  buf_adds(&o, "</workbook>");
   zip_add(&w, "xl/workbook.xml", o.data, o.len);
   o.len = 0;
   buf_adds(&o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"

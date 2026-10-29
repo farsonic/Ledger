@@ -117,6 +117,9 @@ typedef struct {
 } Theme;
 extern const Theme page_themes[];     /* Office's and GridCraft's ready-made ones */
 extern const int page_nthemes;
+/* a custom view (View > Custom Views): how the workbook was shown, under a name */
+typedef struct { char name[40]; int sheet; i32 cur_r, cur_c, top, left; Rect sel; u16 zoom; u8 view, grid, head; } CustomView;
+#define MAXVIEWS 24
 typedef struct LayoutBook {
   char subject[128], keywords[128], description[256], category[64], status[32], company[64], manager[64];
   Theme theme;
@@ -125,6 +128,7 @@ typedef struct LayoutBook {
   double maxchange;               /* 0.001 */
   u8 r1c1;                        /* R1C1 reference style */
   u8 hasprops;
+  CustomView views[MAXVIEWS]; int nviews;
 } LayoutBook;
 LayoutBook *book_lx(Book *b);         /* made with defaults when first asked for (NULL out of memory) */
 void   lx_free(LayoutBook *x);
@@ -136,6 +140,7 @@ void   book_set_theme_fonts(Book *b, const char *major, const char *minor);
 /* ------------------------------------------------------------------ .xlsx (xlsx.c's hooks) */
 /* an element of a worksheet part; 1 if it was page setup's (the parser may have moved on) */
 int    page_xml_sheet(Sheet *s, Xml *x);
+void   page_xml_sheet_in(Book *b, int sheet);   /* (before a sheet's elements: which book and sheet they are) */
 /* the workbook part's _xlnm names (Print_Area, Print_Titles): 1 if taken */
 int    page_xml_name(Book *b, const char *name, int local, const char *text);
 /* written in their places in a worksheet: inside <sheetPr> (fitToPage), and after the hyperlinks */
@@ -152,6 +157,10 @@ void   page_write_core(Book *b, Buf *o);
 int    page_xml_core(Book *b, Xml *x);   /* an element of core.xml or app.xml; 1 if taken */
 void   page_write_theme(Book *b, Buf *o);
 void   page_read_theme(Book *b, const char *xml, size_t len);
+/* custom views: customWorkbookViews (after calcPr) and each sheet's customSheetViews (before mergeCells) */
+void   page_write_book_views(Book *b, Buf *o);
+void   page_write_sheet_views(Book *b, int sheet, Buf *o);
+void   page_xml_book_view(Book *b, Xml *x);
 /* calcPr attributes */
 void   page_write_calcpr(Book *b, Buf *o);
 void   page_xml_calcpr(Book *b, Xml *x);

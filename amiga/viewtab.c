@@ -325,19 +325,17 @@ int lx_grid_mouse(Object *obj, int what, LONG x, LONG y)
   return 1;
 }
 
-/* ------------------------------------------------------------------ custom views (kept while Ledger runs) */
-typedef struct { Book *b; char name[40]; int sheet; i32 cur_r, cur_c, top, left; Rect sel; u16 zoom; u8 view, grid, head; } CView;
-static CView views[24]; static int nviews;
+/* ------------------------------------------------------------------ custom views (saved with the workbook) */
 static void custom_views(void)
 {
   static const ULONG ends[] = { ID_DLGOK, ID_DLG1, ID_DLG2, 0 };
-  static const char *labels[25];
+  static char labels[MAXVIEWS][44];
+  LayoutBook *x = book_lx(book);
   Object *w, *list, *add, *del;
-  int idx[24], n = 0, i;
+  int i;
   ULONG r;
+  if (!x) return;
   for (;;) {
-    n = 0;
-    for (i = 0; i < nviews; i++) if (views[i].b == book) { labels[n] = views[i].name; idx[n++] = i; }
     w = dialog_window("Custom Views", VGroup,
           Child, TextObject, MUIA_Text_Contents, (ULONG)tr("Views of this workbook:"), End,
           Child, ListviewObject, MUIA_Listview_List, list = ListObject, InputListFrame, MUIA_List_ConstructHook, MUIV_List_ConstructHook_String,
@@ -345,8 +343,9 @@ static void custom_views(void)
           Child, HGroup, Child, add = QButton(tr("Add...")), Child, del = QButton(tr("Delete")), Child, HSpace(0), End,
         End, "Show");
     if (!w) return;
-    for (i = 0; i < n; i++) DoMethod(list, MUIM_List_InsertSingle, (ULONG)labels[i], MUIV_List_Insert_Bottom);
-    if (n) set(list, MUIA_List_Active, 0);
+    for (i = 0; i < x->nviews; i++) { lx_utf8_latin1(x->views[i].name, labels[i], sizeof labels[i]); DoMethod(list, MUIM_List_InsertSingle, (ULONG)labels[i], MUIV_List_Insert_Bottom); }
+    if (x->nviews) set(list, MUIA_List_Active, 0);
+    DoMethod(list, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLGOK);
     DoMethod(add, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG1);
     DoMethod(del, MUIM_Notify, MUIA_Pressed, FALSE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG2);
     r = run_modal(w, ends, NULL);
@@ -356,21 +355,23 @@ static void custom_views(void)
       if (r == ID_DLG1) {
         char nm[40] = "";
         Sheet *s = cur_sheet();
+        CustomView *v;
         if (!ask_string("Add View", "Name:", nm, sizeof nm) || !nm[0]) continue;
-        if (nviews >= 24) { ask("OK", "%s", tr("Ledger keeps up to 24 views.")); continue; }
-        views[nviews].b = book; strcpy(views[nviews].name, nm); views[nviews].sheet = book->active;
-        views[nviews].cur_r = s->cur_r; views[nviews].cur_c = s->cur_c; views[nviews].top = s->top; views[nviews].left = s->left;
-        views[nviews].sel = s->sel; views[nviews].zoom = s->zoom; views[nviews].view = page_of(s)->view;
-        views[nviews].grid = s->gridlines; views[nviews].head = s->headings;
-        nviews++;
+        if (x->nviews >= MAXVIEWS) { ask("OK", "%s", tr("A workbook keeps up to 24 views.")); continue; }
+        v = &x->views[x->nviews++];
+        memset(v, 0, sizeof *v);
+        lx_latin1_utf8(nm, v->name, sizeof v->name);
+        v->sheet = book->active; v->cur_r = s->cur_r; v->cur_c = s->cur_c; v->top = s->top; v->left = s->left;
+        v->sel = s->sel; v->zoom = s->zoom ? s->zoom : 100; v->view = page_of(s)->view; v->grid = s->gridlines; v->head = s->headings;
+        book->dirty = 1;
         continue;
       }
       if (r == ID_DLG2) {
-        if (a >= 0 && a < n) { memmove(&views[idx[a]], &views[idx[a] + 1], (size_t)(nviews - idx[a] - 1) * sizeof(CView)); nviews--; }
+        if (a >= 0 && a < x->nviews) { memmove(&x->views[a], &x->views[a + 1], (size_t)(x->nviews - a - 1) * sizeof(CustomView)); x->nviews--; book->dirty = 1; }
         continue;
       }
-      if (r == ID_DLGOK && a >= 0 && a < n) {
-        CView *v = &views[idx[a]];
+      if (r == ID_DLGOK && a >= 0 && a < x->nviews) {
+        CustomView *v = &x->views[a];
         if (v->sheet < book->nsh) {
           Sheet *s;
           book->active = v->sheet;

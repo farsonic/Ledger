@@ -120,6 +120,9 @@ static void pagesetup_tests(void)
     LayoutBook *x = book_lx(b);
     strcpy(x->subject, "Accounts"); strcpy(x->keywords, "money, 2026"); strcpy(x->company, "Acme & Co");
     x->iterate = 1; x->maxiter = 50;
+    strcpy(x->views[0].name, "Wide"); x->views[0].sheet = 0; x->views[0].zoom = 75; x->views[0].view = PV_BREAKS; x->views[0].grid = 0; x->views[0].head = 1;
+    x->views[0].top = 10; x->views[0].left = 2; x->views[0].cur_r = 12; x->views[0].cur_c = 3; x->views[0].sel.r1 = 12; x->views[0].sel.r2 = 14; x->views[0].sel.c1 = x->views[0].sel.c2 = 3;
+    x->nviews = 1;
     book_set_theme(b, &page_themes[1]);
     ok("theme: default font follows", !strcmp(b->fonts[b->styles[0].font].name, "Calibri"));
     book_set_theme_fonts(b, "Cambria", "Arial");
@@ -128,6 +131,8 @@ static void pagesetup_tests(void)
     if (d && d->lx) {
       ok("props: subject, keywords, company", !strcmp(d->lx->subject, "Accounts") && !strcmp(d->lx->keywords, "money, 2026") && !strcmp(d->lx->company, "Acme & Co"));
       ok("calc: iteration kept", d->lx->iterate && d->lx->maxiter == 50);
+      ok("views: custom view kept", d->lx->nviews == 1 && !strcmp(d->lx->views[0].name, "Wide") && d->lx->views[0].zoom == 75 && d->lx->views[0].view == PV_BREAKS &&
+         !d->lx->views[0].grid && d->lx->views[0].top == 10 && d->lx->views[0].left == 2 && d->lx->views[0].sel.r2 == 14 && d->lx->views[0].cur_r == 12);
       ok("theme: kept", !strcmp(d->lx->theme.name, "Office 2007 - 2010") && d->lx->theme.color[4] == 0x4F81BD && !strcmp(d->lx->theme.minor, "Arial"));
     } else ok("props: roundtrip", 0);
     book_free(d);

@@ -290,7 +290,7 @@ The Protect group (Unprotect Sheet, Protect Workbook, Allow Edit Ranges) is the 
 - ✅ Switch Windows (Window) `view.switchWindows`
 - ➖ Macros (Macros) `view.macros`
 
-Not done on View: Split (panes that scroll on their own; Freeze Panes and New Window cover most of its uses). Custom Views are kept while Ledger runs, not saved in the file. Macros: left out, as is scripting.
+Not done on View: Split (panes that scroll on their own; Freeze Panes and New Window cover most of its uses). Custom Views are saved in the file (customWorkbookViews / customSheetViews). Macros: left out, as is scripting.
 
 ### Automate (0 of 4 by name)
 

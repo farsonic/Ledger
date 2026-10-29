@@ -481,10 +481,110 @@ void book_set_theme(Book *b, const Theme *t)
 /* ------------------------------------------------------------------ .xlsx */
 static int truthy(const char *v) { return v && (!strcmp(v, "1") || !strcmp(v, "true")); }
 static double dattr(Xml *x, const char *n, double d) { const char *v = xml_attr(x, n); return v ? strtod(v, NULL) : d; }
+/* a custom view's id as a GUID, from its number */
+static void view_guid(int k, char *out) { sprintf(out, "{4C454447-5649-4557-8000-%012X}", (unsigned)k); }
+static int view_by_guid(LayoutBook *x, const char *g)
+{
+  int k;
+  char t[48];
+  for (k = 0; k < x->nviews; k++) { view_guid(k, t); if (!strcmp(t, g)) return k; }
+  return -1;
+}
+void page_write_book_views(Book *b, Buf *o)
+{
+  LayoutBook *x = b->lx;
+  int k;
+  char g[48];
+  if (!x || !x->nviews) return;
+  buf_adds(o, "<customWorkbookViews>");
+  for (k = 0; k < x->nviews; k++) {
+    view_guid(k, g);
+    buf_adds(o, "<customWorkbookView name=\""); xml_escape(o, x->views[k].name, strlen(x->views[k].name));
+    buf_printf(o, "\" guid=\"%s\" windowWidth=\"800\" windowHeight=\"600\" activeSheetId=\"%d\"/>", g, x->views[k].sheet + 1);
+  }
+  buf_adds(o, "</customWorkbookViews>");
+}
+void page_write_sheet_views(Book *b, int sheet, Buf *o)
+{
+  LayoutBook *x = b->lx;
+  int k, any = 0;
+  char g[48], ref[16];
+  if (!x) return;
+  for (k = 0; k < x->nviews; k++) {
+    const CustomView *v = &x->views[k];
+    if (v->sheet != sheet) continue;
+    if (!any) buf_adds(o, "<customSheetViews>");
+    any = 1;
+    view_guid(k, g);
+    ref_text(v->top, v->left, 0, 0, ref);
+    buf_printf(o, "<customSheetView guid=\"%s\"", g);
+    if (v->zoom && v->zoom != 100) buf_printf(o, " scale=\"%d\"", v->zoom);
+    if (!v->grid) buf_adds(o, " showGridLines=\"0\"");
+    if (!v->head) buf_adds(o, " showRowCol=\"0\"");
+    if (v->view == PV_BREAKS) buf_adds(o, " view=\"pageBreakPreview\"");
+    else if (v->view == PV_LAYOUT) buf_adds(o, " view=\"pageLayout\"");
+    buf_printf(o, " topLeftCell=\"%s\">", ref);
+    {
+      Rect r = v->sel;
+      char a[32];
+      ref_text(v->cur_r, v->cur_c, 0, 0, ref);
+      rect_text(r, a);
+      buf_printf(o, "<selection activeCell=\"%s\" sqref=\"%s\"/>", ref, a);
+    }
+    buf_adds(o, "</customSheetView>");
+  }
+  if (any) buf_adds(o, "</customSheetViews>");
+}
+void page_xml_book_view(Book *b, Xml *x)
+{
+  LayoutBook *l = book_lx(b);
+  const char *nm = xml_attr(x, "name"), *id = xml_attr(x, "activeSheetId");
+  CustomView *v;
+  if (!l || !nm || l->nviews >= MAXVIEWS) return;
+  v = &l->views[l->nviews++];
+  memset(v, 0, sizeof *v);
+  scopy(v->name, sizeof v->name, nm);
+  v->sheet = id ? atoi(id) - 1 : 0;
+  if (v->sheet < 0) v->sheet = 0;
+  v->zoom = 100; v->grid = v->head = 1;
+  (void)view_by_guid;
+}
+/* (loading) the customSheetViews element: each view's look, matched to the workbook's views in
+   order (Ledger writes its own; another program's are matched by their order too) */
+static void read_sheet_views(Book *b, int sheet, Xml *x)
+{
+  int depth = x->depth, k = -1, nth = 0;
+  LayoutBook *l = book_lx(b);
+  if (x->pending_end) return;
+  while (xml_next(x) != XT_EOF && !(x->type == XT_END && x->depth < depth)) {
+    const char *v;
+    if (x->type != XT_START || !l) continue;
+    if (!strcmp(x->name, "customSheetView")) {
+      /* the nth view of the workbook that is on this sheet */
+      int i, seen = 0;
+      k = -1;
+      for (i = 0; i < l->nviews; i++) if (l->views[i].sheet == sheet) { if (seen == nth) { k = i; break; } seen++; }
+      nth++;
+      if (k < 0) continue;
+      if ((v = xml_attr(x, "scale"))) { int z = atoi(v); if (z >= 10 && z <= 400) l->views[k].zoom = (u16)z; }
+      if ((v = xml_attr(x, "showGridLines"))) l->views[k].grid = (u8)truthy(v);
+      if ((v = xml_attr(x, "showRowCol"))) l->views[k].head = (u8)truthy(v);
+      if ((v = xml_attr(x, "view"))) l->views[k].view = !strcmp(v, "pageBreakPreview") ? PV_BREAKS : !strcmp(v, "pageLayout") ? PV_LAYOUT : PV_NORMAL;
+      if ((v = xml_attr(x, "topLeftCell"))) { u16 sh; Rect r; u8 fl; if (parse_ref(b, v, &sh, &r, &fl)) { l->views[k].top = r.r1; l->views[k].left = r.c1; } }
+    } else if (!strcmp(x->name, "selection") && k >= 0) {
+      u16 sh; Rect r; u8 fl;
+      if ((v = xml_attr(x, "activeCell")) && parse_ref(b, v, &sh, &r, &fl)) { l->views[k].cur_r = r.r1; l->views[k].cur_c = r.c1; l->views[k].sel = r; }
+      if ((v = xml_attr(x, "sqref")) && parse_ref(b, v, &sh, &r, &fl)) l->views[k].sel = r;
+    }
+  }
+}
+static Book *rd_book; static int rd_sheet;    /* (page_xml_sheet's book and sheet, set by page_xml_sheet_in) */
+void page_xml_sheet_in(Book *b, int sheet) { rd_book = b; rd_sheet = sheet; }
 int page_xml_sheet(Sheet *s, Xml *x)
 {
   const char *n = x->name, *v;
   PageSetup *p;
+  if (!strcmp(n, "customSheetViews")) { if (rd_book) read_sheet_views(rd_book, rd_sheet, x); else xml_skip(x); return 1; }
   if (!strcmp(n, "sheetView")) {
     if ((v = xml_attr(x, "view")) && strcmp(v, "normal") && (p = page_get(s))) p->view = !strcmp(v, "pageLayout") ? PV_LAYOUT : PV_BREAKS;
     return 0;                       /* (xlsx.c reads the rest) */
