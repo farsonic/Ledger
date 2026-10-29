@@ -5,6 +5,7 @@
 #include "book.h"
 #include "calc.h"
 #include "cond.h"
+#include "pagesetup.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -574,6 +575,7 @@ static void sheet_free(Sheet *s)
   cond_free_all(s->cfs, s->ncfs);
   notes_free(s->notes, s->nnotes);
   links_free(s->links, s->nlinks);
+  page_free(s->page);
   free(s);
 }
 /* a deep copy of a sheet, for undo (NULL out of memory) */
@@ -593,6 +595,7 @@ static Sheet *sheet_clone(const Sheet *s)
   if (!c->notes) c->nnotes = 0;
   c->links = links_copy(s->links, s->nlinks);
   if (!c->links) c->nlinks = 0;
+  c->page = page_copy(s->page);
   if (s->nrows && !(c->rows = (Row **)calloc((size_t)s->nrows, sizeof(Row *)))) goto fail;
   c->nrows = s->nrows;
   for (r = 0; r < s->nrows; r++) {
@@ -777,6 +780,7 @@ void book_free(Book *b)
   undo_free_list(b->undo);
   undo_free_list(b->redo);
   undo_free_list(b->open);
+  lx_free(b->lx);
   free(b);
 }
 int book_find_sheet(Book *b, const char *name)
@@ -1719,6 +1723,7 @@ static int insdel(Book *b, int sheet, int rows, i32 at, i32 n)
   if (rows) move_rows(s, at, n); else move_cols(s, at, n);
   move_extras(s, rows, at, n);
   cond_shift_areas(s, rows, at, n);
+  page_shift(s, rows, at, n);
   sh.target = sheet; sh.rows = rows; sh.at = at; sh.n = n;
   each_formula(b, shift_formula, &sh);
   book_end(b);

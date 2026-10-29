@@ -57,6 +57,7 @@ static int shows(Book *b, int sheet, i32 r, i32 c, const char *want)
   if (strcmp(out, want)) printf("   cell shows \"%s\" (want \"%s\")\n", out, want);
   return !strcmp(out, want);
 }
+#include "layouttest.c"
 static int fmt(const char *code, double n, const char *want)
 {
   Book *b = book_new();
@@ -803,6 +804,7 @@ int main(void)
   condfmt();
   notes();
   links();
+  layout_tests();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }

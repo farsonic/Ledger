@@ -165,6 +165,7 @@ typedef struct {
   Rect sel;
   i32 top, left;                  /* the scroll position when last shown */
   u16 zoom;                       /* per cent */
+  struct PageSetup *page;         /* page setup (pagesetup.h), NULL: the defaults */
 } Sheet;
 
 typedef struct { char name[64]; u16 sheet; char *formula_text; Formula *f; } Name;   /* sheet: SHEET_SELF = workbook scope */
@@ -190,6 +191,7 @@ typedef struct {
   UndoStep *open;                 /* the step being recorded (book_begin .. book_end) */
   int nesting;
   double now_override;            /* tests: NOW() returns this when non-zero */
+  struct LayoutBook *lx;          /* more properties, the theme, calculation options (pagesetup.h), NULL: defaults */
 } Book;
 
 Book  *book_new(void);                    /* one empty sheet, "Sheet1" */

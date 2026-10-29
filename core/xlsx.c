@@ -11,6 +11,7 @@
 #include "cond.h"
 #include "zip.h"
 #include "xml.h"
+#include "pagesetup.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -393,6 +394,7 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
   while (xml_next(&x) != XT_EOF) {
     const char *n = x.name;
     if (x.type != XT_START) continue;
+    if (page_xml_sheet(s, &x)) continue;
     if (!strcmp(n, "sheetFormatPr")) {
       const char *v;
       if ((v = xml_attr(&x, "defaultRowHeight"))) { double h = strtod(v, NULL); if (h > 0 && h < 410) s->defheight = (u16)(h * 4 / 3 + 0.5); }
@@ -842,6 +844,7 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
     } else if (!strcmp(x.name, "calcPr")) {
       const char *v = xml_attr(&x, "calcMode");
       if (v && !strcmp(v, "manual")) b->manualcalc = 0;      /* Ledger recalculates on load anyway */
+      page_xml_calcpr(b, &x);
     } else if (!strcmp(x.name, "definedName")) {
       const char *nm = xml_attr(&x, "name"), *ls = xml_attr(&x, "localSheetId");
       Buf t;
@@ -860,6 +863,7 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
   free(wb);
   if (!nents) { if (err) snprintf(err, errcap, "the workbook has no sheets"); book_free(b); free(ents); zip_close(&z); return NULL; }
   read_theme(&z);
+  { size_t tl; u8 *t = part(&z, "xl/theme/theme1.xml", &tl); if (t) { page_read_theme(b, (const char *)t, tl); free(t); } }
   read_shared_strings(&rd, &z);
   read_styles(&rd, &z);
   nrels = read_rels(&z, "xl/_rels/workbook.xml.rels", "xl/", &rels);
@@ -879,6 +883,7 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
   /* names before the cells (formulas may use them) */
   for (i = 0; i < nnames; i++) {
     Name *nn;
+    if (page_xml_name(b, names[i].name, names[i].local, names[i].text)) { free(names[i].text); continue; }
     if (!strncmp(names[i].name, "_xlnm.", 6) || !(nn = (Name *)realloc(b->names, (size_t)(b->nnames + 1) * sizeof(Name)))) { free(names[i].text); continue; }
     b->names = nn;
     memset(&b->names[b->nnames], 0, sizeof(Name));
@@ -914,8 +919,14 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
             else { strncpy(b->author, t.data, sizeof b->author - 1); }
           }
           buf_free(&t);
-        }
+        } else if (x.type == XT_START) page_xml_core(b, &x);
       }
+      xml_free(&x);
+      free(core);
+    }
+    if ((core = part(&z, "docProps/app.xml", &cl))) {
+      xml_init(&x, (const char *)core, cl);
+      while (xml_next(&x) != XT_EOF) if (x.type == XT_START) page_xml_core(b, &x);
       xml_free(&x);
       free(core);
     }
@@ -1221,7 +1232,12 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   buf_adds(o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
               "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" "
               "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">");
-  if (s->tabcolor) buf_printf(o, "<sheetPr><tabColor rgb=\"FF%06lX\"/></sheetPr>", (unsigned long)(s->tabcolor & 0xFFFFFF));
+  if (s->tabcolor || page_needs_sheetpr(s)) {
+    buf_adds(o, "<sheetPr>");
+    if (s->tabcolor) buf_printf(o, "<tabColor rgb=\"FF%06lX\"/>", (unsigned long)(s->tabcolor & 0xFFFFFF));
+    page_write_sheetpr(s, o);
+    buf_adds(o, "</sheetPr>");
+  }
   if (lr >= 0 && lc >= 0) {
     Rect d; d.r1 = 0; d.c1 = 0; d.r2 = lr; d.c2 = lc;
     rect_text(d, ref);
@@ -1230,6 +1246,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   buf_printf(o, "<sheetViews><sheetView workbookViewId=\"0\"%s%s%s%s", si == b->active ? " tabSelected=\"1\"" : "",
              s->gridlines ? "" : " showGridLines=\"0\"", s->headings ? "" : " showRowColHeaders=\"0\"", s->showzeros ? "" : " showZeros=\"0\"");
   if (s->zoom && s->zoom != 100) buf_printf(o, " zoomScale=\"%d\"", s->zoom);
+  page_write_view(s, o);
   buf_adds(o, ">");
   if (s->freezer || s->freezec) {
     ref_text(s->freezer, s->freezec, 0, 0, ref);
@@ -1351,7 +1368,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
     }
     buf_adds(o, "</hyperlinks>");
   }
-  buf_adds(o, "<pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/>");
+  page_write_sheet(s, o);
   if (s->nnotes) buf_adds(o, "<legacyDrawing r:id=\"rIdN2\"/>");   /* (the notes' boxes, for Excel) */
   buf_adds(o, "</worksheet>");
 }
@@ -1445,7 +1462,8 @@ u8 *xlsx_save(Book *b, size_t *len)
                "<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>"
                "<Override PartName=\"/xl/sharedStrings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml\"/>"
                "<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>"
-               "<Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/>");
+               "<Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/>"
+               "<Override PartName=\"/xl/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>");
   for (i = 0; i < b->nsh; i++) {
     buf_printf(&o, "<Override PartName=\"/xl/worksheets/sheet%d.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>", i + 1);
     if (b->sh[i]->nnotes) buf_printf(&o, "<Override PartName=\"/xl/comments%d.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml\"/>", i + 1);
@@ -1469,11 +1487,15 @@ u8 *xlsx_save(Book *b, size_t *len)
                "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
   if (b->title[0]) { buf_adds(&o, "<dc:title>"); xesc(&o, b->title); buf_adds(&o, "</dc:title>"); }
   if (b->author[0]) { buf_adds(&o, "<dc:creator>"); xesc(&o, b->author); buf_adds(&o, "</dc:creator>"); }
+  page_write_core(b, &o);
   buf_adds(&o, "</cp:coreProperties>");
   zip_add(&w, "docProps/core.xml", o.data, o.len);
   o.len = 0;
   buf_adds(&o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
-               "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\"><Application>Ledger</Application></Properties>");
+               "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\"><Application>Ledger</Application>");
+  if (b->lx && b->lx->manager[0]) { buf_adds(&o, "<Manager>"); xesc(&o, b->lx->manager); buf_adds(&o, "</Manager>"); }
+  if (b->lx && b->lx->company[0]) { buf_adds(&o, "<Company>"); xesc(&o, b->lx->company); buf_adds(&o, "</Company>"); }
+  buf_adds(&o, "</Properties>");
   zip_add(&w, "docProps/app.xml", o.data, o.len);
   /* workbook */
   o.len = 0;
@@ -1487,8 +1509,9 @@ u8 *xlsx_save(Book *b, size_t *len)
     buf_printf(&o, "\" sheetId=\"%d\"%s r:id=\"rId%d\"/>", i + 1, b->sh[i]->hidden ? " state=\"hidden\"" : "", i + 1);
   }
   buf_adds(&o, "</sheets>");
-  if (b->nnames) {
+  if (b->nnames || page_has_names(b)) {
     buf_adds(&o, "<definedNames>");
+    page_write_names(b, &o);
     for (i = 0; i < b->nnames; i++) {
       Name *n = &b->names[i];
       Buf ft;
@@ -1504,7 +1527,9 @@ u8 *xlsx_save(Book *b, size_t *len)
     }
     buf_adds(&o, "</definedNames>");
   }
-  buf_adds(&o, "<calcPr calcId=\"191029\"/></workbook>");
+  buf_adds(&o, "<calcPr calcId=\"191029\"");
+  page_write_calcpr(b, &o);
+  buf_adds(&o, "/></workbook>");
   zip_add(&w, "xl/workbook.xml", o.data, o.len);
   o.len = 0;
   buf_adds(&o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
@@ -1513,6 +1538,7 @@ u8 *xlsx_save(Book *b, size_t *len)
     buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet%d.xml\"/>", i + 1, i + 1);
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>", b->nsh + 1);
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>", b->nsh + 2);
+  buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\"/>", b->nsh + 3);
   buf_adds(&o, "</Relationships>");
   zip_add(&w, "xl/_rels/workbook.xml.rels", o.data, o.len);
   /* sheets (they fill the string table) */
@@ -1528,6 +1554,9 @@ u8 *xlsx_save(Book *b, size_t *len)
       o.len = 0; write_vml(b, i, &o); sprintf(path, "xl/drawings/vmlDrawing%d.vml", i + 1); zip_add(&w, path, o.data, o.len);
     }
   }
+  o.len = 0;
+  page_write_theme(b, &o);
+  zip_add(&w, "xl/theme/theme1.xml", o.data, o.len);
   o.len = 0;
   write_styles(b, &o, &fillmap, &bordermap);
   zip_add(&w, "xl/styles.xml", o.data, o.len);
