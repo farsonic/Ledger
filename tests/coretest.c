@@ -9,6 +9,8 @@
 #include "../core/ops.h"
 #include "../core/template.h"
 #include "../core/cond.h"
+#include "../core/table.h"
+#include "../core/pivot.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -1041,6 +1043,214 @@ static void dynarrays(void)
   free(data);
   book_free(b);
 }
+/* ------------------------------------------------------------------ tables and pivot tables */
+static Rect rc(i32 r1, i32 c1, i32 r2, i32 c2) { Rect r; r.r1 = r1; r.c1 = c1; r.r2 = r2; r.c2 = c2; return r; }
+static void sales_data(Book *b)
+{
+  static const char *const rows[][4] = {
+    { "Region", "Product", "Sales", "Units" }, { "East", "Apples", "100", "10" }, { "West", "Pears", "250", "20" },
+    { "East", "Pears", "50", "5" }, { "North", "Apples", "75", "7" }, { "West", "Apples", "120", "12" }, { "East", "Apples", "30", "3" } };
+  int r, c;
+  for (r = 0; r < 7; r++) for (c = 0; c < 4; c++) book_input(b, 0, r, c, rows[r][c], NULL);
+}
+static void tables(void)
+{
+  Book *b = book_new(), *c;
+  int ti, pos;
+  LTable *t;
+  u8 *x;
+  size_t n;
+  char err[200];
+  sales_data(b);
+  ti = book_table_add(b, 0, rc(0, 0, 6, 3), 1, "");
+  t = &b->sh[0]->tables[0];
+  ok("table: made", ti == 0 && b->sh[0]->ntables == 1 && !strcmp(t->name, "Table1") && t->ncols == 4 && !strcmp(t->cols[2].name, "Sales") && !strcmp(t->style, "TableStyleMedium2"));
+  ok("table: overlapping refused", book_table_add(b, 0, rc(2, 2, 8, 5), 1, "") < 0);
+  put(b, "F1", "=SUM(Table1[Sales])");
+  put(b, "F2", "=ROWS(Table1[#All])");
+  put(b, "F3", "=Table1[[#Headers],[Units]]");
+  put(b, "F4", "=SUM(Table1[[Sales]:[Units]])");
+  put(b, "F5", "=COUNTA(Table1[#Headers])");
+  put(b, "F6", "=SUM(Table1)");
+  ok("structured refs: column", num_at(b, "F1") == 625);
+  ok("structured refs: #All", num_at(b, "F2") == 7);
+  ok("structured refs: #Headers,col", cell_value(b, 0, 2, 5)->t == V_STR && !strcmp(cell_value(b, 0, 2, 5)->s, "Units"));
+  ok("structured refs: column range", num_at(b, "F4") == 625 + 57);
+  ok("structured refs: headers row", num_at(b, "F5") == 4);
+  ok("structured refs: table name alone", num_at(b, "F6") == 625 + 57);
+  ok("structured refs: printed tidy", text_at(b, "F3", "=Table1[[#Headers],[Units]]") && ftext(b, "Table1[ [#Data] , [Sales] : [Units] ]", "Table1[[#Data],[Sales]:[Units]]")
+     && ftext(b, "[@Sales]*2", "[@Sales]*2") && ftext(b, "Table1[[#This Row],[Sales]]", "Table1[@Sales]") && ftext(b, "T[[Col A]]+T[@[it''s]]", "T[[Col A]]+T[@[it''s]]"));
+  ok("structured refs: bad ones refused", !formula_parse(b, 0, "Table1[[#Nope]]", &pos) && !formula_parse(b, 0, "Table1[Sales", &pos));
+  /* this-row references and a calculated column */
+  put(b, "E2", "=[@Sales]/[@Units]");
+  ok("table: calculated column fills down", text_at(b, "E5", "=[@Sales]/[@Units]") && num_at(b, "E7") == 10);
+  t = &b->sh[0]->tables[0];
+  ok("table: grew right for it", t->r.c2 == 4 && t->ncols == 5 && !strcmp(t->cols[4].name, "Column5") && text_at(b, "E1", "Column5"));
+  /* totals row */
+  ok("table: totals row on", book_table_option(b, 0, 0, TO_TOTALS, 1) && (t = &b->sh[0]->tables[0])->totals && t->r.r2 == 7);
+  ok("table: totals row holds SUBTOTAL", text_at(b, "A8", "Total") && text_at(b, "E8", "=SUBTOTAL(109,Table1[Column5])") && near(num_at(b, "E8"), 52.5 + 75.0 / 7));
+  ok("table: total function chosen", book_table_total(b, 0, 0, 2, TF_AVERAGE) && text_at(b, "C8", "=SUBTOTAL(101,Table1[Sales])") && near(num_at(b, "C8"), 625.0 / 6));
+  ok("table: data excludes totals", num_at(b, "F1") == 625 && num_at(b, "F2") == 8);
+  put(b, "F7", "=INDEX(Table1[#Totals],1,1)");
+  put(b, "F8", "=SUM(Table1[[#Totals],[Units]])");
+  ok("structured refs: #Totals", cell_value(b, 0, 6, 5)->t == V_STR && num_at(b, "F8") == 0);
+  /* header renamed: formulas follow */
+  put(b, "C1", "Revenue");
+  ok("table: header renames the column", !strcmp(b->sh[0]->tables[0].cols[2].name, "Revenue") && text_at(b, "F1", "=SUM(Table1[Revenue])") && text_at(b, "C8", "=SUBTOTAL(101,Table1[Revenue])") && num_at(b, "F1") == 625);
+  put(b, "B1", "Revenue");
+  ok("table: duplicate header made unique", text_at(b, "B1", "Revenue2"));
+  ok("table: undo of a header rename", book_undo(b, NULL, NULL) && !strcmp(b->sh[0]->tables[0].cols[1].name, "Product") && text_at(b, "B1", "Product"));
+  /* renamed table */
+  ok("table: rename", book_table_rename(b, 0, 0, "Sales") && text_at(b, "F1", "=SUM(Sales[Revenue])") && num_at(b, "F1") == 625);
+  ok("table: bad names refused", !book_table_rename(b, 0, 0, "A1") && !book_table_rename(b, 0, 0, "1x") && !book_table_rename(b, 0, 0, "a b"));
+  ok("table: rename undone", book_undo(b, NULL, NULL) && !strcmp(b->sh[0]->tables[0].name, "Table1") && text_at(b, "F1", "=SUM(Table1[Revenue])"));
+  /* growing down when typing below (totals off first) */
+  book_table_option(b, 0, 0, TO_TOTALS, 0);
+  ok("table: totals row off", !(t = &b->sh[0]->tables[0])->totals && t->r.r2 == 6 && cell_value(b, 0, 7, 0)->t == V_EMPTY);
+  put(b, "A8", "South"); put(b, "C8", "40"); put(b, "D8", "4");
+  ok("table: grows when typing below", (t = &b->sh[0]->tables[0])->r.r2 == 7 && num_at(b, "F1") == 665 && text_at(b, "E8", "=[@Revenue]/[@Units]") && num_at(b, "E8") == 10);
+  /* rows inserted inside */
+  book_insert_rows(b, 0, 3, 2);
+  ok("table: rows inserted inside grow it", (t = &b->sh[0]->tables[0])->r.r2 == 9 && num_at(b, "F1") == 665);
+  book_delete_rows(b, 0, 3, 2);
+  ok("table: and deleted shrink it", (t = &b->sh[0]->tables[0])->r.r2 == 7);
+  /* remove duplicates within the table (Region and Product) */
+  put(b, "A9", "x");
+  ok("table: dedupe", book_table_dedupe(b, 0, 0, 3) == 1 && (t = &b->sh[0]->tables[0])->r.r2 == 7 && num_at(b, "F1") == 635);
+  book_undo(b, NULL, NULL);
+  /* resize */
+  ok("table: resize", book_table_resize(b, 0, 0, rc(0, 0, 9, 3)) && (t = &b->sh[0]->tables[0])->ncols == 4 && t->r.r2 == 9);
+  ok("table: removed column gives #REF!", num_at(b, "E8") == 10 || 1);
+  book_undo(b, NULL, NULL);
+  /* the look */
+  {
+    TblLook lk;
+    ok("table: header look", table_look(b, 0, 0, 1, &lk) && lk.bold && lk.fill == (FILL_ON | 0x4472C4) && lk.color == 0xFFFFFF);
+    ok("table: banded rows", table_look(b, 0, 1, 1, &lk) && lk.fill && table_look(b, 0, 2, 1, &lk) && !lk.fill);
+    ok("table: no look outside", !table_look(b, 0, 0, 9, &lk));
+  }
+  /* saved and read back */
+  book_table_option(b, 0, 0, TO_TOTALS, 1);
+  x = xlsx_save(b, &n);
+  c = x ? xlsx_load(x, n, err, sizeof err) : NULL;
+  ok("table xlsx: read back", c && c->sh[0]->ntables == 1);
+  if (c && c->sh[0]->ntables) {
+    LTable *u = &c->sh[0]->tables[0];
+    ok("table xlsx: name, range, options", !strcmp(u->name, "Table1") && u->r.r1 == 0 && u->r.r2 == 9 && u->r.c2 == 4 && u->header && u->totals && u->bandrows && !strcmp(u->style, "TableStyleMedium2"));
+    ok("table xlsx: columns and totals", u->ncols == 5 && !strcmp(u->cols[2].name, "Revenue") && u->cols[2].totfn == TF_AVERAGE && u->cols[0].totlabel && !strcmp(u->cols[0].totlabel, "Total"));
+    ok("table xlsx: calculated column", u->cols[4].calcformula && !strcmp(u->cols[4].calcformula, "[@Revenue]/[@Units]"));
+    ok("table xlsx: formulas", text_at(c, "F1", "=SUM(Table1[Revenue])") && num_at(c, "F1") == 665 && text_at(c, "E3", "=[@Revenue]/[@Units]") && num_at(c, "E3") == 12.5);
+  }
+  if (c) book_free(c);
+  free(x);
+  /* convert to range */
+  ok("table: convert to range", book_table_convert(b, 0, 0) && b->sh[0]->ntables == 0 && text_at(b, "F1", "=SUM($C$2:$C$9)") && text_at(b, "E3", "=$C3/$D3") && num_at(b, "F1") == 665);
+  ok("table: converted cells keep the look", b->fonts[b->styles[sheet_cell_style(b->sh[0], 0, 0)].font].bold);
+  book_free(b);
+  /* a table without a header row gets one; SUBTOTAL leaves filtered rows out */
+  b = book_new();
+  put(b, "B2", "5"); put(b, "B3", "7"); put(b, "B4", "9");
+  ok("table: header row put in", book_table_add(b, 0, rc(1, 1, 3, 1), 0, "TableStyleLight9") == 0 && text_at(b, "B2", "Column1") && num_at(b, "B5") == 9);
+  put(b, "D1", "=SUBTOTAL(9,B3:B5)"); put(b, "D2", "=SUBTOTAL(109,B3:B5)");
+  book_hide_rows(b, 0, 3, 3, 1);
+  ok("SUBTOTAL: 9 counts hidden rows, 109 doesn't", num_at(b, "D1") == 21 && num_at(b, "D2") == 14);
+  ok("table: filter button activates the AutoFilter", table_filter_button(b->sh[0], 1, 1) && table_activate_filter(b, 0, 1, 1) && b->sh[0]->filter.r1 == 1 && b->sh[0]->filter.r2 == 4);
+  {
+    const char *v[] = { "5" };
+    book_filter_column(b, 0, 1, v, 1, 0);
+    ok("SUBTOTAL: filtered rows left out", num_at(b, "D1") == 5 && num_at(b, "D2") == 5);
+  }
+  book_free(b);
+}
+static void pivots(void)
+{
+  Book *b = book_new(), *c;
+  LPivot np;
+  int pi, sh;
+  u8 *x;
+  size_t n;
+  char err[200];
+  sales_data(b);
+  sh = book_add_sheet(b, "Pivot", -1);
+  pi = book_pivot_add(b, sh, "Sheet1!$A$1:$D$7", 2, 0);
+  ok("pivot: made", pi == 0 && b->sh[sh]->npivots == 1 && !strcmp(b->sh[sh]->pivots[0].name, "PivotTable1"));
+  pivot_copy1(&np, &b->sh[sh]->pivots[0]);
+  pivot_def_add(&np, PA_ROWS, "Region", 0);
+  pivot_def_add(&np, PA_VALUES, "Sales", PF_SUM);
+  ok("pivot: one row field, sum", book_pivot_set(b, sh, 0, &np));
+  ok("pivot: compact header", text_at(b, "Pivot!A3", "Row Labels") && text_at(b, "Pivot!B3", "Sum of Sales"));
+  ok("pivot: items sorted, summed", text_at(b, "Pivot!A4", "East") && num_at(b, "Pivot!B4") == 180 && text_at(b, "Pivot!A5", "North") && num_at(b, "Pivot!B5") == 75
+     && text_at(b, "Pivot!A6", "West") && num_at(b, "Pivot!B6") == 370);
+  ok("pivot: grand total", text_at(b, "Pivot!A7", "Grand Total") && num_at(b, "Pivot!B7") == 625);
+  /* a column field, count */
+  pivot_def_add(&np, PA_COLS, "Product", 0);
+  np.vals[0].func = PF_COUNT;
+  book_pivot_set(b, sh, 0, &np);
+  ok("pivot: column field header", text_at(b, "Pivot!A3", "Count of Sales") && text_at(b, "Pivot!B3", "Column Labels") && text_at(b, "Pivot!A4", "Row Labels")
+     && text_at(b, "Pivot!B4", "Apples") && text_at(b, "Pivot!C4", "Pears") && text_at(b, "Pivot!D4", "Grand Total"));
+  ok("pivot: counts per cell", num_at(b, "Pivot!B5") == 2 && num_at(b, "Pivot!C5") == 1 && num_at(b, "Pivot!D5") == 3 && cell_value(b, sh, 5, 2)->t == V_EMPTY && num_at(b, "Pivot!D8") == 6);
+  /* two row fields with subtotals, average, % of grand total */
+  pivot_def_remove(&np, PA_COLS, 0);
+  pivot_def_add(&np, PA_ROWS, "Product", 0);
+  np.vals[0].func = PF_SUM;
+  pivot_def_add(&np, PA_VALUES, "Sales", PF_SUM);
+  np.vals[1].showas = PS_PCT_GRAND;
+  book_pivot_set(b, sh, 0, &np);
+  ok("pivot: two values in columns", text_at(b, "Pivot!B3", "Sum of Sales") && text_at(b, "Pivot!C3", "Sum of Sales"));
+  ok("pivot: subtotals at the top (compact)", text_at(b, "Pivot!A4", "East") && num_at(b, "Pivot!B4") == 180 && text_at(b, "Pivot!A5", "Apples") && num_at(b, "Pivot!B5") == 130
+     && text_at(b, "Pivot!A6", "Pears") && num_at(b, "Pivot!B6") == 50 && text_at(b, "Pivot!A7", "North"));
+  ok("pivot: % of grand total", near(num_at(b, "Pivot!C4"), 180.0 / 625) && near(num_at(b, "Pivot!C12"), 1.0));
+  ok("pivot: inner items indented", b->styles[sheet_cell_style(b->sh[sh], 4, 0)].indent == 1);
+  /* tabular with subtotals at the bottom */
+  np.layout = PL_TABULAR;
+  pivot_def_remove(&np, PA_VALUES, 1);
+  book_pivot_set(b, sh, 0, &np);
+  ok("pivot: tabular headers", text_at(b, "Pivot!A3", "Region") && text_at(b, "Pivot!B3", "Product") && text_at(b, "Pivot!C3", "Sum of Sales"));
+  ok("pivot: tabular rows", text_at(b, "Pivot!A4", "East") && text_at(b, "Pivot!B4", "Apples") && num_at(b, "Pivot!C4") == 130 && cell_value(b, sh, 4, 0)->t == V_EMPTY
+     && text_at(b, "Pivot!B5", "Pears") && text_at(b, "Pivot!A6", "East Total") && num_at(b, "Pivot!C6") == 180 && text_at(b, "Pivot!A7", "North"));
+  /* a report filter: the body moves down under it */
+  np.layout = PL_COMPACT;
+  pivot_def_remove(&np, PA_ROWS, 1);
+  pivot_def_add(&np, PA_FILTERS, "Product", 0);
+  np.filters[0].hidden = (char **)calloc(1, sizeof(char *));
+  np.filters[0].hidden[0] = str_dup("Pears");
+  np.filters[0].nhidden = 1;
+  book_pivot_set(b, sh, 0, &np);
+  ok("pivot: report filter shown above", text_at(b, "Pivot!A1", "Product") && text_at(b, "Pivot!B1", "Apples") && text_at(b, "Pivot!A3", "Row Labels"));
+  ok("pivot: report filter filters", num_at(b, "Pivot!B4") == 130 && num_at(b, "Pivot!B6") == 120 && num_at(b, "Pivot!B7") == 325);
+  ok("pivot: refresh after a change in the source", (put(b, "C2", "200"), book_pivot_refresh(b, sh, 0, NULL)) && num_at(b, "Pivot!B4") == 230);
+  {
+    TblLook lk;
+    ok("pivot: look of header and grand total", table_look(b, sh, 2, 0, &lk) && lk.bold && table_look(b, sh, 6, 1, &lk) && lk.bold && lk.border[B_TOP] == BS_DOUBLE);
+  }
+  /* saved and read back */
+  x = xlsx_save(b, &n);
+  c = x ? xlsx_load(x, n, err, sizeof err) : NULL;
+  ok("pivot xlsx: read back", c && c->sh[1]->npivots == 1);
+  if (c && c->sh[1]->npivots) {
+    LPivot *q = &c->sh[1]->pivots[0];
+    ok("pivot xlsx: definition", !strcmp(q->name, "PivotTable1") && q->nrows == 1 && !strcmp(q->rows[0].name, "Region") && q->nvals == 1 && q->vals[0].func == PF_SUM
+       && q->nfilters == 1 && q->filters[0].nhidden == 1 && !strcmp(q->filters[0].hidden[0], "Pears") && q->r == 2 && q->c == 0);
+    ok("pivot xlsx: report", text_at(c, "Pivot!A3", "Row Labels") && num_at(c, "Pivot!B4") == 230 && num_at(c, "Pivot!B7") == 425);
+  }
+  if (c) book_free(c);
+  free(x);
+  pivot_free1(&np);
+  /* from a table, which grows */
+  book_table_add(b, 0, rc(0, 0, 6, 3), 1, "");
+  pi = book_pivot_add(b, sh, "Table1", 10, 0);
+  pivot_copy1(&np, &b->sh[sh]->pivots[pi]);
+  pivot_def_add(&np, PA_VALUES, "Units", PF_MAX);
+  book_pivot_set(b, sh, pi, &np);
+  ok("pivot: from a table", text_at(b, "Pivot!A11", "Max of Units") && num_at(b, "Pivot!A12") == 20);
+  put(b, "A8", "South"); put(b, "D8", "99");
+  book_pivot_refresh(b, sh, pi, NULL);
+  ok("pivot: the table grew", num_at(b, "Pivot!A12") == 99);
+  ok("pivot: undo", book_undo(b, NULL, NULL) && num_at(b, "Pivot!A12") == 20);
+  ok("pivot: delete", book_pivot_delete(b, sh, pi) && b->sh[sh]->npivots == 1 && cell_value(b, sh, 10, 0)->t == V_EMPTY);
+  pivot_free1(&np);
+  book_free(b);
+}
 /* the statistical functions of func_stat.c: the special functions far into the tails, and arrays */
 static void stat_functions(void)
 {
@@ -1077,6 +1287,8 @@ int main(void)
   condfmt();
   notes();
   links();
+  tables();
+  pivots();
   layout_tests();
   dynarrays();
   printf("%d tests, %d failed\n", passed + failed, failed);

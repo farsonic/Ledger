@@ -86,7 +86,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Conditional Formatting (Styles) `home.conditionalFormat`
 - ✅ Clear Rules (Styles) `home.clearRules`
 - ✅ Manage Rules (Styles) `home.manageRules`
-- ⬜ Format as Table (Styles) `home.formatAsTable`
+- ✅ Format as Table (Styles) `home.formatAsTable`
 - ✅ Cell Styles (Styles) `home.cellStyle`
 - ✅ New Cell Style (Styles) `home.newCellStyle`
 - ✅ Insert Cells (Cells) `home.insertCells`
@@ -142,9 +142,9 @@ New Cell Style keeps the active cell's look under a name in Home > My Styles whi
 
 ### Insert (2 of 17 by name)
 
-- ⬜ PivotTable (Tables) `insert.pivotTable`
+- ✅ PivotTable (Tables) `insert.pivotTable`
 - ⬜ Recommended PivotTables (Tables) `insert.recommendedPivotTables`
-- ⬜ Table (Tables) `insert.table`
+- ✅ Table (Tables) `insert.table`
 - ⬜ Pictures (Illustrations) `insert.picture`
 - ⬜ Shapes (Illustrations) `insert.shape`
 - ⬜ Icons (Illustrations) `insert.icons`
@@ -301,19 +301,19 @@ Not done on View: Split (panes that scroll on their own; Freeze Panes and New Wi
 
 ### Table Design (2 of 13 by name)
 
-- ⬜ Table Name (Properties) `table.rename`
-- ⬜ Resize Table (Properties) `table.resize`
-- ⬜ Summarize with PivotTable (Tools) `table.summarizePivot`
+- ✅ Table Name (Properties) `table.rename`
+- ✅ Resize Table (Properties) `table.resize`
+- ✅ Summarize with PivotTable (Tools) `table.summarizePivot`
 - ✅ Remove Duplicates (Tools) `table.removeDuplicates`
-- ⬜ Convert to Range (Tools) `table.convertToRange`
+- ✅ Convert to Range (Tools) `table.convertToRange`
 - ⬜ Insert Slicer (Tools) `table.insertSlicer`
-- ⬜ Header Row (Table Style Options) `table.headerRow`
-- ⬜ Total Row (Table Style Options) `table.totalRow`
-- ⬜ Banded Rows (Table Style Options) `table.bandedRows`
+- ✅ Header Row (Table Style Options) `table.headerRow`
+- ✅ Total Row (Table Style Options) `table.totalRow`
+- ✅ Banded Rows (Table Style Options) `table.bandedRows`
 - ✅ First Column (Table Style Options) `table.firstColumn`
-- ⬜ Last Column (Table Style Options) `table.lastColumn`
-- ⬜ Banded Columns (Table Style Options) `table.bandedColumns`
-- ⬜ Table Styles (Table Styles) `table.style`
+- ✅ Last Column (Table Style Options) `table.lastColumn`
+- ✅ Banded Columns (Table Style Options) `table.bandedColumns`
+- ✅ Table Styles (Table Styles) `table.style`
 
 ### Chart Design (0 of 8 by name)
 
@@ -334,14 +334,14 @@ Not done on View: Split (panes that scroll on their own; Freeze Panes and New Wi
 
 ### PivotTable Analyze (3 of 13 by name)
 
-- ⬜ Field List (Show) `pivot.fieldList`
-- ⬜ Refresh (Data) `pivot.refresh`
-- ⬜ Change Data Source (Data) `pivot.changeSource`
+- ✅ Field List (Show) `pivot.fieldList`
+- ✅ Refresh (Data) `pivot.refresh`
+- ✅ Change Data Source (Data) `pivot.changeSource`
 - ⬜ Fields, Items & Sets (Calculations) `pivot.calculatedField`
-- ⬜ Add Field (Fields) `pivot.addField`
-- ⬜ Remove Field (Fields) `pivot.removeField`
-- ⬜ Move Field (Fields) `pivot.moveField`
-- ⬜ Value Field Settings (Active Field) `pivot.valueSettings`
+- ✅ Add Field (Fields) `pivot.addField`
+- ✅ Remove Field (Fields) `pivot.removeField`
+- ✅ Move Field (Fields) `pivot.moveField`
+- ✅ Value Field Settings (Active Field) `pivot.valueSettings`
 - ✅ Filter (Filter) `pivot.filter`
 - ✅ Sort (Sort) `pivot.sort`
 - ⬜ Group Field (Group) `pivot.group`
@@ -350,8 +350,8 @@ Not done on View: Split (panes that scroll on their own; Freeze Panes and New Wi
 
 ### PivotTable Design (0 of 4 by name)
 
-- ⬜ Grand Totals (Layout) `pivot.grandTotals`
-- ⬜ Subtotals (Layout) `pivot.subtotals`
-- ⬜ Report Layout (Layout) `pivot.reportLayout`
-- ⬜ PivotTable Styles (PivotTable Styles) `pivot.style`
+- ✅ Grand Totals (Layout) `pivot.grandTotals`
+- ✅ Subtotals (Layout) `pivot.subtotals`
+- ✅ Report Layout (Layout) `pivot.reportLayout`
+- ✅ PivotTable Styles (PivotTable Styles) `pivot.style`
 

@@ -7,6 +7,8 @@
  * are points in the file and pixels here (4/3 of a point).
  */
 #include "xlsx.h"
+#include "table.h"
+#include "tablexml.h"
 #include "calc.h"
 #include "cond.h"
 #include "zip.h"
@@ -795,6 +797,7 @@ static void read_sheet_rels(Rd *rd, ZipReader *z, const char *sheetpath, int she
   snprintf(rp, sizeof rp, "%s_rels/%s.rels", base, sl ? sl + 1 : sheetpath);
   n = read_rels(z, rp, base, &rels);
   for (k = 0; k < n; k++) if (!strcmp(rels[k].type, "comments")) read_comments(rd, z, rels[k].target, sheet);
+  for (k = 0; k < n; k++) tablexml_read_rel(rd->b, z, rels[k].type, rels[k].target, sheet);   /* tables, pivot tables */
   for (k = 0; k < n; k++) if (!strcmp(rels[k].type, "threadedComment")) cm_read(rd->b, z, rels[k].target, sheet);
   {
     /* links out: their addresses from the relationships (an external link is written as it is) */
@@ -958,6 +961,7 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
   free(rels);
   free(ents);
   zip_close(&z);
+  tablexml_loaded(b);
   /* loading isn't an edit */
   {
     extern void book_forget_undo(Book *b);
@@ -1354,6 +1358,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
         {
           Buf ft;
           buf_init(&ft);
+          table_home_r = r; table_home_c = c->col;    /* (structured references name their table) */
           file_formula(b, si, c->f, &ft);
           xml_escape(o, ft.data ? ft.data : "", ft.len);
           buf_free(&ft);
@@ -1379,7 +1384,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
     buf_adds(o, "</row>");
   }
   buf_adds(o, "</sheetData>");
-  if (s->filter.r1 >= 0) {
+  if (s->filter.r1 >= 0 && !tablexml_filter_in_table(s)) {
     /* the AutoFilter: its range and the values each filtered column lets through */
     rect_text(s->filter, ref);
     buf_printf(o, "<autoFilter ref=\"%s\"", ref);
@@ -1423,6 +1428,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   }
   page_write_sheet(s, o);
   if (s->nnotes) buf_adds(o, "<legacyDrawing r:id=\"rIdN2\"/>");   /* (the notes' boxes, for Excel) */
+  tablexml_sheet_parts(b, si, o);
   buf_adds(o, "</worksheet>");
 }
 /* a sheet's notes: the comments part, and the VML drawing of their boxes Excel needs to show them */
@@ -1488,7 +1494,7 @@ static int write_sheet_rels(Book *b, int si, Buf *o)
   Sheet *s = b->sh[si];
   int i, out = 0;
   for (i = 0; i < s->nlinks; i++) if (s->links[i].target[0] != '#') out = 1;
-  if (!s->nnotes && !out) return 0;
+  if (!s->nnotes && !out && !tablexml_has_rels(b, si)) return 0;
   buf_adds(o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
               "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">");
   if (s->nnotes)
@@ -1501,6 +1507,7 @@ static int write_sheet_rels(Book *b, int si, Buf *o)
     xesc(o, s->links[i].target);
     buf_adds(o, "\" TargetMode=\"External\"/>");
   }
+  tablexml_sheet_rels(b, si, o);
   buf_adds(o, "</Relationships>");
   return 1;
 }
@@ -1512,6 +1519,8 @@ u8 *xlsx_save(Book *b, size_t *len)
   int i, *fillmap = NULL, *bordermap = NULL, dynamic = book_has_dynamic(b);
   char path[64];
   memset(&sst, 0, sizeof sst);
+  table_file_mode = 1;     /* structured references in their file form */
+  table_home_r = table_home_c = -1;
   zip_begin(&w);
   buf_init(&o);
   /* content types */
@@ -1531,6 +1540,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   }
   for (i = 0; i < b->nsh && !b->sh[i]->nnotes; i++) ;
   if (i < b->nsh) buf_adds(&o, "<Default Extension=\"vml\" ContentType=\"application/vnd.openxmlformats-officedocument.vmlDrawing\"/>");
+  tablexml_content_types(b, &o);
   cm_types(b, &o);
   if (dynamic) buf_adds(&o, "<Override PartName=\"/xl/metadata.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml\"/>");
   buf_adds(&o, "</Types>");
@@ -1590,6 +1600,8 @@ u8 *xlsx_save(Book *b, size_t *len)
     }
     buf_adds(&o, "</definedNames>");
   }
+  buf_adds(&o, "<calcPr calcId=\"191029\"/>");
+  tablexml_workbook(b, &o);
   buf_adds(&o, "<calcPr calcId=\"191029\"");
   page_write_calcpr(b, &o);
   buf_adds(&o, "/>");
@@ -1603,6 +1615,7 @@ u8 *xlsx_save(Book *b, size_t *len)
     buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet%d.xml\"/>", i + 1, i + 1);
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>", b->nsh + 1);
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>", b->nsh + 2);
+  tablexml_workbook_rels(b, &o);
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\"/>", b->nsh + 3);
   cm_book_rels(b, &o, b->nsh + 4);
   if (dynamic) buf_adds(&o, "<Relationship Id=\"rIdMeta1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata\" Target=\"metadata.xml\"/>");
@@ -1621,6 +1634,8 @@ u8 *xlsx_save(Book *b, size_t *len)
       o.len = 0; write_vml(b, i, &o); sprintf(path, "xl/drawings/vmlDrawing%d.vml", i + 1); zip_add(&w, path, o.data, o.len);
     }
   }
+  tablexml_parts(b, &w, file_formula);
+  table_home_r = table_home_c = -1;
   cm_parts(b, &w);
   o.len = 0;
   page_write_theme(b, &o);
@@ -1654,6 +1669,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   }
   free(fillmap); free(bordermap);
   free(sst.s); free(sst.hash);
+  table_file_mode = 0;
   if (o.oom || !zip_finish(&w)) { buf_free(&o); zip_free(&w); return NULL; }
   buf_free(&o);
   *len = w.out.len;

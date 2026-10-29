@@ -6,6 +6,7 @@
  * percent, ^, * and /, + and -, &, then the comparisons. So -2^2 is 4 and 2^-1 is 0.5.
  */
 #include "book.h"
+#include "table.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -290,6 +291,23 @@ static int parse_trimref(P *ps)
   ps->p += len + removed;
   return 1;
 }
+/* a structured reference: the table's name (len characters at name, perhaps none) and its brackets at ps->p */
+static void parse_tref(P *ps, const char *name, size_t len)
+{
+  int n = table_ref_scan(ps->p);
+  char *text, *tidy;
+  Tok t;
+  if (!n) { fail(ps); return; }
+  if (!(text = str_ndup(name, len + (size_t)n))) { fail(ps); return; }
+  tidy = table_ref_tidy(text);
+  free(text);
+  if (!tidy) { fail(ps); return; }
+  memset(&t, 0, sizeof t);
+  t.op = T_TABLE;
+  t.s = tidy;
+  ps->p += n;
+  if (!emit(ps, &t)) free(tidy);
+}
 static void parse_primary(P *ps)
 {
   Tok t;
@@ -335,6 +353,7 @@ static void parse_primary(P *ps)
     emit(ps, &t);
     return;
   }
+  if (*ps->p == '[') { parse_tref(ps, ps->p, 0); return; }
   /* a reference (possibly with a sheet name) */
   if ((n = parse_ref(ps->b, ps->p, &sheet, &r, &flags))) {
     t.op = (r.r1 == r.r2 && r.c1 == r.c2 && !(flags & (RF_COLS | RF_ROWS)) && !strchr(ps->p, ':')) ? T_REF : T_AREA;
@@ -360,6 +379,7 @@ static void parse_primary(P *ps)
     while (isalnum((u8)*ps->p) || *ps->p == '_' || *ps->p == '.' || *ps->p == '\\' || (u8)*ps->p >= 0x80) ps->p++;
     len = (size_t)(ps->p - st);
     if (*ps->p == '(') { parse_call(ps, st, len); return; }
+    if (*ps->p == '[') { parse_tref(ps, st, len); return; }
     if (len == 4 && !strncasecmp(st, "TRUE", 4)) { t.op = T_BOOL; t.a = 1; emit(ps, &t); return; }
     if (len == 5 && !strncasecmp(st, "FALSE", 5)) { t.op = T_BOOL; t.a = 0; emit(ps, &t); return; }
     t.op = T_NAME;
@@ -653,6 +673,7 @@ void formula_text(Book *b, int sheet, const Formula *f, Buf *out)
       buf_adds(&tb, t->s);
       if (t->flags & TN_OPT) buf_addc(&tb, ']');
       break;
+    case T_TABLE: table_ref_text(b, sheet, t->s ? t->s : "", &tb); break;
     case T_MISSING: break;
     case T_ARRAY: {
       int r, c;

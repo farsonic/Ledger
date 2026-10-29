@@ -22,11 +22,12 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "tabletab.h"
 #include "layout.h"
 
 /* ------------------------------------------------------------------ */
 /* the lists */
-enum { PL_TEXT, PL_COLOR, PL_FONTS, PL_CELLSTYLE, PL_BORDER };
+enum { PL_TEXT, PL_COLOR, PL_FONTS, PL_CELLSTYLE, PL_BORDER, PL_TSTYLE };
 /* a drop-down list: its entries (Latin-1), how many, how they are drawn (PL_), and for PL_COLOR
    the 0xRRGGBB beside each (0xFF000000 is COLOR_AUTO: automatic, or none) */
 typedef struct { const char *const *labels; int n; int kind; const ULONG *colors; } List;
@@ -117,10 +118,13 @@ static const char *const condfmts[] = { "Greater Than...", "Less Than...", "Betw
 /* (ledger.h) the cell styles: their names here, their looks in cell_style_look below */
 static const char *const cellstyles[] = { "Normal", "Good", "Bad", "Neutral", "Title", "Heading 1", "Heading 2", "Heading 3", "Total",
                                           "Input", "Output", "Calculation", "Note", "Accent 1", "Accent 2", "Accent 3", "Accent 4" };
+#define TT_LISTS
+#include "tabletabs.h"
 /* the lists by number (Item.list), in the order of lists[] below: the two must be kept in step */
 enum { L_NONE, L_FONTS, L_SIZES, L_COLORS, L_FILLS, L_BORDERS, L_MERGES, L_NUMFMTS, L_INSERTS, L_DELETES, L_FORMATS, L_AUTOSUMS,
        L_FILL, L_CLEARS, L_SORTS, L_FINDS, L_PASTES, L_SYMBOLS, L_TABCOLORS, L_CALCS, L_ZOOMS, L_FREEZES,
-       L_FNFIN, L_FNLOGIC, L_FNTEXT, L_FNDATE, L_FNLOOKUP, L_FNMATH, L_FNMORE, L_CELLSTYLES, L_CONDFMTS };
+       L_FNFIN, L_FNLOGIC, L_FNTEXT, L_FNDATE, L_FNLOOKUP, L_FNMATH, L_FNMORE, L_CELLSTYLES, L_CONDFMTS,
+       L_TSTYLES, L_TOTFN, L_PVSUBTOT, L_PVGRAND, L_PVLAYOUT, L_PVBLANK, L_PVMOVE };
 #define N(a) ((int)(sizeof(a) / sizeof(a[0])))
 static const List lists[] = {
   { NULL, 0, PL_TEXT, NULL }, { usual_fonts, 10, PL_FONTS, NULL }, { sizes, N(sizes), PL_TEXT, NULL },
@@ -134,6 +138,9 @@ static const List lists[] = {
   { fn_fin, N(fn_fin), PL_TEXT, NULL }, { fn_logic, N(fn_logic), PL_TEXT, NULL }, { fn_text, N(fn_text), PL_TEXT, NULL },
   { fn_date, N(fn_date), PL_TEXT, NULL }, { fn_lookup, N(fn_lookup), PL_TEXT, NULL }, { fn_math, N(fn_math), PL_TEXT, NULL },
   { fn_more, N(fn_more), PL_TEXT, NULL }, { cellstyles, N(cellstyles), PL_CELLSTYLE, NULL }, { condfmts, N(condfmts), PL_TEXT, NULL },
+  { tstyles, N(tstyles), PL_TSTYLE, NULL }, { totfns, N(totfns), PL_TEXT, NULL }, { pvsubtots, N(pvsubtots), PL_TEXT, NULL },
+  { pvgrands, N(pvgrands), PL_TEXT, NULL }, { pvlayouts, N(pvlayouts), PL_TEXT, NULL }, { pvblanks, N(pvblanks), PL_TEXT, NULL },
+  { pvmoves, N(pvmoves), PL_TEXT, NULL },
 };
 /* a list by number: Ledger's own here, or (from LXL_FIRST) layout.h's */
 static const List *list_of(int k) { return k >= LXL_FIRST && k < LXL_LAST ? (const List *)(const void *)&lx_lists[k - LXL_FIRST] : &lists[k]; }
@@ -168,7 +175,7 @@ enum { S_SMALL, S_LARGE, S_ICON };
    tr(); NULL for an icon alone), the command it returns (ID_), the RB_ states shown as checked and
    needed to be usable, F_ flags, a field's width in pixels, and its help */
 typedef struct {
-  u8 kind, size, icon, list;
+  u8 kind, size; UWORD icon; u8 list;   /* (icons past 255 since the tables' and layout's) */
   const char *label;
   UWORD id;
   u8 st, en;
@@ -179,6 +186,8 @@ typedef struct {
 enum { G_COLS, G_ROWS };
 typedef struct { const char *name; u8 mode; const Item *items; int n; } Group;
 typedef struct { const char *name; const Group *groups; int n; } Tab;
+#define TT_TOOLS
+#include "tabletabs.h"
 
 /* Save, Undo and Redo: the quick access buttons at the right end of the tab strip */
 #define NQA 3
@@ -234,6 +243,7 @@ static const Item h_num[] = {
 };
 static const Item h_styles[] = {
   { K_DROP, S_LARGE, IC_CONDFMT, L_CONDFMTS, "Conditional Formatting", ID_CONDDD, 0, 0, 0, 0, "Conditional formatting" },
+  { K_DROP, S_LARGE, IC_FMTTABLE, L_TSTYLES, "Format as Table", ID_FMTTABLEDD, 0, 0, 0, 0, "Make the cells a table in the style chosen" },
   { K_DROP, S_LARGE, IC_CELLSTYLES, L_CELLSTYLES, "Cell Styles", ID_CELLSTYLEDD, 0, 0, 0, 0, "Cell styles" },
   { K_DROP, S_SMALL, IC_NEWSTYLE, LXL_MYSTYLES, "My Styles", ID_LX_MYSTYLEDD, 0, 0, 0, 0, "Your own cell styles, and New Cell Style: the active cell's look under a name" },
 };
@@ -277,7 +287,7 @@ static const Item i_links[] = {
 static const Item i_text[] = {
   { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
 };
-static const Group insert[] = { { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Functions", G_COLS, i_fn, N(i_fn) },
+static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Functions", G_COLS, i_fn, N(i_fn) },
                                 { "Links", G_COLS, i_links, N(i_links) }, { "Names", G_COLS, i_names, N(i_names) }, { "Text", G_COLS, i_text, N(i_text) } };
 /* Page Layout: themes, the page setup (Ledger doesn't print, but PDF export, Page Break Preview and
    Excel use it), scaling, the sheet options, and Ledger's sheet tools */
@@ -500,6 +510,8 @@ static const char *tip_for(UWORD id)
 static const Tab tabs[] = {
   { "File", NULL, 0 }, { "Home", home, N(home) }, { "Insert", insert, N(insert) }, { "Page Layout", playout, N(playout) },
   { "Formulas", formulas, N(formulas) }, { "Data", data, N(data) }, { "Review", review, N(review) }, { "View", view, N(view) },
+  /* contextual (TT_CONTEXT_FIRST on): shown while the active cell is in a table or a pivot table */
+  { "Table Design", tdesign, N(tdesign) }, { "PivotTable Analyze", panalyze, N(panalyze) }, { "PivotTable Design", pdesign, N(pdesign) },
 };
 #define NTABS N(tabs)
 /* (ledger.h) the label of entry v of the list of the item that returns id */
@@ -527,7 +539,8 @@ struct RData {
   int shown;
   int tab;
   struct MUIP_Ribbon_State st;
-  char font[48], numfmt[40];
+  char font[48], numfmt[40], ctxname[64];
+  int shortctx;                  /* the contextual tabs under short names (no room for the long ones) */
   RBox tabbox[NTABS];
   RBox qa[NQA];
   RBox item[MAXI]; int nitem;
@@ -555,7 +568,14 @@ static int rowh(void) { return fh() + 7; }
 static int bodyh(void) { return 3 * rowh() + 4; }
 static int caph(void) { return fh() + 3; }
 
-static int bit_on(struct RData *d, int b) { return b >= LXB_FIRST ? lx_bit(b) : (d->st.on & RBIT(b)) != 0; }
+static int bit_on(struct RData *d, int b) { return b >= CB_INTABLE ? (d->st.ctx & CBIT(b)) != 0 : b >= LXB_FIRST ? lx_bit(b) : (d->st.on & RBIT(b)) != 0; }
+/* a contextual tab is shown while the active cell is in a table (Table Design) or a pivot table */
+static int tab_shown(struct RData *d, int t) { return t < TT_CONTEXT_FIRST || bit_on(d, t == TT_CONTEXT_FIRST ? CB_INTABLE : CB_INPIVOT); }
+static const char *tab_name(struct RData *d, int t)
+{
+  static const char *const shortnames[3] = { "Design", "Analyze", "Design" };
+  return t >= TT_CONTEXT_FIRST && d->shortctx ? shortnames[t - TT_CONTEXT_FIRST] : tabs[t].name;
+}
 static int item_on(struct RData *d, const Item *it) { return it->st && bit_on(d, it->st); }
 static int item_enabled(struct RData *d, const Item *it) { return !it->en || bit_on(d, it->en); }
 
@@ -627,8 +647,15 @@ static void layout_ribbon(struct RData *d, Object *obj)
   int t, g, i, n = 0;
   const Tab *tab;
   LONG gw[12];
+  if (!tab_shown(d, d->tab)) d->tab = 1;
+  {
+    LONG all = 0;
+    for (t = 0; t < NTABS; t++) if (tab_shown(d, t)) all += theme_textlen(rp, theme_font(), tabs[t].name) + 16;
+    d->shortctx = all > _mwidth(obj) - NQA * 24 - 8;
+  }
   for (t = 0; t < NTABS; t++) {
-    LONG w = theme_textlen(rp, theme_font(), tabs[t].name) + 16;
+    LONG w = theme_textlen(rp, theme_font(), tab_name(d, t)) + 16;
+    if (!tab_shown(d, t)) { d->tabbox[t].x0 = d->tabbox[t].x1 = -1; continue; }
     d->tabbox[t].x0 = (WORD)x; d->tabbox[t].x1 = (WORD)(x + w - 1);
     d->tabbox[t].y0 = (WORD)_mtop(obj); d->tabbox[t].y1 = (WORD)(_mtop(obj) + tabh() - 1);
     x += w;
@@ -734,6 +761,7 @@ static void field_text(struct RData *d, const Item *it, char *out, size_t cap)
   case ID_FONTDD: utf8_to_latin1(d->st.font ? d->st.font : "", d->st.font ? (u32)strlen(d->st.font) : 0, out, cap); break;
   case ID_SIZEDD: sprintf(out, "%d%s", d->st.size / 10, d->st.size % 10 ? ".5" : ""); break;
   case ID_NUMFMTDD: strncpy(out, tr(d->st.numfmt ? d->st.numfmt : "General"), cap - 1); out[cap - 1] = 0; break;
+  case ID_TBLNAME: case ID_PVNAME: strncpy(out, d->ctxname, cap - 1); out[cap - 1] = 0; break;
   }
 }
 static void draw_item(struct RData *d, Object *obj, int k)
@@ -836,8 +864,9 @@ static void draw_tabs(struct RData *d, Object *obj)
     int act = t == d->tab;
     if (b->x0 < 0) continue;
     if (d->hot == 100 + t && !act) theme_fill(rp, b->x0 + 2, b->y0 + 2, b->x1 - 2, b->y1 - 1, tpen(T_HOVER));
-    w = theme_textlen(rp, theme_font(), tabs[t].name);
-    theme_text(rp, theme_font(), b->x0 + (b->x1 - b->x0 + 1 - w) / 2, b->y0 + (tabh() - fh()) / 2, tabs[t].name, tpen(act ? T_ACCENT : T_TEXT));
+    w = theme_textlen(rp, theme_font(), tab_name(d, t));
+    if (t >= TT_CONTEXT_FIRST) theme_fill(rp, b->x0 + 2, b->y0, b->x1 - 2, b->y0 + 1, tpen(t == TT_CONTEXT_FIRST ? T_GREEN : T_ORANGE));   /* (contextual) */
+    theme_text(rp, theme_font(), b->x0 + (b->x1 - b->x0 + 1 - w) / 2, b->y0 + (tabh() - fh()) / 2, tab_name(d, t), tpen(act || t >= TT_CONTEXT_FIRST ? T_ACCENT : T_TEXT));
     if (act) theme_fill(rp, b->x0 + (b->x1 - b->x0 + 1 - w) / 2, b->y1 - 1, b->x0 + (b->x1 - b->x0 + 1 + w) / 2, b->y1, tpen(T_ACCENT));
   }
   for (t = 0; t < NQA; t++) {
@@ -881,7 +910,7 @@ static void draw_all(struct RData *d, Object *obj)
 /* the list window */
 struct PData { struct RData *r; Object *ribbon; const List *l; int n, hot, cols; LONG w; const char *const *labels; };
 static ULONG popdispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __reg("a1") Msg msg);
-static LONG pop_rowh(struct PData *p) { return p->l && p->l->kind == PL_FONTS ? FONTPX + 8 : p->l && p->l->kind == PL_CELLSTYLE ? fh() + 9 : fh() + 5; }
+static LONG pop_rowh(struct PData *p) { return p->l && p->l->kind == PL_FONTS ? FONTPX + 8 : p->l && (p->l->kind == PL_CELLSTYLE || p->l->kind == PL_TSTYLE) ? fh() + 9 : fh() + 5; }
 static int pop_cols(struct PData *p) { return p->cols > 0 ? p->cols : 1; }
 static int pop_rows(struct PData *p) { int c = pop_cols(p); return (p->n + c - 1) / c; }
 /* opens item k's list under it, in a borderless window of its own (made on first use and kept).
@@ -952,7 +981,7 @@ static void open_list_l(struct RData *d, Object *obj, int k, const List *l)
       utf8_to_latin1(pd->labels[i], (u32)strlen(pd->labels[i]), t, sizeof t);
       tw = f ? theme_preview_width(f, t, FONTPX * 64) : 0;
       if (!tw) tw = theme_textlen(_rp(obj), theme_font(), t);
-    } else tw = theme_textlen(_rp(obj), theme_font(), pd->labels[i]) + (l->kind == PL_COLOR ? 20 : l->kind == PL_BORDER ? 24 : 0);
+    } else tw = theme_textlen(_rp(obj), theme_font(), pd->labels[i]) + (l->kind == PL_COLOR ? 20 : l->kind == PL_BORDER ? 24 : l->kind == PL_TSTYLE ? 40 : 0);
     if (tw + 16 > cw) cw = tw + 16;
   }
   if (l->kind == PL_FONTS) set(_win(obj), MUIA_Window_Sleep, FALSE);
@@ -1083,6 +1112,7 @@ static ULONG popdispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj,
         continue;
       }
       strncpy(t, p->labels[i], sizeof t - 1); t[sizeof t - 1] = 0;
+      if (p->l->kind == PL_TSTYLE) { tabletab_preview(obj, rp, i, x - 2, y + 2, 34, pop_rowh(p) - 5); x += 36; }
       if (p->l->kind == PL_BORDER) { border_picture(rp, i, x, y + 3, pop_rowh(p) - 7); x += pop_rowh(p) + 2; }
       if (p->l->kind == PL_COLOR) {
         ULONG c = p->l->colors[i];
@@ -1211,7 +1241,7 @@ static ULONG events(struct IClass *cl, Object *obj, struct MUIP_HandleEvent *m)
     if (is_group_button(d, k) && hit(d, im->MouseX, im->MouseY) == k) { open_group(d, obj, k); return MUI_EventHandlerRC_Eat; }
     if (it && hit(d, im->MouseX, im->MouseY) == k) {
       if ((it->flags & F_SPLIT) && !on_arrow(d, it, k, im->MouseX, im->MouseY)) DoMethod(_app(obj), MUIM_Application_ReturnID, split_id(it->id));
-      else if (it->kind == K_DROP || it->kind == K_FIELD) open_list(d, obj, k);
+      else if (it->kind == K_DROP || (it->kind == K_FIELD && it->list)) open_list(d, obj, k);
       else DoMethod(_app(obj), MUIM_Application_ReturnID, (ULONG)it->id);
     }
     return MUI_EventHandlerRC_Eat;
@@ -1338,9 +1368,11 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
   case MUIM_Ribbon_State: {
     struct MUIP_Ribbon_State *m = (struct MUIP_Ribbon_State *)msg;
     d = INST_DATA(cl, obj);
-    if (m->on == d->st.on && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt) && lx_bits_hash() == d->lxhash) return 0;
+    if (m->on == d->st.on && m->ctx == d->st.ctx && m->size == d->st.size && m->font && !strcmp(m->font, d->font) && m->numfmt && !strcmp(m->numfmt, d->numfmt)
+        && !strcmp(m->ctxname ? m->ctxname : "", d->ctxname) && lx_bits_hash() == d->lxhash) return 0;
     d->lxhash = lx_bits_hash();
     d->st = *m;
+    strncpy(d->ctxname, m->ctxname ? m->ctxname : "", sizeof d->ctxname - 1); d->ctxname[sizeof d->ctxname - 1] = 0;
     if (m->font) { strncpy(d->font, m->font, sizeof d->font - 1); d->font[sizeof d->font - 1] = 0; }
     if (m->numfmt) { strncpy(d->numfmt, m->numfmt, sizeof d->numfmt - 1); d->numfmt[sizeof d->numfmt - 1] = 0; }
     d->st.font = d->font; d->st.numfmt = d->numfmt;

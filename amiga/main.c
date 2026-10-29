@@ -37,6 +37,7 @@
 #include "layout.h"
 #include "splash.h"
 #include "sysfonts.h"
+#include "tabletab.h"
 #include "../core/calc.h"
 #include "../core/xlsx.h"
 #include "../core/template.h"
@@ -115,6 +116,7 @@ static struct NewMenu menus[] = {
   I("Sort A to Z", 0, ID_SORTAZ), I("Sort Z to A", 0, ID_SORTZA), I("Sort...", 0, ID_CUSTOMSORT), BAR,
   T("Filter", 0, ID_FILTER), I("Clear Filter", 0, ID_CLEARFILTER), I("Reapply Filter", 0, ID_REAPPLY), BAR, I("Remove Duplicates", 0, ID_REMOVEDUP), BAR,
   I("Calculate Now", 0, ID_CALCNOW), T("Manual Calculation", 0, ID_MANUALCALC), BAR, I("Workbook Statistics...", 0, ID_STATS),
+  TABLE_MENUS,
   M("View"),
   T("Show All Notes", 0, ID_NOTESHOW), T("Formula Bar", 0, ID_FORMULABAR), T("Gridlines", 0, ID_GRIDLINES), T("Headings", 0, ID_HEADINGS), T("Show Formulas", 0, ID_SHOWFORMULAS), BAR,
   I("Zoom In", "+", ID_ZOOMIN), I("Zoom Out", "-", ID_ZOOMOUT), I("Zoom 100%", 0, ID_ZOOM100), I("Zoom to Selection", 0, ID_ZOOMSEL), BAR,
@@ -549,6 +551,7 @@ void update_controls(void)
   memset(&rs, 0, sizeof rs);
   rs.MethodID = MUIM_Ribbon_State;
   rs.on = on; rs.font = f->name; rs.size = f->size; rs.numfmt = numfmt_name(book_fmt_code(book, st->numfmt)); rs.fs = &fonts;
+  tabletab_state(&rs.ctx, &rs.ctxname);     /* (Table Design, PivotTable Analyze and Design) */
   DoMethodA(ribbon, (Msg)&rs);
   /* the menus' ticks */
   menu_set(ID_GRIDLINES, MUIA_Menuitem_Checked, s->gridlines);
@@ -1901,6 +1904,7 @@ int main(int argc, char **argv)
     else if (id == ID_EDITCHG || id == ID_EDITDONE) update_controls();
     else if (id == ID_FILETAB || id == ID_BACKSTAGE || id == ID_TEMPLATE || id == ID_RECENT || id == ID_OPTIONS) backstage_command(id);
     else if ((id >= ID_FONTDD && id <= ID_FN_MORE)) ribbon_choice(id);
+    else if (id >= ID_TBL_FIRST && id < ID_TBL_LAST) tabletab_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value));
     else if (id >= ID_LX_FIRST && id < ID_LX_LAST) { if (back_shown && id != ID_LX_REFRESH && id != ID_LX_SCROLLED) backstage_show(0, 0); lx_command(id); }
     else if (id) {
       if (back_shown && (id == ID_OPEN || id == ID_SAVE || id == ID_SAVEAS || id == ID_SAVECSV || id == ID_NEW)) backstage_show(0, 0);

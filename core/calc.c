@@ -8,6 +8,7 @@
  * further passes, so the C stack stays small on the Amiga.
  */
 #include "calc.h"
+#include "table.h"
 #include "pagesetup.h"
 #include <stdlib.h>
 #include <string.h>
@@ -1025,8 +1026,11 @@ static Value eval_name(Ctx *cx, const char *name)
       if (cx->b->names[i].sheet == SHEET_SELF) found = i;
     }
   if (found < 0 || !cx->b->names[found].f) {
-    /* a function given by name: BYROW(A1:C3, SUM) */
-    int id = found < 0 ? func_lookup(name) : -1;
+    /* a table's name alone, or a function given by name: BYROW(A1:C3, SUM) */
+    Value tv;
+    int id;
+    if (found < 0 && table_name_value(cx->b, name, &tv)) return tv;
+    id = found < 0 ? func_lookup(name) : -1;
     if (id >= 0 && !lazy_kind(id)) return builtin_lambda(id);
     return val_err(E_NAME);
   }
@@ -1356,6 +1360,7 @@ static Value eval_range(Ctx *cx, const Formula *f, int lo, int hi)
       if (v.sheet >= cx->b->nsh) v = val_err(E_REF);
       break;
     case T_NAME: v = eval_name(cx, t->s); break;
+    case T_TABLE: v = table_ref_value(cx->b, cx->sheet, cx->row, cx->col, t->s ? t->s : ""); break;
     case T_NEG: case T_POS: case T_PCT:
       if (sp < 1) goto bad;
       v = unop(cx, t->op, &st[sp - 1]);

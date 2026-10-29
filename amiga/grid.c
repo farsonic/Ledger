@@ -34,6 +34,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "../core/table.h"
 #include "layout.h"
 #include "../core/calc.h"
 #include "../core/ops.h"
@@ -90,6 +91,7 @@ struct Data {
   ULONG moved, changed, edited;
   ULONG ctx_pick;
   i32 filter_col;                /* the column whose filter button was clicked */
+  i32 filter_row;                /* (and its row: a table's header row makes its filter the sheet's) */
   i32 hover_r, hover_c;          /* the cell with a note or link the mouse rests on (-1 none) */
   i32 hot_col, hot_row;          /* (0.1.1) the heading edge under the mouse, which a drag resizes (-1 none) */
   int resize_ptr;                /* the resize pointer is showing: 1 columns, 2 rows */
@@ -481,9 +483,11 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
   int st = sheet_cell_style(s, r, c);
   const Style *sty = &b->styles[st];
   const Font *fnt = &b->fonts[sty->font];
-  Font cfnt, vfnt;
+  Font cfnt, tfnt, vfnt;
   LONG vsh = 0;
   CondLook lk;
+  TblLook tl;
+  int tbl;
   struct TextFont *tf;
   char t[1100];
   u32 col;
@@ -500,6 +504,9 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
     cfnt.bold |= lk.bold; cfnt.italic |= lk.italic; cfnt.underline |= lk.underline; cfnt.strike |= lk.strike;
     fnt = &cfnt;
   } else if (!s->ncfs) { lk.color = COLOR_AUTO; lk.fill = 0; }
+  /* a table's or pivot table's look: bold and a colour where the cell has none of its own */
+  tbl = (s->ntables || s->npivots) && table_look(b, SI(d), r, c, &tl);
+  if (tbl && tl.bold && !fnt->bold) { tfnt = *fnt; tfnt.bold = 1; fnt = &tfnt; }
   if (d->formulas && cell->f) { grid_cell_text(b, SI(d), r, c, 1, t, sizeof t, &col); isnum = 0; }
   else {
     if (v->t == V_NUM && sty->numfmt == 0) {
@@ -531,7 +538,12 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
   SetFont(rp, tf);
   SetSoftStyle(rp, (fnt->underline ? FSF_UNDERLINED : 0), FSF_BOLD | FSF_ITALIC | FSF_UNDERLINED);
   SetDrMd(rp, JAM1);
-  SetAPen(rp, ink(d, lk.color != COLOR_AUTO ? lk.color : col != COLOR_AUTO ? col : fnt->color, lk.fill ? lk.fill : sty->fill));
+  {
+    u32 fc = fnt->color;
+    ULONG fl = lk.fill ? lk.fill : sty->fill;
+    if (tbl) { if (fc == COLOR_AUTO && tl.color != COLOR_AUTO) fc = tl.color; if (!fl) fl = tl.fill; }
+    SetAPen(rp, ink(d, lk.color != COLOR_AUTO ? lk.color : col != COLOR_AUTO ? col : fc, fl));
+  }
   ha = sty->halign;
   if (ha == HA_GENERAL) ha = isnum || v->t == V_ERR ? HA_RIGHT : v->t == V_BOOL ? HA_CENTER : HA_LEFT;
   if (ha == HA_CENTERSEL || ha == HA_JUSTIFY) ha = HA_CENTER;
@@ -704,6 +716,7 @@ static void draw_cells(struct Data *d, struct RastPort *rp)
       CondLook lk;
       lk.bar = -1;
       if (s->ncfs && cond_look(b, SI(d), r, c, &lk) && lk.fill) f = lk.fill;
+      if (!f && (s->ntables || s->npivots)) { TblLook tl; if (table_look(b, SI(d), r, c, &tl)) f = tl.fill; }
       if (f) fill(rp, d->vx[j], d->vy[i], d->vx[j + 1] - 1, d->vy[i + 1] - 1, pen_for(d, f));
       if (lk.bar >= 0) {
         /* a data bar, as long as the value is big: its colour fading towards white in four steps, edged in the colour */
@@ -773,11 +786,17 @@ static void draw_cells(struct Data *d, struct RastPort *rp)
       int st = sheet_cell_style(s, r, c);
       const Style *sy = &b->styles[st];
       LONG bx0 = d->vx[j] - 1, bx1 = d->vx[j + 1] - 1, by0 = d->vy[i] - 1, by1 = d->vy[i + 1] - 1;
-      if (!(sy->border[0] | sy->border[1] | sy->border[2] | sy->border[3])) continue;
-      if (sy->border[B_TOP]) border_line(d, rp, sy->border[B_TOP], sy->bcolor[B_TOP], bx0, by0, bx1, by0, 1);
-      if (sy->border[B_BOTTOM]) border_line(d, rp, sy->border[B_BOTTOM], sy->bcolor[B_BOTTOM], bx0, by1, bx1, by1, 1);
-      if (sy->border[B_LEFT]) border_line(d, rp, sy->border[B_LEFT], sy->bcolor[B_LEFT], bx0, by0, bx0, by1, 0);
-      if (sy->border[B_RIGHT]) border_line(d, rp, sy->border[B_RIGHT], sy->bcolor[B_RIGHT], bx1, by0, bx1, by1, 0);
+      u8 bk[4];
+      u32 bc[4];
+      TblLook tl;
+      int tbl = (s->ntables || s->npivots) && table_look(b, SI(d), r, c, &tl), q;
+      /* the cell's own borders, else a table's */
+      for (q = 0; q < 4; q++) { bk[q] = sy->border[q] ? sy->border[q] : tbl ? tl.border[q] : 0; bc[q] = sy->border[q] ? sy->bcolor[q] : tbl ? tl.bcolor[q] : 0; }
+      if (!(bk[0] | bk[1] | bk[2] | bk[3])) continue;
+      if (bk[B_TOP]) border_line(d, rp, bk[B_TOP], bc[B_TOP], bx0, by0, bx1, by0, 1);
+      if (bk[B_BOTTOM]) border_line(d, rp, bk[B_BOTTOM], bc[B_BOTTOM], bx0, by1, bx1, by1, 1);
+      if (bk[B_LEFT]) border_line(d, rp, bk[B_LEFT], bc[B_LEFT], bx0, by0, bx0, by1, 0);
+      if (bk[B_RIGHT]) border_line(d, rp, bk[B_RIGHT], bc[B_RIGHT], bx1, by0, bx1, by1, 0);
     }
   }
   /* notes: a small red triangle in the cell's top right corner */
@@ -847,7 +866,8 @@ static int filter_btn(struct Data *d, int i, int j, LONG *x0, LONG *y0, LONG *x1
 {
   Sheet *s = SH(d);
   LONG h, bs;
-  if (s->filter.r1 < 0 || d->vr[i] != s->filter.r1 || d->vc[j] < s->filter.c1 || d->vc[j] > s->filter.c2) return 0;
+  if ((s->filter.r1 < 0 || d->vr[i] != s->filter.r1 || d->vc[j] < s->filter.c1 || d->vc[j] > s->filter.c2)
+      && !(s->ntables && table_filter_button(s, d->vr[i], d->vc[j]))) return 0;
   h = d->vy[i + 1] - d->vy[i];
   bs = fh() + 2;
   if (bs > h - 2) bs = h - 2;
@@ -861,14 +881,13 @@ static void draw_filters(struct Data *d, struct RastPort *rp)
   Sheet *s = SH(d);
   int i, j, k;
   LONG x0, y0, x1, y1, cx, cy;
-  if (s->filter.r1 < 0) return;
+  if (s->filter.r1 < 0 && !s->ntables) return;
   for (i = 0; i < d->nvr; i++) {
-    if (d->vr[i] != s->filter.r1) continue;
     for (j = 0; j < d->nvc; j++) {
       int on;
       if (!filter_btn(d, i, j, &x0, &y0, &x1, &y1)) continue;
       if (x1 >= d->w || y1 >= d->h) continue;
-      on = sheet_filter_col(s, d->vc[j]) != NULL;
+      on = d->vr[i] == s->filter.r1 && sheet_filter_col(s, d->vc[j]) != NULL;
       fill(rp, x0, y0, x1, y1, d->pen_head);
       SetAPen(rp, d->pen_headline);
       Move(rp, x0, y0); Draw(rp, x1, y0); Draw(rp, x1, y1); Draw(rp, x0, y1); Draw(rp, x0, y0);
@@ -894,7 +913,7 @@ static i32 filter_hit(struct Data *d, LONG x, LONG y)
   LONG x0, y0, x1, y1;
   for (i = 0; i < d->nvr; i++)
     for (j = 0; j < d->nvc; j++)
-      if (filter_btn(d, i, j, &x0, &y0, &x1, &y1) && x >= x0 && x <= x1 && y >= y0 && y <= y1) return d->vc[j];
+      if (filter_btn(d, i, j, &x0, &y0, &x1, &y1) && x >= x0 && x <= x1 && y >= y0 && y <= y1) { d->filter_row = d->vr[i]; return d->vc[j]; }
   return -1;
 }
 /* the selection's outline and fill handle, the copied cells' marching outline, frozen pane lines,
@@ -1697,6 +1716,7 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
     /* the cells: a filter button opens its list (main.c) */
     if (region == 0 && (e = filter_hit(d, x, y)) >= 0) {
       d->filter_col = e;
+      if (s->ntables && d->filter_row != s->filter.r1) { table_activate_filter(d->book, SI(d), d->filter_row, e); redraw(d); }
       DoMethod(_app(obj), MUIM_Application_ReturnID, ID_FILTERCOL);
       return MUI_EventHandlerRC_Eat;
     }

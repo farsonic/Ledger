@@ -3,6 +3,8 @@
  * and columns going in and out (formulas follow). See book.h.
  */
 #include "book.h"
+#include "table.h"
+#include "pivot.h"
 #include "calc.h"
 #include "cond.h"
 #include "pagesetup.h"
@@ -577,6 +579,8 @@ static void sheet_free(Sheet *s)
   cond_free_all(s->cfs, s->ncfs);
   notes_free(s->notes, s->nnotes);
   links_free(s->links, s->nlinks);
+  tables_free(s->tables, s->ntables);
+  pivots_free(s->pivots, s->npivots);
   page_free(s->page);
   free(s);
 }
@@ -597,6 +601,10 @@ static Sheet *sheet_clone(const Sheet *s)
   if (!c->notes) c->nnotes = 0;
   c->links = links_copy(s->links, s->nlinks);
   if (!c->links) c->nlinks = 0;
+  c->tables = tables_copy(s->tables, s->ntables);
+  if (!c->tables) c->ntables = 0;
+  c->pivots = pivots_copy(s->pivots, s->npivots);
+  if (!c->pivots) c->npivots = 0;
   c->page = page_copy(s->page);
   if (s->nrows && !(c->rows = (Row **)calloc((size_t)s->nrows, sizeof(Row *)))) goto fail;
   c->nrows = s->nrows;
@@ -929,6 +937,7 @@ static void undo_book(Book *b)
   u->active = b->active;
   u->kind = U_BOOK;
 }
+void book_note_book(Book *b) { undo_book(b); }
 /* apply step u (taking it off from), and push its opposite onto to */
 static int undo_apply(Book *b, UndoStep **from, UndoStep **to, int *sheet, Rect *area)
 {
@@ -1065,6 +1074,7 @@ int book_duplicate_sheet(Book *b, int i)
     strncpy(c->name, nm, sizeof c->name - 1); c->name[sizeof c->name - 1] = 0;
     sheet_free(b->sh[at]);
     b->sh[at] = c;
+    tables_rename_copies(b, at);
   }
   book_end(b);
   if (!b->manualcalc) book_recalc(b);
@@ -1248,7 +1258,7 @@ int book_input(Book *b, int sheet, i32 r, i32 c, const char *text, int *errpos)
   Cell *cell;
   Value v = val_empty();
   Formula *f = NULL;
-  int style, kind = 0;
+  int style, kind = 0, tg;
   double n;
   if (sheet < 0 || sheet >= b->nsh || r < 0 || r >= MAXROW || c < 0 || c >= MAXCOL) return 0;
   s = b->sh[sheet];
@@ -1265,6 +1275,7 @@ int book_input(Book *b, int sheet, i32 r, i32 c, const char *text, int *errpos)
   else if (parse_number(text, &n, &kind)) v = val_num(n);
   else v = val_str(text);
   book_begin(b);
+  tg = s->ntables ? table_input_pre(b, sheet, r, c, text) : 0;     /* (a table grows, or its header changes) */
   undo_cell(b, sheet, r, c);
   style = sheet_cell_style(s, r, c);
   if (v.t == V_EMPTY && !f) {
@@ -1283,6 +1294,7 @@ int book_input(Book *b, int sheet, i32 r, i32 c, const char *text, int *errpos)
   }
   val_free(&v);
   formula_free(f);
+  if (tg) table_input_post(b, sheet, r, c, tg);
   book_end(b);
   after_edit(b);
   return 1;
@@ -1519,6 +1531,7 @@ int book_hide_rows(Book *b, int sheet, i32 r1, i32 r2, int hide)
     if (row) { row->hidden = (u8)hide; if (!hide && row->height == 0) row->height = 0; }
   }
   book_end(b);
+  if (!b->manualcalc) book_recalc(b);     /* (SUBTOTAL leaves hidden rows out) */
   return 1;
 }
 int book_merge(Book *b, int sheet, Rect a, int merge)
@@ -1725,6 +1738,8 @@ static int insdel(Book *b, int sheet, int rows, i32 at, i32 n)
   if (rows) move_rows(s, at, n); else move_cols(s, at, n);
   move_extras(s, rows, at, n);
   cond_shift_areas(s, rows, at, n);
+  tables_shift(s, rows, at, n);
+  pivots_shift(s, rows, at, n);
   page_shift(s, rows, at, n);
   sh.target = sheet; sh.rows = rows; sh.at = at; sh.n = n;
   each_formula(b, shift_formula, &sh);
@@ -2045,6 +2060,7 @@ int book_filter_column(Book *b, int sheet, i32 col, const char *const *vals, int
   filter_apply(b, sheet);
   book_end(b);
   b->dirty = 1;
+  if (!b->manualcalc) book_recalc(b);     /* (SUBTOTAL leaves filtered rows out) */
   return 1;
 }
 static int cmp_text(const void *a, const void *b)
@@ -2066,6 +2082,7 @@ int book_filter_reapply(Book *b, int sheet)
   for (r = s->filter.r1 + 1; r <= s->filter.r2 && r < s->nrows; r++) if (s->rows[r]) s->rows[r]->filtered = 0;
   filter_apply(b, sheet);
   book_end(b);
+  if (!b->manualcalc) book_recalc(b);
   return 1;
 }
 int book_filter_values(Book *b, int sheet, i32 col, char ***out, int *blanks)
