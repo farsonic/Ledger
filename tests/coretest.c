@@ -1635,6 +1635,7 @@ static void stat_functions(void)
   book_free(b);
 }
 
+#include "analysistest.c"
 int main(void)
 {
   values_dates();
@@ -1664,6 +1665,7 @@ int main(void)
   imports();
   layout_tests();
   dynarrays();
+  analysis_tests();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }
