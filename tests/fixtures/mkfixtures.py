@@ -5,6 +5,7 @@ coretest.c reads: a workbook written with openpyxl, then converted by LibreOffic
 import os, subprocess, sys, tempfile, shutil
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.worksheet.datavalidation import DataValidation
 
 here = os.path.dirname(os.path.abspath(__file__))
 wb = Workbook()
@@ -33,6 +34,11 @@ s.column_dimensions["A"].width = 20
 s.row_dimensions[3].height = 30
 s.merge_cells("A12:C12"); s["A12"] = "Merged title"
 s["A13"] = "Café über"
+dv = DataValidation(type="list", formula1='"Yes,No,Maybe"', allow_blank=True, promptTitle="Answer", prompt="Pick one")
+dv.add("E2:E5"); s.add_data_validation(dv)
+dv2 = DataValidation(type="whole", operator="between", formula1="1", formula2="10", errorTitle="Qty", error="1 to 10", errorStyle="warning")
+dv2.add("B2:B5"); s.add_data_validation(dv2)
+s.row_dimensions.group(2, 5, outline_level=1)
 o = wb.create_sheet("Other")
 o["A1"] = "x"; o["B2"] = 21; o["A3"] = "=Data!D6+B2"
 tmp = tempfile.mkdtemp()

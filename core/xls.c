@@ -184,7 +184,7 @@ static void put_chars(Buf *o, const u8 *p, u32 n, int wide)
   for (i = 0; i < n; i++) {
     u32 cp = wide ? rd16(p + i * 2) : p[i];
     if (wide && cp >= 0xD800 && cp < 0xDC00 && i + 1 < n) { u32 lo = rd16(p + (i + 1) * 2); if (lo >= 0xDC00 && lo < 0xE000) { cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00); i++; } }
-    buf_add(o, u, (size_t)utf8_put(u, cp ? cp : ' '));
+    buf_add(o, u, (size_t)utf8_put(u, cp ? cp : 1));      /* (NUL kept as \001: a list's separator) */
   }
 }
 /* an XLUnicodeString (cch of lenbytes bytes, then flags) at p within a record of n bytes: malloc'd
@@ -663,6 +663,66 @@ static Cell *put_cell(Rd *rd, int si, u32 r, u32 c, u32 xf)
   cell->style = (u16)style_of(rd, xf);
   return cell;
 }
+/* a DV record: one data validation rule (its formulas seen from the first cell of its ranges) */
+static char *dvstr(const u8 *p, u32 n, u32 *used)
+{
+  char *t = xlstr(p, n, 2, used);
+  if (t && t[0] == 1 && !t[1]) t[0] = 0;       /* (an empty string is written as one NUL) */
+  return t;
+}
+static void read_dv(Rd *rd, int si, const u8 *d, u32 len)
+{
+  Sheet *s = rd->b->sh[si];
+  DVRule r;
+  u32 fl, at = 4, used, k, cce, cref;
+  char *fx[2] = { NULL, NULL };
+  const u8 *fp[2];
+  u32 fc[2];
+  if (len < 4 + 4 * 3 || s->ndvs >= 10000) return;
+  fl = rd32(d);
+  dv_rule_init(&r);
+  r.type = (u8)((fl & 15) < DV_N ? (fl & 15) : 0);
+  r.errstyle = (u8)(((fl >> 4) & 7) > 2 ? 0 : ((fl >> 4) & 7));
+  r.blank = (u8)((fl >> 8) & 1); r.dropdown = (u8)!((fl >> 9) & 1);
+  r.showinput = (u8)((fl >> 18) & 1); r.showerror = (u8)((fl >> 19) & 1);
+  r.op = (u8)(((fl >> 20) & 15) < 8 ? ((fl >> 20) & 15) : 0);
+  free(r.intitle); free(r.errtitle); free(r.inmsg); free(r.errmsg);
+  r.intitle = dvstr(d + at, len - at, &used); at += used;
+  r.errtitle = at < len ? dvstr(d + at, len - at, &used) : str_dup(""); at += used;
+  r.inmsg = at < len ? dvstr(d + at, len - at, &used) : str_dup(""); at += used;
+  r.errmsg = at < len ? dvstr(d + at, len - at, &used) : str_dup(""); at += used;
+  for (k = 0; k < 2; k++) {
+    if (at + 4 > len) { dv_rule_free(&r); return; }
+    cce = rd16(d + at); at += 4;
+    if (at + cce > len) { dv_rule_free(&r); return; }
+    fp[k] = d + at; fc[k] = cce; at += cce;
+  }
+  if (at + 2 > len) { dv_rule_free(&r); return; }
+  cref = rd16(d + at); at += 2;
+  for (k = 0; k < cref && at + 8 <= len && k < 1000; k++, at += 8) {
+    Rect *na = (Rect *)realloc(r.areas, (size_t)(r.nareas + 1) * sizeof(Rect));
+    if (!na) break;
+    r.areas = na;
+    na[r.nareas].r1 = (i32)rd16(d + at); na[r.nareas].r2 = (i32)rd16(d + at + 2); na[r.nareas].c1 = (i32)rd16(d + at + 4); na[r.nareas].c2 = (i32)rd16(d + at + 6);
+    if (na[r.nareas].r2 >= 65535) na[r.nareas].r2 = MAXROW - 1;
+    r.nareas++;
+  }
+  if (!r.nareas) { dv_rule_free(&r); return; }
+  for (k = 0; k < 2; k++) if (fc[k]) fx[k] = rpn(rd, fp[k], fc[k], NULL, 0, 1, r.areas[0].r1, r.areas[0].c1);
+  if (fx[0]) { char *p; for (p = fx[0]; *p; p++) if (*p == 1) *p = ','; }      /* (a typed list's items: NUL-separated) */
+  for (k = 0; k < 2; k++) if (fx[k]) {
+    int pos;
+    Formula *f = formula_parse(rd->b, si, fx[k], &pos);
+    if (k == 0) r.f1 = f; else r.f2 = f;
+    free(fx[k]);
+  }
+  if (r.type != DV_ANY && !r.f1) { dv_rule_free(&r); return; }
+  {
+    DVRule *nd = (DVRule *)realloc(s->dvs, (size_t)(s->ndvs + 1) * sizeof(DVRule));
+    if (!nd) { dv_rule_free(&r); return; }
+    s->dvs = nd; nd[s->ndvs++] = r;
+  }
+}
 static void read_sheet(Rd *rd, int si, size_t o)
 {
   u32 id, len;
@@ -811,7 +871,7 @@ static void read_sheet(Rd *rd, int si, size_t o)
       case 0x0081: if (len >= 2) { u32 g = rd16(d); s->sumabove = (u8)!((g >> 6) & 1); s->sumleft = (u8)!((g >> 7) & 1); } break;
       case 0x0012: if (len >= 2 && rd16(d)) { s->protect = 1; s->protallow = PA_DEFAULT; } break;
       case 0x0013: if (len >= 2) s->pwhash = (u16)rd16(d); break;
-      case 0x00EF: break;
+      case 0x01BE: read_dv(rd, si, d, len); break;
       }
       q = next;
     }

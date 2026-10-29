@@ -1139,6 +1139,14 @@ static void imports(void)
        (b->styles[sheet_cell_style(b->sh[0], 0, 2)].fill & 0xFFFFFF) == 0xFFFF00 && b->styles[sheet_cell_style(b->sh[0], 0, 3)].halign == HA_CENTER);
     snprintf(t, sizeof t, "%s: widths, heights, merges", what);
     ok(t, sheet_col_width(b->sh[0], 0) > 120 && sheet_row_height(b->sh[0], 2) == 40 && b->sh[0]->nmerges == 1 && b->sh[0]->merges[0].c2 == 2 && b->sh[0]->merges[0].r1 == 11);
+    snprintf(t, sizeof t, "%s: validation", what);
+    {
+      const DVRule *dl = dv_at(b->sh[0], 2, 4), *dw = dv_at(b->sh[0], 3, 1);
+      ok(t, dl && dl->type == DV_LIST && dv_check_text(b, 0, 2, 4, "maybe", NULL) && !dv_check_text(b, 0, 2, 4, "Never", NULL) && !strcmp(dl->intitle, "Answer") &&
+         dw && dw->type == DV_WHOLE && dw->errstyle == DVE_WARNING && !strcmp(dw->errmsg, "1 to 10") && dv_check_text(b, 0, 3, 1, "7", NULL) && !dv_check_text(b, 0, 3, 1, "11", NULL));
+    }
+    snprintf(t, sizeof t, "%s: outline", what);
+    ok(t, outline_level(b->sh[0], 1, 1) == 1 && outline_level(b->sh[0], 1, 4) == 1 && outline_level(b->sh[0], 1, 5) == 0);
     book_free(b);
   }
   ok("xls: not one", !xls_load((const u8 *)"PK\3\4", 4, NULL, 0));

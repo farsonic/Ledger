@@ -31,7 +31,10 @@ typedef struct {
   CStyle *cs; int ncs;
   DStyle *ds; int nds;
   LStyle *ls; int nls;
+  struct OVal *val; int nval;
 } Od;
+/* a content validation: its rule (without cells), its base cell, and the cells of the table being read that use it */
+typedef struct OVal { char name[64]; DVRule r; i32 br, bc; Rect *a; int na; } OVal;
 /* a length ("2.2in", "1.5cm", "12pt", "25mm", "3pc") in pixels at 96 per inch */
 static double px_of(const char *v)
 {
@@ -351,6 +354,178 @@ static void cell_text(Xml *x, Buf *out)
   }
 }
 
+
+/* ------------------------------------------------------------------ content validations */
+static void oval_add(OVal *v, i32 r, i32 c, i32 nc, i32 nr)
+{
+  Rect *na;
+  if (nc < 1) nc = 1;
+  if (nr < 1) nr = 1;
+  if (v->na) {
+    /* joined to the last area when it continues it */
+    Rect *l = &v->a[v->na - 1];
+    if (l->r1 == r && l->r2 == r + nr - 1 && l->c2 + 1 == c) { l->c2 = c + nc - 1; return; }
+    if (l->c1 == c && l->c2 == c + nc - 1 && l->r2 + 1 == r) { l->r2 = r + nr - 1; return; }
+  }
+  if (v->na >= 2000 || !(na = (Rect *)realloc(v->a, (size_t)(v->na + 1) * sizeof(Rect)))) return;
+  v->a = na;
+  na[v->na].r1 = r; na[v->na].c1 = c; na[v->na].r2 = r + nr - 1; na[v->na].c2 = c + nc - 1;
+  v->na++;
+}
+/* an OpenFormula operand as a Ledger formula */
+static Formula *of_value(Od *o, const char *s, size_t n)
+{
+  char buf[600], *t;
+  int pos;
+  Formula *f;
+  if (n >= sizeof buf - 4) return NULL;
+  memcpy(buf, "of:", 3); memcpy(buf + 3, s, n); buf[n + 3] = 0;
+  if (!(t = of_formula(buf))) return NULL;
+  f = formula_parse(o->b, 0, t, &pos);
+  free(t);
+  return f;
+}
+/* the arguments of name(...) at s: the text inside (its length in *n); NULL if s doesn't start so */
+static const char *args_of(const char *s, const char *name, size_t *n)
+{
+  size_t l = strlen(name);
+  int depth = 0, q = 0;
+  const char *p;
+  if (strncmp(s, name, l) || s[l] != '(') return NULL;
+  for (p = s + l; *p; p++) {
+    if (*p == '"') q = !q;
+    else if (!q && *p == '(') depth++;
+    else if (!q && *p == ')' && !--depth) { *n = (size_t)(p - s - l - 1); return s + l + 1; }
+  }
+  return NULL;
+}
+/* "a;b" (outside brackets, strings and quotes) split in two */
+static int split2(const char *s, size_t n, size_t *cut)
+{
+  size_t i;
+  int depth = 0, q = 0;
+  for (i = 0; i < n; i++) {
+    if (s[i] == '"') q = !q;
+    else if (!q && (s[i] == '(' || s[i] == '[')) depth++;
+    else if (!q && (s[i] == ')' || s[i] == ']')) depth--;
+    else if (!q && !depth && s[i] == ';') { *cut = i; return 1; }
+  }
+  /* (LibreOffice writes some conditions' arguments with commas) */
+  for (i = 0, depth = 0, q = 0; i < n; i++) {
+    if (s[i] == '"') q = !q;
+    else if (!q && (s[i] == '(' || s[i] == '[')) depth++;
+    else if (!q && (s[i] == ')' || s[i] == ']')) depth--;
+    else if (!q && !depth && s[i] == ',') { *cut = i; return 1; }
+  }
+  return 0;
+}
+/* the comparison part: "cell-content()>=5", "cell-content-is-between(1;10)" (or text-length's) */
+static int of_compare(Od *o, const char *s, DVRule *r)
+{
+  static const char *const ops[] = { "<=", ">=", "!=", "<>", "=", "<", ">", NULL };
+  static const u8 codes[] = { CO_LE, CO_GE, CO_NE, CO_NE, CO_EQ, CO_LT, CO_GT };
+  const char *a, *p;
+  size_t n, cut;
+  int k;
+  while (*s == ' ') s++;
+  if ((a = args_of(s, "cell-content-is-between", &n)) || (a = args_of(s, "cell-content-text-length-is-between", &n)) ||
+      (a = args_of(s, "cell-content-is-not-between", &n)) || (a = args_of(s, "cell-content-text-length-is-not-between", &n))) {
+    r->op = strstr(s, "-not-between") && strstr(s, "-not-between") < a ? CO_NOTBETWEEN : CO_BETWEEN;
+    if (!split2(a, n, &cut)) return 0;
+    r->f1 = of_value(o, a, cut); r->f2 = of_value(o, a + cut + 1, n - cut - 1);
+    return r->f1 && r->f2;
+  }
+  if (!(p = strstr(s, "()"))) return 0;
+  p += 2;
+  for (k = 0; ops[k]; k++) if (!strncmp(p, ops[k], strlen(ops[k]))) break;
+  if (!ops[k]) return 0;
+  r->op = codes[k];
+  p += strlen(ops[k]);
+  r->f1 = of_value(o, p, strlen(p));
+  return r->f1 != NULL;
+}
+static int of_condition(Od *o, const char *c, DVRule *r)
+{
+  const char *a, *rest;
+  size_t n;
+  if (!strncmp(c, "of:", 3)) c += 3; else if (!strncmp(c, "ooo:", 4)) c += 4;
+  if ((a = args_of(c, "cell-content-is-in-list", &n))) {
+    r->type = DV_LIST;
+    if (*a == '[') { r->f1 = of_value(o, a, n); return r->f1 != NULL; }
+    {
+      /* "a";"b";"c": the items as one "a,b,c" string */
+      Buf t;
+      size_t i;
+      int q = 0, pos;
+      buf_init(&t);
+      buf_addc(&t, '"');
+      for (i = 0; i < n; i++) {
+        if (a[i] == '"') { if (q && i + 1 < n && a[i + 1] == '"') { buf_adds(&t, "\"\""); i++; continue; } q = !q; continue; }
+        if (!q && a[i] == ';') { buf_addc(&t, ','); continue; }
+        if (q) buf_addc(&t, a[i]);
+      }
+      buf_addc(&t, '"');
+      r->f1 = t.data ? formula_parse(o->b, 0, t.data, &pos) : NULL;
+      buf_free(&t);
+      return r->f1 != NULL;
+    }
+  }
+  if ((a = args_of(c, "is-true-formula", &n))) { r->type = DV_CUSTOM; r->f1 = of_value(o, a, n); return r->f1 != NULL; }
+  if (!strncmp(c, "cell-content-text-length", 24)) { r->type = DV_TEXTLEN; return of_compare(o, c, r); }
+  if (!strncmp(c, "cell-content-is-whole-number()", 30)) r->type = DV_WHOLE;
+  else if (!strncmp(c, "cell-content-is-decimal-number()", 32)) r->type = DV_DECIMAL;
+  else if (!strncmp(c, "cell-content-is-date()", 22)) r->type = DV_DATE;
+  else if (!strncmp(c, "cell-content-is-time()", 22)) r->type = DV_TIME;
+  else return 0;
+  if (!(rest = strstr(c, " and "))) return 0;
+  return of_compare(o, rest + 5, r);
+}
+static void read_validation(Od *o, Xml *x)
+{
+  const char *v;
+  OVal ov;
+  int depth = x->depth, in = 0;          /* 1 the help message, 2 the error message */
+  Buf title, msg;
+  OVal *nv;
+  memset(&ov, 0, sizeof ov);
+  dv_rule_init(&ov.r);
+  if (!(v = xml_attr(x, "name")) || o->nval >= 1000) { xml_skip(x); return; }
+  strncpy(ov.name, v, sizeof ov.name - 1);
+  if ((v = xml_attr(x, "allow-empty-cell"))) ov.r.blank = !strcmp(v, "true");
+  if ((v = xml_attr(x, "display-list"))) ov.r.dropdown = strcmp(v, "none") != 0;
+  if ((v = xml_attr(x, "base-cell-address"))) {
+    Buf b;
+    u16 sh; Rect rc; u8 fl;
+    buf_init(&b);
+    ref_text_of(v, strlen(v), &b);
+    if (b.data && parse_ref(o->b, b.data, &sh, &rc, &fl)) { ov.br = rc.r1; ov.bc = rc.c1; }
+    buf_free(&b);
+  }
+  if (!(v = xml_attr(x, "condition")) || !of_condition(o, v, &ov.r)) { dv_rule_free(&ov.r); xml_skip(x); return; }
+  ov.r.showinput = ov.r.showerror = 0;
+  buf_init(&title); buf_init(&msg);
+  if (!x->pending_end)
+    while (xml_next(x) != XT_EOF) {
+      if (x->type == XT_END && x->depth < depth) break;
+      if (x->type == XT_START && (!strcmp(x->name, "help-message") || !strcmp(x->name, "error-message"))) {
+        int err = x->name[0] == 'e';
+        const char *t = xml_attr(x, "title"), *d = xml_attr(x, "display"), *mt = xml_attr(x, "message-type");
+        in = err ? 2 : 1;
+        if (err) { free(ov.r.errtitle); ov.r.errtitle = str_dup(t ? t : ""); ov.r.showerror = !d || !strcmp(d, "true");
+                   if (mt) ov.r.errstyle = !strcmp(mt, "warning") ? DVE_WARNING : !strcmp(mt, "information") ? DVE_INFO : DVE_STOP; }
+        else { free(ov.r.intitle); ov.r.intitle = str_dup(t ? t : ""); ov.r.showinput = !d || !strcmp(d, "true"); }
+        msg.len = 0; if (msg.data) msg.data[0] = 0;
+        cell_text(x, &msg);
+        if (err) { free(ov.r.errmsg); ov.r.errmsg = str_dup(msg.data ? msg.data : ""); }
+        else { free(ov.r.inmsg); ov.r.inmsg = str_dup(msg.data ? msg.data : ""); }
+      }
+    }
+  buf_free(&title); buf_free(&msg);
+  (void)in;
+  if (!(nv = (OVal *)realloc(o->val, (size_t)(o->nval + 1) * sizeof(OVal)))) { dv_rule_free(&ov.r); return; }
+  o->val = nv; nv[o->nval++] = ov;
+}
+
 typedef struct { int style; u16 px; u8 hidden, level; } ColDef;
 static void read_table(Od *o, Xml *x, int si)
 {
@@ -430,6 +605,11 @@ static void read_table(Od *o, Xml *x, int si)
             long cr = crep ? atol(crep) : 1, j;
             int style, covered = !strcmp(x->name, "covered-table-cell");
             char *ftext = fm ? of_formula(fm) : NULL;
+            const char *vn = xml_attr(x, "content-validation-name");
+            if (vn) {
+              int q;
+              for (q = 0; q < o->nval; q++) if (!strcmp(o->val[q].name, vn)) { oval_add(&o->val[q], row, col, (i32)(cr > 1024 ? 1024 : cr), (i32)(r > 1024 ? 1024 : r)); break; }
+            }
             char *vtype = vt ? str_dup(vt) : NULL, *vval = val ? str_dup(val) : NULL, *dval = dv ? str_dup(dv) : NULL, *tval = tv ? str_dup(tv) : NULL;
             char *bval = bv ? str_dup(bv) : NULL, *sval = sv ? str_dup(sv) : NULL;
             long span_c = cs ? atol(cs) : 1, span_r = rs ? atol(rs) : 1;
@@ -484,6 +664,21 @@ static void read_table(Od *o, Xml *x, int si)
   }
   (void)k;
   free(cdef);
+  /* the validations' cells on this table: each a rule of the sheet */
+  for (k = 0; k < o->nval; k++) {
+    OVal *v = &o->val[k];
+    DVRule *nd;
+    if (!v->na) continue;
+    if ((nd = (DVRule *)realloc(s->dvs, (size_t)(s->ndvs + 1) * sizeof(DVRule))) && dv_rule_copy(&nd[s->ndvs], &v->r)) {
+      DVRule *r = &nd[s->ndvs];
+      s->dvs = nd;
+      free(r->areas); r->areas = v->a; r->nareas = v->na; v->a = NULL;
+      if (r->f1) formula_offset(r->f1, r->areas[0].r1 - v->br, r->areas[0].c1 - v->bc);
+      if (r->f2) formula_offset(r->f2, r->areas[0].r1 - v->br, r->areas[0].c1 - v->bc);
+      s->ndvs++;
+    } else if (nd) s->dvs = nd;
+    free(v->a); v->a = NULL; v->na = 0;
+  }
 }
 /* defined names: <table:named-range table:name= table:cell-range-address=> and named expressions */
 static void read_names(Od *o, Xml *x)
@@ -566,11 +761,14 @@ Book *ods_load(const u8 *data, size_t len, char *err, size_t errcap)
       if (ls && ls->hidden) b->sh[i]->hidden = 1;
       read_table(&o, &x, i++);
     } else if (!strcmp(x.name, "named-range") || !strcmp(x.name, "named-expression")) read_names(&o, &x);
+    else if (!strcmp(x.name, "content-validation")) read_validation(&o, &x);
   }
   xml_free(&x);
   free(content);
   for (i = 0; i < o.nds; i++) free(o.ds[i].code);
   free(o.ds); free(o.cs); free(o.ls);
+  for (i = 0; i < o.nval; i++) { dv_rule_free(&o.val[i].r); free(o.val[i].a); }
+  free(o.val);
   if (!ntables) { book_free(b); if (err) snprintf(err, errcap, "the spreadsheet has no tables"); return NULL; }
   {
     int vis = 0;
