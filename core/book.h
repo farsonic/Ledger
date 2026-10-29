@@ -16,7 +16,7 @@
 #define MAXSHEETS 255
 
 /* ------------------------------------------------------------------ values */
-enum { V_EMPTY, V_NUM, V_STR, V_BOOL, V_ERR, V_REF, V_ARR };
+enum { V_EMPTY, V_NUM, V_STR, V_BOOL, V_ERR, V_REF, V_ARR, V_LAMBDA };   /* V_LAMBDA: a LAMBDA value (calc.c; in the evaluator only) */
 /* errors, in Excel's order (their ERROR.TYPE numbers); E_CIRC shows as #CALC! (a circular reference) */
 enum { E_NONE, E_NULL, E_DIV0, E_VALUE, E_REF, E_NAME, E_NUM, E_NA, E_GETTING, E_SPILL, E_CALC, E_N };
 
@@ -30,7 +30,7 @@ typedef struct {
   double n;                       /* V_NUM */
   char *s;                        /* V_STR */
   i32 r1, c1, r2, c2;             /* V_REF: the rectangle, r1 <= r2, c1 <= c2 */
-  Arr *a;                         /* V_ARR (owned) */
+  Arr *a;                         /* V_ARR (owned); V_LAMBDA: calc.c's lambda, counted references */
 } Value;
 struct Arr { int rows, cols; Value *v; };     /* row by row */
 
@@ -65,8 +65,14 @@ int    serial_weekday(double serial);      /* 0 Sunday .. 6 Saturday */
 enum {
   T_END, T_NUM, T_STR, T_BOOL, T_ERR, T_REF, T_AREA, T_NAME, T_FUNC, T_MISSING, T_PAREN, T_ARRAY,
   T_ADD, T_SUB, T_MUL, T_DIV, T_POW, T_CAT, T_EQ, T_NE, T_LT, T_GT, T_LE, T_GE,
-  T_NEG, T_POS, T_PCT, T_RANGE, T_UNION, T_ISECT
+  T_NEG, T_POS, T_PCT, T_RANGE, T_UNION, T_ISECT,
+  T_AT,                           /* @: implicit intersection (files: _xlfn.SINGLE) */
+  T_SPILL,                        /* A1#: the spill range of the dynamic array at A1 (files: _xlfn.ANCHORARRAY) */
+  T_TRIM,                         /* A1.:.B9 trim reference (flags 1 leading, 2 trailing, 3 both; files: _xlfn.TRIMRANGE) */
+  T_CALL                          /* call the value below the arguments: LAMBDA(x,x+1)(2) (flags: argument count) */
 };
+/* T_NAME flags: a LET/LAMBDA parameter or a use of one (files write _xlpm.), [optional] parameter */
+enum { TN_LOCAL = 1, TN_OPT = 2 };
 /* reference flags: which coordinates have a $, and whole rows/columns (A:A, 1:1) */
 enum { RF_ABSR1 = 1, RF_ABSC1 = 2, RF_ABSR2 = 4, RF_ABSC2 = 8, RF_COLS = 16, RF_ROWS = 32, RF_SHEET = 64 };
 #define SHEET_SELF 0xFFFF        /* a reference without a sheet name: the formula's own sheet */
@@ -79,13 +85,23 @@ typedef struct {
   char *s;                        /* T_STR, T_NAME (owned) */
   Arr *arr;                       /* T_ARRAY (owned) */
 } Tok;
-typedef struct { Tok *t; int n; int volatile_; } Formula;
+typedef struct {
+  Tok *t; int n; int volatile_;
+  /* dynamic arrays: legacy = loaded without the dynamic-array mark (an array result is cut to one
+     value, as Excel before dynamic arrays); cse = a {=...} array formula filling arows by acols;
+     sr, sc = the rows and columns its result last spilled over (1 by 1 when it didn't spill);
+     arrayeval = its last evaluation worked on arrays (files mark it as a dynamic array) */
+  u8 legacy, cse, arrayeval, spillblocked;
+  i32 arows, acols, sr, sc;
+  int *lz;                        /* (calc.c) where each token's operand begins, for lazy functions */
+} Formula;
 
 /* ------------------------------------------------------------------ styles */
 typedef struct {
   char name[32];                  /* font family (UTF-8) */
   u16 size;                       /* tenths of a point (110 = 11 pt) */
   u8 bold, italic, underline, strike;   /* underline: 0 none, 1 single, 2 double */
+  u8 vert;                        /* 0 normal, 1 superscript, 2 subscript */
   u32 color;                      /* 0xRRGGBB, or COLOR_AUTO */
 } Font;
 #define COLOR_AUTO 0xFF000000UL
@@ -114,6 +130,7 @@ typedef struct {
   Formula *f;                     /* NULL: a constant */
   u32 calcgen;                    /* the recalculation that last computed it */
   u8 calcstate;                   /* 0 idle, 1 being computed (circularity check) */
+  u8 spill;                       /* a value spilled from a dynamic array formula above or left (no formula of its own) */
 } Cell;
 typedef struct { Cell *c; int n, cap; u16 height; u16 style; u8 hidden, custom, filtered, outline, collapsed; } Row;   /* filtered: hidden by the AutoFilter; outline: level 0-7 (outline.c); collapsed: its group's detail hidden */
 typedef struct { u16 width; u16 style; u8 hidden, custom, outline, collapsed; } ColInfo;
@@ -127,8 +144,9 @@ typedef struct { i32 col; int n; char **vals; u8 blanks; } FilterCol;
 enum { CF_CELL, CF_TEXT, CF_NOTTEXT, CF_BEGINS, CF_ENDS, CF_DUP, CF_UNIQUE, CF_TOP, CF_AVERAGE, CF_BLANKS, CF_NOBLANKS,
        CF_ERRORS, CF_NOERRORS, CF_EXPR, CF_BAR, CF_SCALE, CF_N };
 enum { CO_BETWEEN, CO_NOTBETWEEN, CO_EQ, CO_NE, CO_GT, CO_LT, CO_GE, CO_LE, CO_N };
-/* a note on a cell (Excel's notes, once called comments): who wrote it and what it says (UTF-8) */
-typedef struct { i32 r, c; char *author, *text; } Note;
+/* a note on a cell (Excel's notes, once called comments): who wrote it and what it says (UTF-8).
+   A threaded comment (comments.h) is a note with threaded set and its replies */
+typedef struct { i32 r, c; char *author, *text; u8 threaded, visible, resolved; char *replies; } Note;
 /* a hyperlink on a cell: a web or mail address, or a place in the workbook ("#Sheet2!A1"), and its tip */
 typedef struct { i32 r, c; char *target, *tip; } Link;
 typedef struct CondCache CondCache;
@@ -172,6 +190,7 @@ typedef struct {
   u8 protect;                     /* sheet protected: locked cells can't be changed */
   u16 pwhash, protallow;          /* its password's legacy hash (0 none); what users may still do (PA_ bits) */
   char protkey[144];              /* or a newer file's password check, "SHA-512:spin:salt:hash" ("" none) */
+  struct PageSetup *page;         /* page setup (pagesetup.h), NULL: the defaults */
 } Sheet;
 
 typedef struct { char name[64]; u16 sheet; char *formula_text; Formula *f; } Name;   /* sheet: SHEET_SELF = workbook scope */
@@ -200,6 +219,7 @@ typedef struct {
   u8 lockstruct;                  /* workbook structure protected (sheets can't be added, moved, renamed...) */
   u16 bookpwhash;                 /* its password's legacy hash (0 none) */
   char bookkey[144];              /* or a newer file's password check (as Sheet.protkey) */
+  struct LayoutBook *lx;          /* more properties, the theme, calculation options (pagesetup.h), NULL: defaults */
 } Book;
 
 Book  *book_new(void);                    /* one empty sheet, "Sheet1" */
@@ -327,5 +347,13 @@ Value  book_eval_text(Book *b, int sheet, const char *formula);   /* evaluate wi
 Value  book_eval_at(Book *b, int sheet, i32 r, i32 c, const Formula *f);   /* f evaluated as if in cell r, c (never V_REF) */
 /* the value of a cell for display or reading: computed if needed. Never V_REF */
 const Value *cell_value(Book *b, int sheet, i32 r, i32 c);
+/* the spill range of the dynamic array the cell belongs to (its anchor or a spilled cell); 0 if none.
+   *blocked: the formula shows #SPILL! (the range is where it would go) */
+int    book_spill_range(Book *b, int sheet, i32 r, i32 c, Rect *area, int *blocked);
+/* after loading: cells inside a dynamic or {=...} array formula's range become its spilled cells */
+void   book_adopt_spills(Book *b);
+void   calc_lambda_ref(void *lambda, int delta);   /* (calc.c) a lambda value's references counted */
+/* formula_text writes the file form (_xlfn.SINGLE, _xlpm. names, _xlws. and _xleta. prefixes) while set */
+extern int formula_file_mode;
 
 #endif

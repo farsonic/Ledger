@@ -34,6 +34,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "layout.h"
 #include "splash.h"
 #include "sysfonts.h"
 #include "../core/calc.h"
@@ -87,7 +88,7 @@ double ledger_now(void)
 static struct NewMenu menus[] = {
   M("Project"),
   I("New", "N", ID_NEW), I("Open...", "O", ID_OPEN), I("Import CSV...", 0, ID_IMPORTCSV), BAR,
-  I("Save", "S", ID_SAVE), I("Save As...", "A", ID_SAVEAS), I("Save Sheet as CSV...", 0, ID_SAVECSV), BAR,
+  I("Save", "S", ID_SAVE), I("Save As...", "A", ID_SAVEAS), I("Save Sheet as CSV...", 0, ID_SAVECSV), LX_PROJECT_ITEMS BAR,
   I("Close", "W", ID_CLOSE), I("Next Window", "`", ID_NEXTWIN), BAR, I("About...", "?", ID_ABOUT), I("Quit", "Q", ID_QUIT),
   M("Edit"),
   I("Undo", "Z", ID_UNDO), I("Redo", "Y", ID_REDO), BAR,
@@ -96,6 +97,7 @@ static struct NewMenu menus[] = {
   I("Select All", "L", ID_SELALL), I("Edit Cell", 0, ID_EDITCELL), I("Clear Contents", 0, ID_CLEARCONTENTS), I("Clear Formats", 0, ID_CLEARFORMATS),
   I("Fill Down", "D", ID_FILLDOWN), I("Fill Right", "R", ID_FILLRIGHT), I("Fill Series...", 0, ID_FILLSERIES), BAR,
   I("Find...", "F", ID_FIND), I("Find Next", "K", ID_FINDNEXT), I("Replace...", "H", ID_REPLACE), I("Go To...", "G", ID_GOTO),
+  LX_EDIT_ITEMS
   M("Insert"),
   I("Rows", 0, ID_INSROWS), I("Columns", 0, ID_INSCOLS), I("Cells...", 0, ID_INSCELLS), I("Sheet", 0, ID_INSSHEET), BAR,
   I("Function...", 0, ID_FUNCTION), I("AutoSum", "=", ID_AUTOSUM), I("Today's Date", ";", ID_DATE), I("Time Now", ":", ID_TIME), BAR,
@@ -110,6 +112,7 @@ static struct NewMenu menus[] = {
   I("Row Height...", 0, ID_ROWHEIGHT), I("AutoFit Row Height", 0, ID_AUTOFITROW), I("Column Width...", 0, ID_COLWIDTH), I("AutoFit Column Width", 0, ID_AUTOFITCOL),
   I("Hide Rows", 0, ID_HIDEROWS), I("Hide Columns", 0, ID_HIDECOLS), I("Unhide Rows", 0, ID_UNHIDEROWS), I("Unhide Columns", 0, ID_UNHIDECOLS), BAR,
   I("Rename Sheet...", 0, ID_RENAMESHEET), I("Duplicate Sheet", 0, ID_DUPSHEET), I("Delete Sheet", 0, ID_DELSHEET),
+  LX_FORMAT_ITEMS
   M("Data"),
   I("Sort A to Z", 0, ID_SORTAZ), I("Sort Z to A", 0, ID_SORTZA), I("Sort...", 0, ID_CUSTOMSORT), BAR,
   T("Filter", 0, ID_FILTER), I("Clear Filter", 0, ID_CLEARFILTER), I("Reapply Filter", 0, ID_REAPPLY), I("Advanced Filter...", 0, ID_ADVFILTER), BAR,
@@ -126,6 +129,7 @@ static struct NewMenu menus[] = {
   T("Show All Notes", 0, ID_NOTESHOW), T("Formula Bar", 0, ID_FORMULABAR), T("Gridlines", 0, ID_GRIDLINES), T("Headings", 0, ID_HEADINGS), T("Show Formulas", 0, ID_SHOWFORMULAS), BAR,
   I("Zoom In", "+", ID_ZOOMIN), I("Zoom Out", "-", ID_ZOOMOUT), I("Zoom 100%", 0, ID_ZOOM100), I("Zoom to Selection", 0, ID_ZOOMSEL), BAR,
   I("Freeze Panes", 0, ID_FREEZE), I("Unfreeze Panes", 0, ID_UNFREEZE), BAR, T("Dark Mode", 0, ID_DARKUI),
+  LX_MENUS
   { NM_END, 0, 0, 0, 0, 0 }
 };
 
@@ -572,6 +576,7 @@ void update_controls(void)
   menu_set(ID_PROTECTSHEET, MUIA_Menuitem_Checked, s->protect);
   menu_set(ID_PROTECTBOOK, MUIA_Menuitem_Checked, book->lockstruct);
   status_update();
+  lx_update();
 }
 static void set_title(void)
 {
@@ -629,6 +634,7 @@ static void load_prefs(void)
     else if (!strcmp(line, "aatext=off")) theme_no_aatext();
     else if (!strcmp(line, "hinting=off")) theme_no_hinting();
     else if (!strncmp(line, "screen=", 7)) { strncpy(pub_screen, line + 7, sizeof pub_screen - 1); pub_screen[sizeof pub_screen - 1] = 0; }
+    else if (lx_pref_line(line)) ;
     else if (!strncmp(line, "windowbox=", 10)) {
       long b[4] = { 0, 0, 0, 0 };
       if (sscanf(line + 10, "%ld,%ld,%ld,%ld", &b[0], &b[1], &b[2], &b[3]) == 4 && b[2] >= 200 && b[3] >= 150)
@@ -646,8 +652,10 @@ static void save_prefs(void)
   if (username[0]) fprintf(f, "name=%s\n", username);
   if (pub_screen[0]) fprintf(f, "screen=%s\n", pub_screen);
   if (win_box[2] > 0) fprintf(f, "windowbox=%ld,%ld,%ld,%ld\n", (long)win_box[0], (long)win_box[1], (long)win_box[2], (long)win_box[3]);
+  lx_pref_save(f);
   fclose(f);
 }
+void lx_save_prefs(void) { save_prefs(); }
 
 /* ------------------------------------------------------------------ files */
 static int win_new(Book *b, const char *path);
@@ -705,6 +713,7 @@ static int save_to(const char *path)
 {
   size_t n = strlen(path);
   int ok = 0, csv = n > 4 && !Stricmp((STRPTR)path + n - 4, (STRPTR)".csv");
+  if (lx_save_as_other(path)) return 1;          /* (.pdf, .html: an export, the workbook keeps its name) */
   set(win, MUIA_Window_Sleep, TRUE);
   if (csv) {
     char *t = csv_save(book, cur_index(), ',');
@@ -749,6 +758,7 @@ static int may_discard(void)
 static Clip *clip;               /* what Ledger copied last (any window) */
 static char *clip_text;          /* and its text, to tell whether the clipboard still holds it */
 static Book *cut_book; static int cut_sheet; static Rect cut_area; static int cut_pending;
+Clip *app_clip(void) { return clip; }     /* (layout.h: Paste Special) */
 static void copy_cells(int cut)
 {
   Rect a = cur_sel();
@@ -803,6 +813,7 @@ static Style brush_st; static Font brush_font; static int brush_pending;
 /* the grid has let go of the mouse after a selection with the painter armed */
 static void brush_done(void)
 {
+  if (lx_brush_done()) return;                /* (Draw Border's stroke) */
   if (!brush_pending || xget(grid, MUIA_Grid_Brush)) return;
   brush_pending = 0;
   apply_style(&brush_st, &brush_font, SM_NUMFMT | SM_HALIGN | SM_VALIGN | SM_WRAP | SM_INDENT | SM_FONT | SM_BORDER | SM_FILL);
@@ -1211,6 +1222,7 @@ static void ribbon_choice(ULONG id)
 {
   LONG v = (LONG)xget(ribbon, MUIA_Ribbon_Value);
   if (datatab_refused(id, v)) return;                                          /* (a protected sheet or workbook) */
+  if (lx_ribbon_choice(id, v)) return;
   switch (id) {
   case ID_FONTDD: { const char *n = ribbon_font_name((int)v); char l[64]; if (n) { utf8_to_latin1(n, (u32)strlen(n), l, sizeof l); apply_format(FX_FONT, 0, l); } break; }
   case ID_SIZEDD: apply_format(FX_SIZE, v, NULL); break;
@@ -1246,7 +1258,7 @@ static void ribbon_choice(ULONG id)
     case 9: rename_sheet(); break;
     case 10: { LONG c = ask_color(cur_sheet()->tabcolor & 0xFFFFFF); if (c >= 0) { cur_sheet()->tabcolor = FILL_ON | (ULONG)c; book->dirty = 1; refresh_all(); } break; }
     case 11: dlg_format_cells(0); break;
-    case 12: datatab_command(ID_PROTECTSHEET, 0); break;     /* (datatab) */
+    case 15: datatab_command(ID_PROTECTSHEET, 0); break;     /* (datatab) */
     }
     break;
   case ID_AUTOSUMDD: {
@@ -1284,7 +1296,7 @@ static void command(ULONG id)
   Sheet *s = cur_sheet();
   if (datatab_command(id, (LONG)xget(ribbon, MUIA_Ribbon_Value))) return;    /* (the Data tab's, and protection's guard) */
   switch (id) {
-  case ID_NEW: win_new(book_new(), ""); break;
+  case ID_NEW: win_new(lx_new_book(), ""); break;
   case ID_OPEN: {
     char path[512];
     strcpy(path, bookpath);
@@ -1510,6 +1522,7 @@ typedef struct {
   Book *book;
   char path[512];
   int back_shown;
+  int hidden;                    /* (Hide) closed but kept, to come back with Unhide */
 } DocWin;
 static DocWin wins[MAXWIN];
 static int curwin = -1;
@@ -1549,7 +1562,7 @@ static int win_new(Book *b, const char *path)
   Object *w, *strip, *fxb, *fxok, *fxno;
   if (!b) return 0;
   for (i = 0; i < MAXWIN && slot < 0; i++) if (!wins[i].used) slot = i;
-  if (slot < 0) { book_free(b); ask("OK", "Ledger can have %s workbooks open at once.\nClose one to open another.", "8"); return 0; }
+  if (slot < 0) { if (b != book) book_free(b); ask("OK", "Ledger can have %s workbooks open at once.\nClose one to open another.", "8"); return 0; }
   if (curwin >= 0 && win_now(box)) { box[0] += 24; box[1] += 20; has_box = 1; }
   else if (win_box[2] > 0) { memcpy(box, win_box, sizeof box); has_box = 1; }
   if (curwin >= 0) win_save(&wins[curwin]);
@@ -1589,7 +1602,7 @@ static int win_new(Book *b, const char *path)
   End;
   if (!w) {
     if (strip) MUI_DisposeObject(strip);
-    book_free(b);
+    if (curwin < 0 || b != wins[curwin].book) book_free(b);
     if (curwin >= 0) { win_load(&wins[curwin]); ask("OK", "%s", "There isn't enough memory for another window."); }
     return 0;
   }
@@ -1604,6 +1617,8 @@ static int win_new(Book *b, const char *path)
   DoMethod(win, MUIM_Notify, MUIA_Window_Activate, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_WINACT + slot);
   DoMethod(vscroll, MUIM_Notify, MUIA_Prop_First, MUIV_EveryTime, (ULONG)grid, 3, MUIM_Set, MUIA_Grid_Top, MUIV_TriggerValue);
   DoMethod(hscroll, MUIM_Notify, MUIA_Prop_First, MUIV_EveryTime, (ULONG)grid, 3, MUIM_Set, MUIA_Grid_Left, MUIV_TriggerValue);
+  DoMethod(vscroll, MUIM_Notify, MUIA_Prop_First, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_LX_SCROLLED);
+  DoMethod(hscroll, MUIM_Notify, MUIA_Prop_First, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_LX_SCROLLED);
   DoMethod(grid, MUIM_Notify, MUIA_Grid_Moved, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_SELCHG);
   DoMethod(grid, MUIM_Notify, MUIA_Grid_Changed, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_CHANGED);
   DoMethod(grid, MUIM_Notify, MUIA_Grid_EditText, MUIV_EveryTime, (ULONG)app, 2, MUIM_Application_ReturnID, ID_EDITCHG);
@@ -1626,24 +1641,73 @@ static int win_new(Book *b, const char *path)
   win_save(&wins[slot]);
   return 1;
 }
+/* another window shows the same workbook (New Window) */
+static int win_book_shared(Book *b)
+{
+  int i;
+  for (i = 0; i < MAXWIN; i++) if (wins[i].used && i != curwin && wins[i].book == b) return 1;
+  return 0;
+}
 static int win_close(void)
 {
   int i = curwin;
   Object *w = win;
   if (i < 0) return 1;
-  if (!may_discard()) return 0;
+  if (!win_book_shared(book) && !may_discard()) return 0;
   if (i == 0 && win_now(win_box)) save_prefs();
   if (back_shown) backstage_show(0, 0);
   set(w, MUIA_Window_Open, FALSE);
   DoMethod(app, OM_REMMEMBER, (ULONG)w);
   MUI_DisposeObject(w);
   if (cut_book == book) { cut_book = NULL; cut_pending = 0; }
-  book_free(book);
-  book = NULL;
   memset(&wins[i], 0, sizeof wins[i]);
+  if (!win_book_shared(book)) book_free(book);
+  book = NULL;
   curwin = -1;
-  for (i = 0; i < MAXWIN; i++) if (wins[i].used) { win_switch(i); set(win, MUIA_Window_Activate, TRUE); break; }
+  for (i = 0; i < MAXWIN; i++) if (wins[i].used && !wins[i].hidden) { win_switch(i); set(win, MUIA_Window_Activate, TRUE); break; }
+  for (i = 0; curwin < 0 && i < MAXWIN; i++) if (wins[i].used) { win_switch(i); wins[i].hidden = 0; set(win, MUIA_Window_Open, TRUE); }
   return 1;
+}
+/* (layout.h) the workbook windows, for View > Window */
+int win_slots(void) { return MAXWIN; }
+int win_current(void) { return curwin; }
+int win_info(int i, Object **w, Book **b, const char **path, int *hidden)
+{
+  if (i < 0 || i >= MAXWIN || !wins[i].used) return 0;
+  if (i == curwin) win_save(&wins[i]);
+  if (w) *w = wins[i].win;
+  if (b) *b = wins[i].book;
+  if (path) *path = wins[i].path;
+  if (hidden) *hidden = wins[i].hidden;
+  return 1;
+}
+void win_activate(int i)
+{
+  if (i < 0 || i >= MAXWIN || !wins[i].used) return;
+  win_switch(i);
+  if (wins[i].hidden) { wins[i].hidden = 0; set(win, MUIA_Window_Open, TRUE); }
+  DoMethod(win, MUIM_Window_ToFront);
+  set(win, MUIA_Window_Activate, TRUE);
+  refresh_all();
+}
+int win_new_shared(void)
+{
+  Book *b = book;
+  char path[512];
+  strcpy(path, bookpath);
+  return win_new(b, path);
+}
+static void win_next(void);
+/* the window hidden (not closed): the next one shown comes forward */
+void win_hide(void)
+{
+  int i, k;
+  if (curwin < 0) return;
+  for (k = i = 0; i < MAXWIN; i++) if (wins[i].used && !wins[i].hidden) k++;
+  if (k < 2) { ask("OK", "%s", tr("Ledger needs one window shown: open another before hiding this one.")); return; }
+  wins[curwin].hidden = 1;
+  set(win, MUIA_Window_Open, FALSE);
+  win_next();
 }
 static int win_find(const char *path)
 {
@@ -1674,7 +1738,7 @@ static void win_next(void)
   int i, k;
   for (k = 1; k < MAXWIN; k++) {
     i = (curwin + k) % MAXWIN;
-    if (wins[i].used) { win_switch(i); DoMethod(win, MUIM_Window_ToFront); set(win, MUIA_Window_Activate, TRUE); return; }
+    if (wins[i].used && !wins[i].hidden) { win_switch(i); DoMethod(win, MUIM_Window_ToFront); set(win, MUIA_Window_Activate, TRUE); return; }
   }
 }
 static int win_close_all(void)
@@ -1815,6 +1879,7 @@ int main(int argc, char **argv)
   splash_step(45, tr("Preparing"));
   if (!grid_class() || !ribbon_class() || !status_class() || !tabs_class() || !flatscroll_class() || !ticklist_class() || !backstage_class()) goto done;
   load_recent();
+  lx_init();
   splash_step(60, tr("Building the window"));
   app = ApplicationObject,
     MUIA_Application_Title, (ULONG)"Ledger",
@@ -1824,7 +1889,7 @@ int main(int argc, char **argv)
   End;
   if (!app) { printf("Ledger: the application could not be made (MUI classes missing?)\n"); goto done; }
   splash_step(75, tr("Opening the window and loading its fonts"));
-  if (!win_new(book_new(), "")) { printf("Ledger: the window could not be made\n"); goto done; }
+  if (!win_new(lx_new_book(), "")) { printf("Ledger: the window could not be made\n"); goto done; }
   if (start[0]) {
     static char what[300];
     snprintf(what, sizeof what, tr("Opening %s"), (const char *)FilePart((STRPTR)start));
@@ -1862,6 +1927,7 @@ int main(int argc, char **argv)
     else if (id == ID_EDITCHG || id == ID_EDITDONE) update_controls();
     else if (id == ID_FILETAB || id == ID_BACKSTAGE || id == ID_TEMPLATE || id == ID_RECENT || id == ID_OPTIONS) backstage_command(id);
     else if ((id >= ID_FONTDD && id <= ID_FN_MORE)) ribbon_choice(id);
+    else if (id >= ID_LX_FIRST && id < ID_LX_LAST) { if (back_shown && id != ID_LX_REFRESH && id != ID_LX_SCROLLED) backstage_show(0, 0); lx_command(id); }
     else if (id) {
       if (back_shown && (id == ID_OPEN || id == ID_SAVE || id == ID_SAVEAS || id == ID_SAVECSV || id == ID_NEW)) backstage_show(0, 0);
       command(id);
@@ -1881,6 +1947,7 @@ done:
   book = NULL;
   clip_free(clip); clip = NULL;
   free(clip_text);
+  lx_cleanup();
   if (app) MUI_DisposeObject(app);
   grid_class_free();
   ribbon_class_free();

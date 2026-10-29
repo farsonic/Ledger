@@ -178,6 +178,13 @@
     (all))
   (if (exists "TrueType.info" (noreq)) (copyfiles (source "TrueType.info") (dest #dest) (nogauge)))
   (complete 80)
+  (if (exists "Dict" (noreq))
+    (copyfiles
+      (prompt "Copying the spelling dictionary")
+      (help @copyfiles-help)
+      (source "Dict")
+      (dest (tackon #dest "Dict"))
+      (all)))
   (complete 85)
 
   (if (in #parts 0)

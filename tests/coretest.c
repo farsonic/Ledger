@@ -59,6 +59,7 @@ static int shows(Book *b, int sheet, i32 r, i32 c, const char *want)
   if (strcmp(out, want)) printf("   cell shows \"%s\" (want \"%s\")\n", out, want);
   return !strcmp(out, want);
 }
+#include "layouttest.c"
 static int fmt(const char *code, double n, const char *want)
 {
   Book *b = book_new();
@@ -182,6 +183,32 @@ static void formulas(void)
   book_free(b);
 }
 
+/* the engineering, maths, text and web functions of func_eng.c and func_misc.c (array results whole) */
+static void eng_misc_functions(void)
+{
+  Book *b = book_new();
+  ok("MMULT whole", evn(b, "INDEX(MMULT({1,2;3,4},{5,6;7,8}),1,2)") == 22 && evn(b, "ROWS(MMULT({1;2},{3,4}))") == 2 && evn(b, "COLUMNS(MMULT({1;2},{3,4}))") == 2);
+  ok("MINVERSE", near(evn(b, "INDEX(MINVERSE({4,7;2,6}),2,1)"), -0.2) && near(evn(b, "SUMPRODUCT(MMULT({4,7;2,6},MINVERSE({4,7;2,6}))*MUNIT(2))"), 2));
+  ok("MDETERM", near(evn(b, "MDETERM({1,3,8,5;1,3,6,1;1,1,1,0;7,3,10,2})"), 88));
+  ok("number bases", evs(b, "DEC2BIN(-1)", "1111111111") && evs(b, "HEX2OCT(\"FFFFFFFF00\")", "7777777400") && evs(b, "BASE(255,16,4)", "00FF") && evn(b, "DECIMAL(\"zz\",36)") == 1295);
+  ok("bits", evn(b, "BITXOR(BITLSHIFT(1,40),1)") == 1099511627777.0 && evn(b, "BITRSHIFT(1024,3)") == 128);
+  ok("CONVERT prefixes", near(evn(b, "CONVERT(1,\"Mibyte\",\"kbyte\")"), 1048.576) && near(evn(b, "CONVERT(1,\"km^2\",\"m2\")"), 1e6) && near(evn(b, "CONVERT(212,\"F\",\"C\")"), 100));
+  ok("ERF and Bessel", near(evn(b, "ERF(0.5)"), 0.520499877813047) && near(evn(b, "BESSELJ(1,0)"), 0.765197686557967) && near(evn(b, "BESSELY(1,1)"), -0.781212821300289));
+  ok("complex", evs(b, "IMPRODUCT(\"1+2j\",\"3-j\")", "5+5j") && evs(b, "IMSUM(\"1.5\",\"-i\")", "1.5-i") && evs(b, "COMPLEX(0,0)", "0") && evs(b, "IMCONJUGATE(\"i\")", "-i"));
+  ok("ROMAN forms", evs(b, "ROMAN(1999)", "MCMXCIX") && evs(b, "ROMAN(1999,4)", "MIM") && evn(b, "ARABIC(\"MIM\")") == 1999);
+  ok("regex classes and anchors", evn(b, "REGEXTEST(\"2026-10-29\",\"^\\d{4}-\\d\\d-\\d\\d$\")") == 1 && evn(b, "REGEXTEST(\"ab\",\"^(a|ab)$\")") == 1 && evn(b, "REGEXTEST(\"x\",\"[^a-z]\")") == 0);
+  ok("regex quantifiers", evs(b, "REGEXEXTRACT(\"<b>x</b><b>y</b>\",\"<b>.*?</b>\")", "<b>x</b>") && evs(b, "REGEXEXTRACT(\"aaaa\",\"a{2,3}\")", "aaa") && evs(b, "REGEXEXTRACT(\"ab{2}\",\"b\\{2\\}\")", "b{2}"));
+  ok("regex empty loops and words", evs(b, "REGEXREPLACE(\"abc\",\"(x*)*\",\"-\")", "-a-b-c-") && evs(b, "REGEXREPLACE(\"cat catalog\",\"\\bcat\\b\",\"dog\")", "dog catalog"));
+  ok("regex lookahead, case, backref", evs(b, "REGEXEXTRACT(\"price: 30 USD\",\"\\d+(?= USD)\")", "30") && evn(b, "REGEXTEST(\"ABC\",\"abc\",1)") == 1 && evs(b, "REGEXEXTRACT(\"xyzzy\",\"(.)\\1\")", "zz"));
+  ok("regex bad patterns", evn(b, "REGEXTEST(\"a\",\"a)\")") == -1000 - E_VALUE && evn(b, "REGEXTEST(\"a\",\"*a\")") == -1000 - E_VALUE && evn(b, "REGEXTEST(\"a\",\"[a\")") == -1000 - E_VALUE);
+  ok("regex unicode", evs(b, "REGEXEXTRACT(\"na\xc3\xafve\",\"a.v\")", "a\xc3\xafv") && evn(b, "REGEXTEST(\"\xc3\x89t\xc3\xa9\",\"^\xc3\xa9T\xc3\x89$\",1)") == 1);
+  ok("TEXTSPLIT shape", evn(b, "ROWS(TEXTSPLIT(\"a,b;c\",\",\",\";\"))") == 2 && evn(b, "COLUMNS(TEXTSPLIT(\"a1b2c\",{\"1\",\"2\"}))") == 3);
+  ok("TEXTBEFORE/AFTER", evs(b, "TEXTBEFORE(\"a.b.c\",\".\",-1)", "a.b") && evs(b, "TEXTAFTER(\"a.b.c\",\".\",2)", "c"));
+  ok("FILTERXML", evn(b, "SUM(FILTERXML(\"<r><v>1</v><w><v>2</v></w><v>4</v></r>\",\"//v\"))") == 7 && evs(b, "FILTERXML(\"<r><v a='x'>1</v></r>\",\"/r/v/@a\")", "x"));
+  ok("dates", evn(b, "DAYS360(DATE(2026,1,31),DATE(2026,3,31))") == 60 && evn(b, "ISOWEEKNUM(DATE(2027,1,3))") == 53 && evn(b, "WORKDAY.INTL(DATE(2026,10,30),1,\"0000110\")") == evn(b, "DATE(2026,11,1)"));
+  ok("BAHTTEXT, EUROCONVERT", evs(b, "BAHTTEXT(21)", "\xe0\xb8\xa2\xe0\xb8\xb5\xe0\xb9\x88\xe0\xb8\xaa\xe0\xb8\xb4\xe0\xb8\x9a\xe0\xb9\x80\xe0\xb8\xad\xe0\xb9\x87\xe0\xb8\x94\xe0\xb8\x9a\xe0\xb8\xb2\xe0\xb8\x97\xe0\xb8\x96\xe0\xb9\x89\xe0\xb8\xa7\xe0\xb8\x99") && near(evn(b, "EUROCONVERT(1,\"DEM\",\"EUR\")"), 0.51));
+  book_free(b);
+}
 static void functions(void)
 {
   Book *b = book_new();
@@ -762,6 +789,58 @@ static void links(void)
   book_free(b);
 }
 
+/* financial and database functions (func_fin.c): Excel's documented examples, and checks
+   LibreOffice can't make (computed criteria, odd first periods) */
+static void fin_db(void)
+{
+  Book *b = book_new();
+  ok("ODDFPRICE Excel example", near(evn(b, "ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0785,0.0625,100,2,1)"), 113.597717474079));
+  ok("ODDFYIELD Excel example", fabs(evn(b, "ODDFYIELD(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,10,15),DATE(2009,3,1),0.0575,84.5,100,2,0)") - 0.0772) < 5e-5);
+  ok("ODDFPRICE of a regular first period is PRICE", near(evn(b, "ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,9,1),DATE(2009,3,1),0.0785,0.0625,100,2,1)"),
+     evn(b, "PRICE(DATE(2008,11,11),DATE(2021,3,1),0.0785,0.0625,100,2,1)")));
+  ok("ODDFPRICE of a regular first period is PRICE (30/360)", near(evn(b, "ODDFPRICE(DATE(2008,11,11),DATE(2021,3,1),DATE(2008,9,1),DATE(2008,12,1),0.0785,0.0625,100,4,0)"),
+     evn(b, "PRICE(DATE(2008,11,11),DATE(2021,3,1),0.0785,0.0625,100,4,0)")));
+  /* a long first period of two whole quasi-periods, settlement in the first: the same cash flows as
+     a regular bond but for the coupon of the first quasi-period, paid a period later */
+  ok("ODDFPRICE long first period", near(evn(b, "ODDFPRICE(DATE(2008,5,1),DATE(2021,3,1),DATE(2008,3,1),DATE(2009,3,1),0.08,0.06,100,2,0)"),
+     evn(b, "PRICE(DATE(2008,5,1),DATE(2021,3,1),0.08,0.06,100,2,0)-4/1.03^(120/180)+4/1.03^(1+120/180)")));
+  ok("ODDFYIELD inverts ODDFPRICE", near(evn(b, "ODDFYIELD(DATE(2008,5,1),DATE(2021,3,1),DATE(2008,3,1),DATE(2009,3,1),0.08,"
+     "ODDFPRICE(DATE(2008,5,1),DATE(2021,3,1),DATE(2008,3,1),DATE(2009,3,1),0.08,0.06,100,2,0),100,2,0)"), 0.06));
+  ok("ODDLPRICE Excel example", fabs(evn(b, "ODDLPRICE(DATE(2008,2,7),DATE(2008,6,15),DATE(2007,10,15),0.0375,0.0405,100,2,0)") - 99.87829) < 5e-6);
+  ok("ODDLYIELD Excel example", fabs(evn(b, "ODDLYIELD(DATE(2008,4,20),DATE(2008,6,15),DATE(2007,12,24),0.0375,99.875,100,2,0)") - 0.045192) < 5e-7);
+  ok("DURATION Excel example", fabs(evn(b, "DURATION(DATE(2018,7,1),DATE(2048,1,1),0.08,0.09,2,1)") - 10.9191453) < 5e-8);
+  ok("MIRR Excel example", fabs(evn(b, "MIRR({-120000,39000,30000,21000,37000,46000},0.1,0.12)") - 0.126094) < 5e-7);
+  ok("XIRR Excel example", fabs(evn(b, "XIRR({-10000,2750,4250,3250,2750},{39448,39508,39751,39859,39904},0.1)") - 0.373362535) < 5e-9);
+  ok("PDURATION is _xlfn.", (func_table[func_lookup("PDURATION")].flags & FF_XLFN) != 0);
+  /* database functions: Excel's example table */
+  put(b, "A5", "Tree"); put(b, "B5", "Height"); put(b, "C5", "Age"); put(b, "D5", "Yield"); put(b, "E5", "Profit");
+  put(b, "A6", "Apple"); put(b, "B6", "18"); put(b, "C6", "20"); put(b, "D6", "14"); put(b, "E6", "105");
+  put(b, "A7", "Pear"); put(b, "B7", "12"); put(b, "C7", "12"); put(b, "D7", "10"); put(b, "E7", "96");
+  put(b, "A8", "Cherry"); put(b, "B8", "13"); put(b, "C8", "14"); put(b, "D8", "9"); put(b, "E8", "105");
+  put(b, "A9", "Apple"); put(b, "B9", "14"); put(b, "C9", "15"); put(b, "D9", "10"); put(b, "E9", "75");
+  put(b, "A10", "Pear"); put(b, "B10", "9"); put(b, "C10", "8"); put(b, "D10", "8"); put(b, "E10", "76.8");
+  put(b, "A11", "Apple"); put(b, "B11", "8"); put(b, "C11", "9"); put(b, "D11", "6"); put(b, "E11", "45");
+  put(b, "A1", "Tree"); put(b, "B1", "Height"); put(b, "C1", "Age"); put(b, "D1", "Yield"); put(b, "E1", "Profit"); put(b, "F1", "Height");
+  put(b, "A2", "=\"=Apple\""); put(b, "B2", ">10"); put(b, "F2", "<16"); put(b, "A3", "=\"=Pear\"");
+  ok("DCOUNT Excel example", evn(b, "DCOUNT(A5:E11,\"Age\",A1:F2)") == 1);
+  ok("DCOUNT with the field left out counts records", evn(b, "DCOUNT(A5:E11,,A1:F2)") == 1 && evn(b, "DCOUNTA(A5:E11,,A1:A3)") == 5);
+  ok("DMAX Excel example", evn(b, "DMAX(A5:E11,\"Profit\",A1:F3)") == 96);
+  ok("DSUM Excel example", evn(b, "DSUM(A5:E11,\"Profit\",A1:A2)") == 225 && evn(b, "DSUM(A5:E11,\"Profit\",A1:F2)") == 75);
+  ok("DAVERAGE by field number", evn(b, "DAVERAGE(A5:E11,3,A5:E11)") == 13);
+  ok("DSTDEV Excel example", fabs(evn(b, "DSTDEV(A5:E11,\"Yield\",A1:A3)") - 2.96647939483827) < 1e-12);
+  put(b, "G1", "Tree"); put(b, "G2", "Plum");
+  ok("DGET: more than one match is #NUM!, none #VALUE!", evn(b, "DGET(A5:E11,\"Yield\",A1:A3)") == -1000 - E_NUM && evn(b, "DGET(A5:E11,\"Yield\",G1:G2)") == -1000 - E_VALUE);
+  put(b, "G2", "Ch");
+  ok("text criteria match the beginning", evn(b, "DGET(A5:E11,\"Yield\",G1:G2)") == 9);
+  ok("DGET of a missing field is #VALUE!", evn(b, "DGET(A5:E11,\"Price\",G1:G2)") == -1000 - E_VALUE);
+  /* computed criteria: a formula under a heading that isn't a field, about the first record */
+  put(b, "H1", "Big"); put(b, "H2", "=E6>AVERAGE($E$6:$E$11)");
+  ok("computed criteria", near(evn(b, "DSUM(A5:E11,\"Profit\",H1:H2)"), 306) && evn(b, "DCOUNT(A5:E11,\"Age\",H1:H2)") == 3);
+  put(b, "I1", "Tree"); put(b, "I2", "Apple");
+  ok("computed criteria AND a field", near(evn(b, "DSUM(A5:E11,\"Profit\",H1:I2)"), 105));
+  book_free(b);
+}
+
 static void templates(void)
 {
   Book *b;
@@ -924,6 +1003,7 @@ static void outline(void)
   ok("subtotal: rows added", n == 4 && sheet_last_row(b->sh[0]) == 9);
   ok("subtotal: labels and formulas", text_at(b, "A4", "East Total") && text_at(b, "B4", "=SUBTOTAL(9,B2:B3)") && text_at(b, "A6", "West Total") &&
      text_at(b, "B9", "=SUBTOTAL(9,B7:B8)") && text_at(b, "A10", "Grand Total") && text_at(b, "B10", "=SUBTOTAL(9,B2:B9)"));
+  ok("subtotal: sums (nested totals skipped)", num_at(b, "B4") == 30 && num_at(b, "B10") == 38);
   ok("subtotal: outline", outline_level(b->sh[0], 1, 1) == 2 && outline_level(b->sh[0], 1, 3) == 1 && outline_level(b->sh[0], 1, 9) == 0 && b->fonts[b->styles[sheet_cell_style(b->sh[0], 3, 1)].font].bold);
   ok("subtotal: replace", book_subtotal(b, 0, rc(b, "A1:B10"), 0, 9, (i32[]){ 1 }, 1, 1, 1) == 4 && sheet_last_row(b->sh[0]) == 9);
   ok("subtotal: remove all", book_subtotal_remove(b, 0, rc(b, "A1:B10")) == 4 && sheet_last_row(b->sh[0]) == 5 && !outline_max_level(b->sh[0], 1) && text_at(b, "A4", "West"));
@@ -1152,16 +1232,211 @@ static void imports(void)
   ok("xls: not one", !xls_load((const u8 *)"PK\3\4", 4, NULL, 0));
 }
 
+/* dynamic arrays, LET/LAMBDA, the array and lookup functions (core/func_array.c, calc.c) */
+static int is_err(Book *b, const char *ref, int e) { return num_at(b, ref) == -1000 - e; }
+static int spills(Book *b, const char *ref, const char *want)
+{
+  u16 sh; Rect r, a; u8 fl;
+  char t[32];
+  int blocked = 0, got;
+  parse_ref(b, ref, &sh, &r, &fl);
+  got = book_spill_range(b, 0, r.r1, r.c1, &a, &blocked);
+  if (!got) { if (*want) printf("   %s: no spill (want %s)\n", ref, want); return !*want; }
+  rect_text(a, t);
+  if (strcmp(t, want)) printf("   %s spills over %s (want %s)\n", ref, t, want);
+  return !strcmp(t, want);
+}
+static void dynarrays(void)
+{
+  Book *b = book_new(), *c;
+  size_t n;
+  u8 *data;
+  char err[200];
+  /* spilling */
+  put(b, "A1", "=SEQUENCE(4)");
+  ok("spill: SEQUENCE fills below", num_at(b, "A1") == 1 && num_at(b, "A4") == 4 && spills(b, "A1", "A1:A4") && spills(b, "A3", "A1:A4"));
+  put(b, "C1", "=SUM(A1#)"); put(b, "C1", ""); put(b, "D10", "=SUM(A1#)");
+  ok("spill: A1# is the spill range", num_at(b, "D10") == 10);
+  put(b, "A3", "x");
+  ok("spill: blocked is #SPILL!", is_err(b, "A1", E_SPILL) && is_err(b, "D10", E_SPILL));
+  put(b, "A3", "");
+  ok("spill: unblocked spills again", num_at(b, "A3") == 3 && num_at(b, "D10") == 10);
+  put(b, "A1", "=SEQUENCE(2,3,10,10)");
+  ok("spill: shrinks and grows", num_at(b, "A3") == -999999 && num_at(b, "C2") == 60 && spills(b, "B2", "A1:C2"));
+  ok("spill: the old cells are gone", sheet_cell(b->sh[0], 3, 0) == NULL);
+  put(b, "E1", "=A1:A2*{1,2}");
+  ok("spill: arithmetic broadcasts", num_at(b, "E1") == 10 && num_at(b, "F2") == 80);
+  put(b, "E4", "={1,2}+{10;20}");
+  ok("spill: row plus column", num_at(b, "E4") == 11 && num_at(b, "F5") == 22);
+  put(b, "H1", "=LEN({\"a\",\"bb\",\"ccc\"})");
+  ok("spill: functions map over arrays", num_at(b, "J1") == 3);
+  put(b, "H3", "=@A1:A2");
+  ok("@: implicit intersection", num_at(b, "H3") == 10 || is_err(b, "H3", E_VALUE));
+  put(b, "H4", "=ROW(A1:A3)");
+  ok("ROW of a range spills", num_at(b, "H6") == 3);
+  put(b, "K1", "=IF({1,0},\"y\",\"n\")");
+  ok("IF over an array", text_at(b, "K1", "=IF({1,0},\"y\",\"n\")") && sheet_cell(b->sh[0], 0, 11) && cell_value(b, 0, 0, 11)->t == V_STR);
+  book_free(b);
+
+  b = book_new();
+  /* lazy functions don't evaluate the other branch */
+  ok("IF short-circuits", evn(b, "IF(TRUE,1,1/0)") == 1 && evn(b, "IF(FALSE,1/0,2)") == 2);
+  ok("IFERROR short-circuits", evn(b, "IFERROR(5,1/0)") == 5 && evn(b, "IFERROR(1/0,7)") == 7);
+  ok("CHOOSE evaluates only its pick", evn(b, "CHOOSE(2,1/0,3)") == 3);
+  ok("SWITCH evaluates only the match", evn(b, "SWITCH(2,1,1/0,2,9)") == 9);
+  ok("IFS", evn(b, "IFS(FALSE,1/0,TRUE,4)") == 4);
+  /* LET and LAMBDA */
+  ok("LET", evn(b, "LET(x,2,y,x*3,x+y)") == 8);
+  ok("LET shadows", evn(b, "LET(x,1,LET(x,5,x)+x)") == 6);
+  ok("LAMBDA called inline", evn(b, "LAMBDA(x,x+1)(2)") == 3);
+  ok("LAMBDA in LET", evn(b, "LET(f,LAMBDA(a,b,a*b),f(3,4))") == 12);
+  ok("LAMBDA closure", evn(b, "LET(k,10,f,LAMBDA(x,x+k),f(1))") == 11);
+  ok("LAMBDA arg count", evn(b, "LAMBDA(a,b,a+b)(2)") == -1000 - E_VALUE);
+  ok("ISOMITTED", evs(b, "LAMBDA(x,[y],IF(ISOMITTED(y),\"none\",x+y))(1)", "none") && evn(b, "LAMBDA(x,[y],IF(ISOMITTED(y),0,x+y))(1,2)") == 3);
+  ok("MAP", evn(b, "SUM(MAP({1,2,3},LAMBDA(x,x*x)))") == 14);
+  ok("REDUCE", evn(b, "REDUCE(0,{1,2,3},LAMBDA(a,v,a+v))") == 6);
+  ok("SCAN", evn(b, "INDEX(SCAN(0,{1,2,3},LAMBDA(a,v,a+v)),1,3)") == 6);
+  ok("BYROW", evn(b, "INDEX(BYROW({1,2;3,4},LAMBDA(r,SUM(r))),2)") == 7);
+  ok("BYCOL", evn(b, "INDEX(BYCOL({1,2;3,4},LAMBDA(c,SUM(c))),1,2)") == 6);
+  ok("MAKEARRAY", evn(b, "SUM(MAKEARRAY(2,3,LAMBDA(r,c,r*c)))") == 18);
+  ok("function given by name", evn(b, "INDEX(BYROW({1,2;3,4},SUM),2)") == 7 && evn(b, "REDUCE(0,{1,-2},SUM)") == -1);
+  ok("a lambda left in a cell is #CALC!", evn(b, "LAMBDA(x,x)") == -1000 - E_CALC);
+  ok("recursion stops", evn(b, "LET(f,LAMBDA(g,n,g(g,n)),f(f,1))") == -1000 - E_NUM);
+  book_define_name(b, "ADDPAIR", "LAMBDA(a,b,a+b)", SHEET_SELF);
+  book_define_name(b, "FACTR", "LAMBDA(n,IF(n<=1,1,n*FACTR(n-1)))", SHEET_SELF);
+  ok("named LAMBDA", evn(b, "ADDPAIR(2,3)") == 5 && evn(b, "FACTR(5)") == 120);
+  ok("formula text of LET/LAMBDA", ftext(b, "LET(x,1,LAMBDA(y,[z],x+y)(2))", "LET(x,1,LAMBDA(y,[z],x+y)(2))"));
+  ok("formula text of @, # and trim refs", ftext(b, "@A1:A3+SUM(B1#)+SUM(A1:.C9)+ROWS(A1.:.C9)", "@A1:A3+SUM(B1#)+SUM(A1:.C9)+ROWS(A1.:.C9)"));
+  ok("formula text of unions", ftext(b, "AREAS((A1:B2,C3))", "AREAS((A1:B2,C3))"));
+  /* array functions */
+  ok("SEQUENCE", evn(b, "SUM(SEQUENCE(3,2,1,2))") == 36);
+  ok("FILTER", evn(b, "SUM(FILTER({1;2;3;4},{1;0;1;0}))") == 4 && evs(b, "FILTER({1;2},{0;0},\"none\")", "none") &&
+     evn(b, "FILTER({1;2},{0;0})") == -1000 - E_CALC);
+  ok("SORT", evn(b, "INDEX(SORT({3;1;2}),1)") == 1 && evn(b, "INDEX(SORT({3;1;2},1,-1),1)") == 3 &&
+     evn(b, "INDEX(SORT({1,9;2,8;3,7},2),1,1)") == 3);
+  ok("SORTBY", evs(b, "INDEX(SORTBY({\"a\";\"b\";\"c\"},{3;1;2}),1)", "b"));
+  ok("UNIQUE", evn(b, "ROWS(UNIQUE({1;2;2;3;1}))") == 3 && evn(b, "ROWS(UNIQUE({1;2;2;3;1},,TRUE))") == 1 &&
+     evn(b, "ROWS(UNIQUE({\"a\";\"A\"}))") == 1);
+  ok("TAKE and DROP", evn(b, "SUM(TAKE({1;2;3;4},2))") == 3 && evn(b, "SUM(TAKE({1;2;3;4},-1))") == 4 && evn(b, "SUM(DROP({1;2;3;4},1))") == 9);
+  ok("CHOOSEROWS/COLS", evn(b, "SUM(CHOOSEROWS({1;2;3},1,-1))") == 4 && evn(b, "SUM(CHOOSECOLS({1,2,3},{2,3}))") == 5);
+  ok("VSTACK/HSTACK", evn(b, "ROWS(VSTACK({1,2},{3,4}))") == 2 && evn(b, "COLUMNS(HSTACK({1;2},{3;4},5))") == 3 &&
+     evn(b, "ISNA(INDEX(HSTACK({1;2},5),2,2))") == 1);
+  ok("TOCOL/TOROW", evn(b, "ROWS(TOCOL({1,2;3,4}))") == 4 && evn(b, "INDEX(TOCOL({1,2;3,4},0,TRUE),2)") == 3 && evn(b, "COLUMNS(TOROW({1,2;3,4}))") == 4);
+  ok("WRAPROWS/WRAPCOLS", evn(b, "ROWS(WRAPROWS({1,2,3,4,5},2))") == 3 && evn(b, "ISNA(INDEX(WRAPROWS({1,2,3},2),2,2))") == 1 &&
+     evn(b, "INDEX(WRAPCOLS({1,2,3,4},2),2,1)") == 2);
+  ok("EXPAND", evn(b, "INDEX(EXPAND({1},2,2,0),2,2)") == 0 && evn(b, "ROWS(EXPAND({1;2},3))") == 3);
+  ok("XMATCH", evn(b, "XMATCH(3,{1;3;5})") == 2 && evn(b, "XMATCH(4,{1;3;5},-1)") == 2 && evn(b, "XMATCH(4,{1;3;5},1)") == 3 &&
+     evn(b, "XMATCH(\"b*\",{\"a\";\"bc\"},2)") == 2 && evn(b, "XMATCH(3,{3;1;3},0,-1)") == 3);
+  ok("XLOOKUP returns a row", evn(b, "SUM(XLOOKUP(2,{1;2},{1,2;3,4}))") == 7);
+  ok("INDEX of an array's column", evn(b, "SUM(INDEX({1,2;3,4},0,2))") == 6);
+  ok("INDEX of a union", evn(b, "AREAS((A1:B2,C3))") == 2);
+  ok("RANDARRAY", evn(b, "ROWS(RANDARRAY(3,2))") == 3 && evn(b, "AND(RANDARRAY(5,1,1,3,TRUE)>=1)") == 1);
+  ok("SHEET and SHEETS", evn(b, "SHEET()") == 1 && evn(b, "SHEETS()") == 1);
+  put(b, "A1", "1"); put(b, "A2", "2"); put(b, "B1", "a"); put(b, "B2", "b");
+  ok("VLOOKUP over CHOOSE({1,2},...)", evs(b, "VLOOKUP(\"b\",CHOOSE({1,2},B1:B2,A1:A2),2,FALSE)", "2"));
+  ok("array constants map in old formulas too", evn(b, "SUM(LEN({\"a\",\"bb\"}))") == 3);
+  book_free(b);
+
+  /* sheets for SUBTOTAL, AGGREGATE, CELL, FORMULATEXT, TRIMRANGE */
+  b = book_new();
+  put(b, "A1", "1"); put(b, "A2", "2"); put(b, "A3", "=SUBTOTAL(9,A1:A2)"); put(b, "A4", "4"); put(b, "A5", "=1/0");
+  put(b, "B1", "=SUBTOTAL(9,A1:A4)");
+  ok("SUBTOTAL leaves out subtotals", num_at(b, "B1") == 7 && num_at(b, "A3") == 3);
+  book_hide_rows(b, 0, 1, 1, 1);
+  put(b, "B2", "=SUBTOTAL(109,A1:A4)"); put(b, "B3", "=SUBTOTAL(9,A1:A4)");
+  ok("SUBTOTAL 109 leaves out hidden rows", num_at(b, "B2") == 5 && num_at(b, "B3") == 7);
+  put(b, "B4", "=AGGREGATE(9,6,A1:A5)"); put(b, "B5", "=AGGREGATE(9,7,A1:A5)"); put(b, "B6", "=AGGREGATE(14,6,A1:A5,2)");
+  put(b, "B7", "=AGGREGATE(9,4,A1:A5)");
+  ok("AGGREGATE ignores errors and hidden rows", num_at(b, "B4") == 10 && num_at(b, "B5") == 8 && num_at(b, "B6") == 3 && is_err(b, "B7", E_DIV0));
+  put(b, "C1", "=FORMULATEXT(B4)"); put(b, "C2", "=CELL(\"address\",B4)"); put(b, "C3", "=CELL(\"row\",B4)"); put(b, "C4", "=CELL(\"type\",Z9)");
+  ok("FORMULATEXT and CELL", text_at(b, "C1", "=FORMULATEXT(B4)") && cell_value(b, 0, 0, 2)->t == V_STR && !strcmp(cell_value(b, 0, 0, 2)->s, "=AGGREGATE(9,6,A1:A5)") &&
+     !strcmp(cell_value(b, 0, 1, 2)->s, "$B$4") && num_at(b, "C3") == 4 && !strcmp(cell_value(b, 0, 3, 2)->s, "b"));
+  put(b, "E3", "5"); put(b, "F5", "6");
+  put(b, "H1", "=ROWS(TRIMRANGE(D1:G9))"); put(b, "H2", "=COLUMNS(D1:.G9)"); put(b, "H3", "=ROWS(D1.:.G9)");
+  ok("TRIMRANGE and trim references", num_at(b, "H1") == 3 && num_at(b, "H2") == 3 && num_at(b, "H3") == 3);
+  put(b, "J1", "=(A1:A2,A4)");
+  put(b, "J2", "=SUM((A1:A2,A4))");
+  ok("unions", num_at(b, "J2") == 7);
+  /* dynamic arrays through .xlsx */
+  put(b, "L1", "=SEQUENCE(3)*2");
+  put(b, "M1", "=SUM(L1#)");
+  put(b, "N1", "=LET(x,{1,2,3},SUM(x*x))");
+  put(b, "N2", "=SUM(IF(L1:L3>2,1,0))");
+  book_define_name(b, "TIMES", "LAMBDA(a,b,a*b)", SHEET_SELF);
+  put(b, "N3", "=TIMES(3,4)");
+  data = xlsx_save(b, &n);
+  c = data ? xlsx_load(data, n, err, sizeof err) : NULL;
+  ok("xlsx: dynamic array loaded back", c && num_at(c, "L3") == 6 && num_at(c, "M1") == 12 && spills(c, "L2", "L1:L3") && num_at(c, "N1") == 14 && num_at(c, "N2") == 2);
+  ok("xlsx: dynamic formulas written", data && n > 0);
+  if (c) {
+    Cell *x = sheet_cell(c->sh[0], 1, 11);
+    ok("xlsx: spilled cells come back as spilled", x && x->spill && !x->f);
+    ok("xlsx: formulas keep their text", text_at(c, "M1", "=SUM(L1#)") && text_at(c, "N1", "=LET(x,{1,2,3},SUM(x*x))"));
+    ok("xlsx: a named LAMBDA", c->nnames == 1 && !strcmp(c->names[0].formula_text, "LAMBDA(a,b,a*b)") && num_at(c, "N3") == 12);
+    book_free(c);
+  }
+  free(data);
+  book_free(b);
+
+  /* order: a formula before the spill it reads, a spill sized by another, merges, {=...} */
+  b = book_new();
+  put(b, "A1", "=SUM(B2:B4)");
+  put(b, "B1", "=SEQUENCE(4)");
+  ok("spill read before its formula", num_at(b, "A1") == 9);
+  put(b, "C1", "=SEQUENCE(ROWS(B1#),2)");
+  ok("spill sized by a spill", num_at(b, "D4") == 8 && spills(b, "C1", "C1:D4"));
+  put(b, "B1", "=SEQUENCE(2)");
+  ok("both shrink", num_at(b, "A1") == 2 && spills(b, "C1", "C1:D2") && sheet_cell(b->sh[0], 3, 3) == NULL);
+  book_merge(b, 0, (Rect){ 10, 0, 10, 1 }, 1);
+  put(b, "A10", "=SEQUENCE(2)");
+  ok("a merge in the way is #SPILL!", is_err(b, "A10", E_SPILL) && spills(b, "A10", "A10:A11"));
+  {
+    int pos;
+    Formula *f = formula_parse(b, 0, "B1:B2*10", &pos);
+    f->cse = 1; f->arows = 3; f->acols = 1;
+    book_set_formula(b, 0, 14, 0, f);
+  }
+  ok("{=...} fills its range, #N/A past the result", num_at(b, "A15") == 10 && num_at(b, "A16") == 20 && is_err(b, "A17", E_NA));
+  data = xlsx_save(b, &n);
+  c = data ? xlsx_load(data, n, err, sizeof err) : NULL;
+  ok("xlsx: {=...} loaded back", c && num_at(c, "A16") == 20 && is_err(c, "A17", E_NA) && sheet_cell(c->sh[0], 14, 0)->f->cse &&
+     num_at(c, "A1") == 2 && num_at(c, "D2") == 4 && is_err(c, "A10", E_SPILL));
+  if (c) book_free(c);
+  free(data);
+  book_free(b);
+}
+/* the statistical functions of func_stat.c: the special functions far into the tails, and arrays */
+static void stat_functions(void)
+{
+  Book *b = book_new();
+  put(b, "A1", "2"); put(b, "A2", "4"); put(b, "A3", "5"); put(b, "A4", "4"); put(b, "A5", "5");
+  put(b, "B1", "1"); put(b, "B2", "2"); put(b, "B3", "3"); put(b, "B4", "4"); put(b, "B5", "5");
+  ok("NORM.S.INV", near(evn(b, "NORM.S.INV(0.975)"), 1.959963984540054) && near(evn(b, "NORM.S.INV(1E-20)") / -9.262340089798153, 1));
+  ok("NORM.S.DIST tail", near(evn(b, "NORM.S.DIST(-10,TRUE)") / 7.619853024160527e-24, 1));
+  ok("T.DIST.2T", near(evn(b, "T.DIST.2T(2,10)"), 0.07338803477074038));
+  ok("CHISQ.DIST.RT tail", near(evn(b, "CHISQ.DIST.RT(100,3)") / 1.554159431389605e-21, 1));
+  ok("GAMMALN BETA.DIST", near(evn(b, "GAMMALN(0.1)"), 2.252712651734206) && near(evn(b, "BETA.DIST(0.2,2,3,TRUE)"), 0.1808));
+  ok("BETA.INV inverts", near(evn(b, "BETA.INV(0.1808,2,3)"), 0.2));
+  ok("domain errors", evn(b, "NORM.S.INV(0)") == -1000 - E_NUM && evn(b, "GAMMA(-1)") == -1000 - E_NUM);
+  ok("SLOPE INTERCEPT", near(evn(b, "SLOPE(A1:A5,B1:B5)"), 0.6) && near(evn(b, "INTERCEPT(A1:A5,B1:B5)"), 2.2));
+  ok("LINEST array", near(evn(b, "INDEX(LINEST(A1:A5,B1:B5),1,1)"), 0.6) && near(evn(b, "INDEX(LINEST(A1:A5,B1:B5,TRUE,TRUE),3,1)"), 0.6));
+  ok("TREND FREQUENCY", near(evn(b, "INDEX(TREND(A1:A5,B1:B5,{6;7}),2)"), 6.4) && evn(b, "INDEX(FREQUENCY(A1:A5,{3;4}),2)") == 2);
+  book_free(b);
+}
+
 int main(void)
 {
   values_dates();
   formulas();
   functions();
+  stat_functions();
+  eng_misc_functions();
   editing();
   formats();
   files();
   ops();
   templates();
+  fin_db();
   autofilter();
   condfmt();
   notes();
@@ -1173,6 +1448,8 @@ int main(void)
   datatools();
   whatif();
   imports();
+  layout_tests();
+  dynarrays();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }

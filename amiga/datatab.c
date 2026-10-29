@@ -194,7 +194,7 @@ static int guard_of(ULONG id, LONG v)
     return G_STRUCT;
   case ID_INSERTDD: return v == 0 ? G_ALWAYS : v == 1 ? G_INSROWS : v == 2 ? G_INSCOLS : G_STRUCT;
   case ID_DELETEDD: return v == 0 ? G_ALWAYS : v == 1 ? G_DELROWS : v == 2 ? G_DELCOLS : G_STRUCT;
-  case ID_FORMATDD: return v == 0 || v == 1 || v == 5 || v == 7 ? G_ROWS : v == 2 || v == 3 || v == 4 || v == 6 || v == 8 ? G_COLS : v == 9 || v == 10 ? G_STRUCT : v == 12 ? G_NONE : G_FORMAT;
+  case ID_FORMATDD: return v == 0 || v == 1 || v == 5 || v == 7 ? G_ROWS : v == 2 || v == 3 || v == 4 || v == 6 || v == 8 ? G_COLS : (v >= 9 && v <= 10) || (v >= 12 && v <= 14) ? G_STRUCT : v == 15 ? G_NONE : G_FORMAT;
   case ID_CLEARDD: return v == 1 ? G_FORMAT : G_CELLS;
   case ID_SORTDD: return v <= 2 ? G_SORT : G_FILTER;
   }

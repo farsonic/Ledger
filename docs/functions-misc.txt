@@ -1,0 +1,38 @@
+# The functions of core/func_misc.c, one a line: NAME|category|args|description (for the Insert Function dialog)
+ARRAYTOTEXT|Text|array, [format]|An array as text: values joined by commas, or (format 1) as an array constant.
+ASC|Text|text|Full-width (double-byte) letters and digits as half-width ones.
+BAHTTEXT|Text|number|A number in Thai words with Baht and Satang.
+CUBEKPIMEMBER|Cube|connection, kpi_name, kpi_property, [caption]|A key performance indicator from a cube (no cube connections: #N/A).
+CUBEMEMBER|Cube|connection, member_expression, [caption]|A member of a cube (no cube connections: #N/A).
+CUBEMEMBERPROPERTY|Cube|connection, member_expression, property|A property of a cube member (no cube connections: #N/A).
+CUBERANKEDMEMBER|Cube|connection, set_expression, rank, [caption]|The nth member of a cube set (no cube connections: #N/A).
+CUBESET|Cube|connection, set_expression, [caption], [sort_order], [sort_by]|A set of cube members (no cube connections: #N/A).
+CUBESETCOUNT|Cube|set|How many items a cube set has (no cube connections: #N/A).
+CUBEVALUE|Cube|connection, [member_expression1], ...|A value from a cube (no cube connections: #N/A).
+DAYS360|Date & Time|start_date, end_date, [method]|Days between two dates in a 360-day year (US or, with TRUE, European).
+DBCS|Text|text|Half-width letters and digits as full-width (double-byte) ones.
+ENCODEURL|Web|text|Text with the characters a URL can't hold percent-encoded.
+EUROCONVERT|Add-in|number, source, target, [full_precision], [triangulation_precision]|Converts between the euro and the currencies it replaced.
+FILTERXML|Web|xml, xpath|The values an XPath finds in XML (a column when there are several).
+FINDB|Text|find_text, within_text, [start_num]|The position of one text in another (as FIND).
+INFO|Information|type_text|About the system: "numfile", "recalc", "release", "system", "osversion", "directory", "origin".
+ISOWEEKNUM|Date & Time|date|The ISO 8601 week number of a date.
+JIS|Text|text|Half-width letters and digits as full-width (double-byte) ones.
+LEFTB|Text|text, [num_bytes]|The first characters of a text (as LEFT).
+LENB|Text|text|The length of a text (as LEN).
+MIDB|Text|text, start_num, num_bytes|Characters from the middle of a text (as MID).
+NETWORKDAYS.INTL|Date & Time|start_date, end_date, [weekend], [holidays]|Working days between two dates, with a chosen weekend.
+PHONETIC|Text|reference|The phonetic (furigana) text; without it, the text itself.
+REGEXEXTRACT|Text|text, pattern, [return_mode], [case_sensitivity]|The text a regular expression matches: the first, all (a column) or the groups (a row).
+REGEXREPLACE|Text|text, pattern, replacement, [occurrence], [case_sensitivity]|Text with the matches of a regular expression replaced ($1 for a group).
+REGEXTEST|Text|text, pattern, [case_sensitivity]|TRUE if a regular expression matches part of the text.
+REPLACEB|Text|old_text, start_num, num_bytes, new_text|Replaces part of a text (as REPLACE).
+RIGHTB|Text|text, [num_bytes]|The last characters of a text (as RIGHT).
+SEARCHB|Text|find_text, within_text, [start_num]|The position of one text in another, ignoring case (as SEARCH).
+TEXTAFTER|Text|text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found]|The text after a delimiter.
+TEXTBEFORE|Text|text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found]|The text before a delimiter.
+TEXTSPLIT|Text|text, col_delimiter, [row_delimiter], [ignore_empty], [match_mode], [pad_with]|Text split into columns and rows (an array).
+UNICODE|Text|text|The Unicode code point of the first character.
+VALUETOTEXT|Text|value, [format]|A value as text (format 1: text in quotes).
+WEBSERVICE|Web|url|Data from a web service (no network from a worksheet: #VALUE!).
+WORKDAY.INTL|Date & Time|start_date, days, [weekend], [holidays]|The date a number of working days away, with a chosen weekend.

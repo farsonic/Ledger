@@ -1,0 +1,42 @@
+# Functions of core/func_array.c, one per line: NAME|category|args|description (for the Insert Function dialog)
+AGGREGATE|Math & Trig|function_num, options, ref1, [ref2/k], ...|An average, count, sum, maximum, percentile... (19 functions) that can skip hidden rows, errors and nested subtotals.
+AREAS|Lookup & Reference|reference|The number of areas in a reference, such as (A1:B2,D4).
+BYCOL|Logical|array, lambda|Applies a LAMBDA to each column of an array and returns one value per column.
+BYROW|Logical|array, lambda|Applies a LAMBDA to each row of an array and returns one value per row.
+CELL|Information|info_type, [reference]|Information about a cell: its address, row, column, contents, type, format, width or protection.
+CHOOSECOLS|Lookup & Reference|array, col_num1, [col_num2], ...|The given columns of an array (negative numbers count from the end).
+CHOOSEROWS|Lookup & Reference|array, row_num1, [row_num2], ...|The given rows of an array (negative numbers count from the end).
+COLUMN|Lookup & Reference|[reference]|The column number of a reference; of a range, all its column numbers.
+DROP|Lookup & Reference|array, rows, [columns]|An array without its first (or, negative, last) rows or columns.
+EXPAND|Lookup & Reference|array, rows, [columns], [pad_with]|An array grown to the given size, padded with #N/A or pad_with.
+FILTER|Lookup & Reference|array, include, [if_empty]|The rows or columns of an array whose include value is TRUE.
+FORMULATEXT|Lookup & Reference|reference|The formula in a cell, as text.
+GROUPBY|Lookup & Reference|row_fields, values, function, [field_headers], [total_depth], [sort_order], [filter_array]|Groups rows by their fields and aggregates each group's values, with a total.
+HSTACK|Lookup & Reference|array1, [array2], ...|Arrays placed side by side.
+INDEX|Lookup & Reference|array, row_num, [column_num], [area_num]|The value or reference at a row and column; 0 for a whole row or column; area_num picks an area of a union.
+ISOMITTED|Information|argument|TRUE if a LAMBDA's argument was left out.
+LAMBDA|Logical|[parameter1, ...], calculation|A function of your own: call it inline, keep it in a LET name, or name it in the Name Manager.
+LET|Logical|name1, value1, [name2, value2, ...], calculation|Gives names to values within a formula and works out the calculation with them.
+MAKEARRAY|Logical|rows, columns, lambda|An array of the given size whose elements a LAMBDA works out from their row and column.
+MAP|Logical|array1, [array2], ..., lambda|Applies a LAMBDA to each element of one or more arrays.
+PIVOTBY|Lookup & Reference|row_fields, col_fields, values, function, [field_headers], [row_total_depth], [row_sort_order], [col_total_depth], [col_sort_order], [filter_array]|Summarises values by row and column fields, with totals.
+RANDARRAY|Math & Trig|[rows], [columns], [min], [max], [whole_number]|An array of random numbers between min and max.
+REDUCE|Logical|[initial_value], array, lambda|Carries an accumulator through an array with a LAMBDA and returns its final value.
+ROW|Lookup & Reference|[reference]|The row number of a reference; of a range, all its row numbers.
+SCAN|Logical|[initial_value], array, lambda|Like REDUCE, but returns every intermediate value.
+SEQUENCE|Math & Trig|rows, [columns], [start], [step]|An array of evenly stepped numbers.
+SHEET|Information|[value]|The number of a sheet, given a reference or a sheet name.
+SHEETS|Information|[reference]|The number of sheets in the workbook (or in a reference).
+SORT|Lookup & Reference|array, [sort_index], [sort_order], [by_col]|An array sorted by one or more of its columns (or rows).
+SORTBY|Lookup & Reference|array, by_array1, [sort_order1], ...|An array sorted by the values of other arrays.
+SUBTOTAL|Math & Trig|function_num, ref1, [ref2], ...|A subtotal (sum, average, count...) that skips other subtotals; 101-111 also skip hidden rows.
+TAKE|Lookup & Reference|array, rows, [columns]|The first (or, negative, last) rows or columns of an array.
+TOCOL|Lookup & Reference|array, [ignore], [scan_by_column]|An array as a single column, optionally without blanks or errors.
+TOROW|Lookup & Reference|array, [ignore], [scan_by_column]|An array as a single row, optionally without blanks or errors.
+TRIMRANGE|Lookup & Reference|range, [trim_rows], [trim_cols]|A range without its blank outer rows and columns (also written A1:.E10, A1.:E10, A1.:.E10).
+UNIQUE|Lookup & Reference|array, [by_col], [exactly_once]|The distinct rows (or columns) of an array.
+VSTACK|Lookup & Reference|array1, [array2], ...|Arrays stacked one under another.
+WRAPCOLS|Lookup & Reference|vector, wrap_count, [pad_with]|A row or column wrapped into columns of wrap_count values.
+WRAPROWS|Lookup & Reference|vector, wrap_count, [pad_with]|A row or column wrapped into rows of wrap_count values.
+XLOOKUP|Lookup & Reference|lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]|Looks a value up and returns the matching row or column of another range (exact, next smaller/larger, wildcards).
+XMATCH|Lookup & Reference|lookup_value, lookup_array, [match_mode], [search_mode]|The position of a value in a row or column (exact, next smaller/larger, wildcards, from the end).

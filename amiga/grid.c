@@ -34,6 +34,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "ids.h"
+#include "layout.h"
 #include "../core/calc.h"
 #include "../core/ops.h"
 #include "../core/cond.h"
@@ -52,7 +53,7 @@
 #define EMAX 2000                /* the editor's text, bytes */
 
 /* where the mouse is dragging */
-enum { DR_NONE, DR_CELLS, DR_COLW, DR_ROWH, DR_COLS, DR_ROWS, DR_FILL, DR_POINT };
+enum { DR_NONE, DR_CELLS, DR_COLW, DR_ROWH, DR_COLS, DR_ROWS, DR_FILL, DR_POINT, DR_LAYOUT };
 
 struct Data {
   Object *obj;
@@ -326,6 +327,7 @@ static void layout(struct Data *d, LONG w, LONG h)
   for (r = s->top; r < MAXROW && d->nvr < MAXVR && y < h; r++) {
     LONG rh = rowh(d, r);
     if (!rh) continue;
+    y += lx_gap_before(d->book, SI(d), 1, r, zoom(d));
     d->vr[d->nvr] = r; d->vy[d->nvr++] = y; y += rh;
   }
   d->vy[d->nvr] = y;
@@ -340,6 +342,7 @@ static void layout(struct Data *d, LONG w, LONG h)
   for (c = s->left; c < MAXCOL && d->nvc < MAXVC && x < w; c++) {
     LONG cw = colw(d, c);
     if (!cw) continue;
+    x += lx_gap_before(d->book, SI(d), 0, c, zoom(d));
     d->vc[d->nvc] = c; d->vx[d->nvc++] = x; x += cw;
   }
   d->vx[d->nvc] = x;
@@ -484,7 +487,8 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
   int st = sheet_cell_style(s, r, c);
   const Style *sty = &b->styles[st];
   const Font *fnt = &b->fonts[sty->font];
-  Font cfnt;
+  Font cfnt, vfnt;
+  LONG vsh = 0;
   CondLook lk;
   struct TextFont *tf;
   char t[1100];
@@ -521,6 +525,12 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
     } else grid_cell_text(b, SI(d), r, c, 0, t, sizeof t, &col);
     isnum = v->t == V_NUM;
     if (v->t == V_NUM && v->n == 0 && !s->showzeros) return;
+  }
+  /* superscript and subscript: two thirds the size, raised or lowered */
+  if (fnt->vert) {
+    vfnt = *fnt; vfnt.size = (u16)(fnt->size * 2 / 3);
+    vsh = fnt->vert == 1 ? -(LONG)fnt->size * zoom(d) / 2400 : (LONG)fnt->size * zoom(d) / 6000;
+    fnt = &vfnt;
   }
   tf = cell_font(d, fnt);
   if (!tf) tf = theme_font();
@@ -577,7 +587,7 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
     else if (sty->valign == VA_CENTER) ty = y0 + (y1 - y0 + 1 - lines * lh) / 2 + li * lh;
     else ty = y1 - 1 - (lines - li) * lh;
     if (ty < y0 && lines == 1) ty = y0;
-    Move(rp, tx, ty + tf->tf_Baseline);
+    Move(rp, tx, ty + tf->tf_Baseline + vsh);
     Text(rp, (STRPTR)ls, n);
     if (fnt->strike) { Move(rp, tx, ty + tf->tf_Baseline - tf->tf_Baseline / 3); Draw(rp, tx + te.te_Width - 1, ty + tf->tf_Baseline - tf->tf_Baseline / 3); }
     if (fnt->underline == 2) { Move(rp, tx, ty + tf->tf_Baseline + 3); Draw(rp, tx + te.te_Width - 1, ty + tf->tf_Baseline + 3); }
@@ -903,6 +913,18 @@ static void draw_marks(struct Data *d, struct RastPort *rp)
   /* frozen panes: a darker line after the frozen rows and columns */
   if (s->freezer && d->nfr) hline(rp, d->hw, d->w - 1, d->vy[d->nfr] - 1, d->pen_frozen);
   if (s->freezec && d->nfcol) vline(rp, d->vx[d->nfcol] - 1, d->hh, d->h - 1, d->pen_frozen);
+  {
+    /* the active cell in a dynamic array's spill range: a thin line round the range (dashed where
+       it would go when something is in its way: #SPILL!) */
+    Rect sp;
+    int blocked = 0;
+    if (book_spill_range(d->book, SI(d), s->cur_r, s->cur_c, &sp, &blocked) && rect_px(d, &sp, &x0, &y0, &x1, &y1)) {
+      SetAPen(rp, d->pen_accent);
+      if (blocked) SetDrPt(rp, 0xCCCC);
+      Move(rp, x0, y0); Draw(rp, x1 - 1, y0); Draw(rp, x1 - 1, y1 - 1); Draw(rp, x0, y1 - 1); Draw(rp, x0, y0);
+      SetDrPt(rp, 0xFFFF);
+    }
+  }
   if (rect_px(d, &sel, &x0, &y0, &x1, &y1) && x0 < d->w && y0 < d->h) {
     Rect act;
     LONG ax0, ay0, ax1, ay1;
@@ -1033,15 +1055,21 @@ static void geo(struct Data *d, GridGeo *g)
   g->pen_white = d->pen_white; g->pen_text = d->pen_text; g->pen = geo_pen; g->ctx = d;
   g->cur_r = SH(d)->cur_r; g->cur_c = SH(d)->cur_c;
 }
+static LONG pen_cb(void *pd, ULONG rgb) { return pen_for((struct Data *)pd, rgb); }
 static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
 {
   GridGeo g;
+  GridGeom lg;
   layout(d, w, h);
   draw_cells(d, rp);
   draw_headings(d, rp);
   geo(d, &g);
   gx_draw_outline(rp, &g);
   draw_filters(d, rp);
+  /* (layout.h) page breaks, page numbers and tracer arrows over the cells */
+  lg.obj = d->obj; lg.book = d->book; lg.sheet = SI(d); lg.zoom = zoom(d); lg.hw = d->hw; lg.hh = d->hh; lg.w = d->w; lg.h = d->h;
+  lg.nvr = d->nvr; lg.nvc = d->nvc; lg.vr = d->vr; lg.vy = d->vy; lg.vc = d->vc; lg.vx = d->vx; lg.pen = pen_cb; lg.pd = d;
+  lx_grid_draw(rp, &lg);
   draw_marks(d, rp);
   gx_draw_marks(rp, &g);
   draw_notes(d, rp);
@@ -1424,7 +1452,8 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   case 0x41: edit_begin(d, "", 1); return 1;                    /* Backspace: the cell cleared and typed into */
   case 0x51: edit_begin(d, NULL, 2); return 1;                  /* F2 */
   case 0x45: if (d->copied) { d->copied = 0; redraw(d); } return 1;   /* Esc: the copied outline goes */
-  case 0x58: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_CALCNOW); return 1;   /* F9 */
+  case 0x58: DoMethod(_app(obj), MUIM_Application_ReturnID, shift ? ID_LX_CALCSHEET : ID_CALCNOW); return 1;   /* F9, Shift-F9 */
+  case 0x56: DoMethod(_app(obj), MUIM_Application_ReturnID, ID_LX_SPELLING); return 1;   /* F7 */
   case 0x7A: case 0x7B: scroll_rows(d, code == 0x7A ? -3 : 3); return 1;             /* the mouse wheel */
   }
   /* (datatab) Ctrl-E Flash Fill; Alt-Shift-Right and Left group and ungroup */
@@ -1630,6 +1659,7 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
   x = im->MouseX - _mleft(obj); y = im->MouseY - _mtop(obj);
   inside = x >= 0 && y >= 0 && x < _mwidth(obj) && y < _mheight(obj);
   if (im->Class == IDCMP_MOUSEMOVE || im->Class == IDCMP_INTUITICKS) {
+    if (d->drag == DR_LAYOUT) { lx_grid_mouse(obj, 1, x, y); return MUI_EventHandlerRC_Eat; }
     if (d->drag) { drag_to(d, obj, x, y); return MUI_EventHandlerRC_Eat; }
     if (im->Class == IDCMP_MOUSEMOVE) { hover_edge(d, obj, x, y, inside); return 0; }
     if (im->Class == IDCMP_INTUITICKS) {
@@ -1643,8 +1673,10 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
     return 0;
   }
   if (im->Class != IDCMP_MOUSEBUTTONS) return 0;
+  if (im->Code == SELECTUP && d->drag == DR_LAYOUT) { d->drag = DR_NONE; events_set(d, obj, EV_IDLE); lx_grid_mouse(obj, 2, x, y); return MUI_EventHandlerRC_Eat; }
   if (im->Code == SELECTUP) { if (d->drag) { drag_end(d, obj); return MUI_EventHandlerRC_Eat; } return 0; }
   if (im->Code != SELECTDOWN || !inside) return 0;
+  if (!d->editing && lx_grid_mouse(obj, 0, x, y)) { d->drag = DR_LAYOUT; events_set(d, obj, EV_DRAG); return MUI_EventHandlerRC_Eat; }
   {
     Sheet *s = SH(d);
     i32 r, c, e;
