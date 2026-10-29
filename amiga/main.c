@@ -701,6 +701,8 @@ static void show_book(Book *b, const char *path)
   Book *old = book;
   book = b;
   strncpy(bookpath, path ? path : "", sizeof bookpath - 1); bookpath[sizeof bookpath - 1] = 0;
+  ui_book_path(b, bookpath);
+  if (b && b->path[0] && !b->manualcalc) book_recalc(b);     /* (CELL("filename") knows the file now) */
   set(grid, MUIA_Grid_Book, (ULONG)book);
   set(tabs, MUIA_Tabs_Book, (ULONG)book);
   fx_shown[0] = 1; fx_shown[1] = 0;
@@ -743,7 +745,7 @@ static int save_to(const char *path)
   }
   set(win, MUIA_Window_Sleep, FALSE);
   if (!ok) { ask("OK", "Ledger couldn't save\n%s\n(Is the disk full or write-protected?)", path); return 0; }
-  if (!csv) { book->dirty = 0; strncpy(bookpath, path, sizeof bookpath - 1); bookpath[sizeof bookpath - 1] = 0; }
+  if (!csv) { book->dirty = 0; strncpy(bookpath, path, sizeof bookpath - 1); bookpath[sizeof bookpath - 1] = 0; ui_book_path(book, bookpath); book_recalc(book); }
   add_recent(path);
   set_title();
   return 1;

@@ -170,6 +170,15 @@ void ui_fx_ghost(APTR fxbar, int on, const char *text)
 }
 void ui_class_free(void) { if (gcls) { MUI_DeleteCustomClass(gcls); gcls = NULL; } }
 
+/* ------------------------------------------------------------------ the workbook's file */
+void ui_book_path(Book *b, const char *path)
+{
+  size_t o = 0;
+  if (!b) return;
+  for (; path && *path && o + 4 < sizeof b->path; path++) o += (size_t)utf8_put(b->path + o, (u8)*path);
+  b->path[o] = 0;
+}
+
 /* ------------------------------------------------------------------ the commands */
 void ui_command(unsigned long id, long v)
 {

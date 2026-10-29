@@ -26,5 +26,6 @@ int  ui_spill_formula(Book *b, int sheet, i32 r, i32 c, char *out, size_t cap);
 APTR ui_fxghost(void);
 void ui_fx_ghost(APTR fxbar, int on, const char *text);    /* shown (the page with it) or not */
 void ui_class_free(void);
+void ui_book_path(Book *b, const char *path);   /* the workbook's file (Latin-1) for CELL("filename") */
 
 #endif
