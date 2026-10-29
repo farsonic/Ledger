@@ -834,6 +834,7 @@ static void fx_one(Style *st, Font *f, const void *arg)
   const FxArg *a = (const FxArg *)arg;
   if (a->what == 0) f->underline = f->underline == 2 ? 0 : 2;
   else if (a->what == 1) st->rotation = (i16)a->v;
+  else if (a->what == 2) f->vert = (u8)(a->v < 0 ? 0 : a->v);
 }
 static void text_orient(LONG v)
 {
@@ -879,6 +880,11 @@ void lt_command(ULONG id, LONG v)
     if (v >= 0) set_breaks((int)v);
     break;
   case ID_LX_TITLES: lt_page_setup(3); break;
+  case ID_LX_HEADERFOOTER:
+    /* as Excel does: Page Layout view, then the header and footer to write */
+    if (page_of(cur_sheet())->view != PV_LAYOUT) vt_command(ID_LX_PAGELAYOUT, -1);
+    lt_page_setup(2);
+    break;
   case ID_LX_PAGESETUP: lt_page_setup(0); break;
   case ID_LX_FITWDD: case ID_LX_FITHDD: fit_choice(id == ID_LX_FITHDD, v); break;
   case ID_LX_SCALEDD:
@@ -909,6 +915,15 @@ void lt_command(ULONG id, LONG v)
     if (v >= 0) text_orient(v);
     break;
   case ID_LX_NEWCELLSTYLE: new_cell_style(); break;
+  case ID_LX_SUPER: case ID_LX_SUB: {
+    FxArg a;
+    const Style *st = &book->styles[sheet_cell_style(cur_sheet(), cur_sheet()->cur_r, cur_sheet()->cur_c)];
+    a.what = 2; a.v = id == ID_LX_SUPER ? 1 : 2;
+    /* (all the selection to the active cell's new state) */
+    if (book->fonts[st->font].vert == a.v) a.v = -a.v;
+    book_restyle(book, cur_index(), cur_sel(), fx_one, &a);
+    refresh_all();
+    break; }
   }
 }
 
@@ -919,7 +934,7 @@ void lx_command(ULONG id)
   if (id == ID_LX_THEMEDD || id == ID_LX_COLORSDD || id == ID_LX_FONTSDD || id == ID_LX_MARGINSDD || id == ID_LX_ORIENTDD || id == ID_LX_SIZEDD ||
       id == ID_LX_AREADD || id == ID_LX_BREAKSDD || id == ID_LX_FITWDD || id == ID_LX_FITHDD || id == ID_LX_SCALEDD || id == ID_LX_RECENTDD ||
       id == ID_LX_USENAMEDD || id == ID_LX_REMOVEDD || id == ID_LX_CALCOPTDD || id == ID_LX_SWITCHDD || id == ID_LX_TEXTORIENTDD) v = lx_value();
-  if (id <= ID_LX_SAVEPDF || (id >= ID_LX_GOTOSPECIAL && id <= ID_LX_NEWCELLSTYLE && id != ID_LX_GOTOSPECIAL)) lt_command(id, v);
+  if (id <= ID_LX_SAVEPDF || (id >= ID_LX_GOTOSPECIAL && id <= ID_LX_SUB && id != ID_LX_GOTOSPECIAL)) lt_command(id, v);
   else if (id >= ID_LX_NORMAL && id <= ID_LX_ZOOMDLG) vt_command(id, v);
   else if (id == ID_LX_SCROLLED || id == ID_LX_REFRESH) vt_command(id, v);
   else ft_command(id, v);

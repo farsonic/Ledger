@@ -9,6 +9,7 @@
 #include "../core/spell.h"
 #include "../core/calc.h"
 #include "../core/ops.h"
+#include "../core/comments.h"
 
 void lt_command(ULONG id, LONG v);
 
@@ -258,6 +259,18 @@ void ft_draw(struct RastPort *rp, const GridGeom *g)
       LONG x, y, x0, y0, x1, y1;
       if (!centre(g, marks.c[k].r, marks.c[k].c, &x, &y, &x0, &y0, &x1, &y1)) continue;
       theme_rect(rp, x0 + 1, y0 + 1, x1 - 1, y1 - 1, pen);
+    }
+  }
+  {
+    /* a threaded comment's corner is purple (a note's red one is the grid's) */
+    Sheet *s = g->book->sh[g->sheet];
+    LONG purple = g->pen(g->pd, 0x7030A0);
+    for (i = 0; i < s->nnotes; i++) {
+      LONG x, y, x0, y0, x1, y1;
+      int k;
+      if (!s->notes[i].threaded || !centre(g, s->notes[i].r, s->notes[i].c, &x, &y, &x0, &y0, &x1, &y1)) continue;
+      SetAPen(rp, purple);
+      for (k = 0; k < 6; k++) { Move(rp, x1 - 5 + k, y0); Draw(rp, x1, y0 + 5 - k); }
     }
   }
   for (i = 0; i < npins; i++) {
@@ -691,6 +704,109 @@ static void note_show_hide(void)
   update_controls();
 }
 
+/* ------------------------------------------------------------------ threaded comments */
+static void thread_text(const Note *n, char *out, size_t cap)
+{
+  char a[100], t[600], la[100], lt[600];
+  int k;
+  size_t len;
+  lx_utf8_latin1(n->author ? n->author : "", la, sizeof la);
+  lx_utf8_latin1(n->text ? n->text : "", lt, sizeof lt);
+  snprintf(out, cap, "\33b%s\33n%s\n%s", la[0] ? la : tr("(no name)"), n->resolved ? tr("  (resolved)") : "", lt);
+  for (k = 0; comment_reply(n, k, a, sizeof a, t, sizeof t); k++) {
+    lx_utf8_latin1(a, la, sizeof la); lx_utf8_latin1(t, lt, sizeof lt);
+    len = strlen(out);
+    snprintf(out + len, cap - len, "\n  \33b%s\33n: %s", la, lt);
+  }
+}
+static void comment_dlg(void)
+{
+  static const ULONG ends[] = { ID_DLGOK, 0 };
+  Sheet *s = cur_sheet();
+  const Note *n = sheet_note(s, s->cur_r, s->cur_c);
+  Object *w, *text, *res = NULL;
+  char thread[2000], au[70];
+  if (n && !n->threaded) {
+    if (ask("Convert|Cancel", "%s", tr("The cell has a note. Turn it into a comment, so it can have replies?")) != 1) return;
+    book_begin(book); book_note_sheet(book, cur_index()); ((Note *)n)->threaded = 1; book_end(book); book->dirty = 1;
+    n = sheet_note(cur_sheet(), s->cur_r, s->cur_c);
+  }
+  lx_latin1_utf8(username, au, sizeof au);
+  if (n) {
+    thread_text(n, thread, sizeof thread);
+    w = dialog_window("Reply to Comment", VGroup,
+          Child, TextObject, TextFrame, MUIA_Background, MUII_TextBack, MUIA_Text_Contents, (ULONG)thread, MUIA_FixWidthTxt, (ULONG)"WWWWWWWWWWWWWWWWWWWWWWWWWW", End,
+          Child, HGroup, Child, Label1(tr("Reply:")), Child, text = lx_str("", 500), End,
+          Child, HGroup, Child, res = lx_check(n->resolved), Child, LLabel1(tr("Resolve thread")), Child, HSpace(0), End,
+        End, "Post");
+  } else {
+    w = dialog_window("New Comment", VGroup,
+          Child, TextObject, MUIA_Text_Contents, (ULONG)tr("Start a conversation: others can reply under it."), End,
+          Child, text = lx_str("", 500),
+        End, "Post");
+  }
+  if (!w) return;
+  set(w, MUIA_Window_ActiveObject, (ULONG)text);
+  if (run_modal(w, ends, NULL) == ID_DLGOK) {
+    char u[1000];
+    lx_latin1_utf8(lx_sget(text), u, sizeof u);
+    if (n) {
+      if (u[0]) book_add_reply(book, cur_index(), s->cur_r, s->cur_c, u, au[0] ? au : "Ledger");
+      if (res && (lx_xget(res, MUIA_Selected) != 0) != (n->resolved != 0)) book_resolve_comment(book, cur_index(), s->cur_r, s->cur_c, lx_xget(res, MUIA_Selected) != 0);
+    } else if (u[0]) book_set_comment(book, cur_index(), s->cur_r, s->cur_c, u, au[0] ? au : "Ledger");
+    refresh_all();
+  }
+  MUI_DisposeObject(w);
+}
+static void comment_go(int threaded, int forward)
+{
+  Sheet *s = cur_sheet();
+  int sh = cur_index();
+  i32 r = s->cur_r, c = s->cur_c;
+  if (!comment_step(book, threaded, forward, &sh, &r, &c)) { DisplayBeep(NULL); return; }
+  if (sh != cur_index()) { book->active = sh; set(grid, MUIA_Grid_Book, (ULONG)book); }
+  DoMethod(grid, MUIM_Grid_Select, r, c, r, c, r, c);
+  refresh_all();
+}
+/* Show Comments: every thread of the workbook, to read and go to */
+static void comments_pane(void)
+{
+  static const ULONG ends[] = { ID_DLGOK, 0 };
+  static char lines[200][160];
+  static const char *ptrs[201];
+  static struct { int sheet; i32 r, c; } where[200];
+  Object *w, *list;
+  int si, i, n = 0;
+  for (si = 0; si < book->nsh && n < 199; si++) {
+    Sheet *s = book->sh[si];
+    for (i = 0; i < s->nnotes && n < 199; i++) {
+      const Note *nt = &s->notes[i];
+      char ref[16], nm[40], la[60], lt[100];
+      if (!nt->threaded) continue;
+      ref_text(nt->r, nt->c, 0, 0, ref);
+      lx_utf8_latin1(s->name, nm, sizeof nm); lx_utf8_latin1(nt->author ? nt->author : "", la, sizeof la); lx_utf8_latin1(nt->text ? nt->text : "", lt, sizeof lt);
+      snprintf(lines[n], sizeof lines[n], "%s!%s  %s: %s  [%d %s]%s", nm, ref, la, lt, comment_nreplies(nt), tr("replies"), nt->resolved ? tr(" (resolved)") : "");
+      ptrs[n] = lines[n]; where[n].sheet = si; where[n].r = nt->r; where[n].c = nt->c; n++;
+    }
+  }
+  ptrs[n] = NULL;
+  if (!n) { ask("OK", "%s", tr("The workbook has no comments (Review > New Comment).")); return; }
+  w = dialog_window("Comments", VGroup,
+        Child, ListviewObject, MUIA_Listview_List, list = ListObject, InputListFrame, MUIA_List_SourceArray, (ULONG)ptrs, MUIA_List_Active, 0, End, MUIA_CycleChain, 1, End,
+      End, "Go To");
+  if (!w) return;
+  DoMethod(list, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLGOK);
+  if (run_modal(w, ends, NULL) == ID_DLGOK) {
+    LONG a = (LONG)lx_xget(list, MUIA_List_Active);
+    if (a >= 0 && a < n) {
+      if (where[a].sheet != cur_index()) { book->active = where[a].sheet; set(grid, MUIA_Grid_Book, (ULONG)book); }
+      DoMethod(grid, MUIM_Grid_Select, where[a].r, where[a].c, where[a].r, where[a].c, where[a].r, where[a].c);
+      refresh_all();
+    }
+  }
+  MUI_DisposeObject(w);
+}
+
 /* ------------------------------------------------------------------ the commands */
 void ft_command(ULONG id, LONG v)
 {
@@ -739,6 +855,21 @@ void ft_command(ULONG id, LONG v)
   case ID_LX_THESAURUS: thesaurus(); break;
   case ID_LX_ACCESS: accessibility(); break;
   case ID_LX_NOTESHOWHIDE: note_show_hide(); break;
+  case ID_LX_COMMENTNEW: comment_dlg(); break;
+  case ID_LX_COMMENTDEL: {
+    Sheet *s = cur_sheet();
+    const Note *n = sheet_note(s, s->cur_r, s->cur_c);
+    if (n && n->threaded) { book_set_note(book, cur_index(), s->cur_r, s->cur_c, NULL, NULL); refresh_all(); }
+    break; }
+  case ID_LX_COMMENTPREV: case ID_LX_COMMENTNEXT: comment_go(1, id == ID_LX_COMMENTNEXT); break;
+  case ID_LX_COMMENTSHOW: comments_pane(); break;
+  case ID_LX_CONVERTNOTES: {
+    int n = book_convert_notes(book, -1);
+    char m[80];
+    sprintf(m, tr("%d notes turned into comments."), n);
+    ask("OK", "%s", m);
+    refresh_all();
+    break; }
   case ID_LX_GOTOSPECIAL: goto_special_dlg(); break;
   }
 }
@@ -750,6 +881,7 @@ int ft_bit(int b)
   switch (b) {
   case LXB_ARROWS: for (i = 0; i < narrows; i++) if (arrows[i].b == book) return 1; return 0;
   case LXB_HASFORMULA: s = cur_sheet(); c = sheet_cell(s, s->cur_r, s->cur_c); return c && c->f;
+  case LXB_COMMENTS: s = cur_sheet(); { const Note *n = sheet_note(s, s->cur_r, s->cur_c); return n && n->threaded; }
   case LXB_NOTESHOWN:
     s = cur_sheet();
     for (i = 0; i < npins; i++) if (pins[i].b == book && pins[i].sheet == cur_index() && pins[i].r == s->cur_r && pins[i].c == s->cur_c) return 1;

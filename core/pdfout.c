@@ -249,7 +249,7 @@ static void cell_text(Pdf *p, Buf *b, Sheet *s, int si, i32 r, i32 c, double x0,
   memset(&lk, 0, sizeof lk); lk.color = COLOR_AUTO;
   if (s->ncfs && cond_look(bk, si, r, c, &lk)) { fnt.bold |= lk.bold; fnt.italic |= lk.italic; fnt.underline |= lk.underline; fnt.strike |= lk.strike; }
   if (v->t == V_NUM && v->n == 0 && !s->showzeros && !(p->opt->formulas && cell->f)) return;
-  if (!pfont(p, fnt.name, fnt.bold, fnt.italic, fnt.size ? fnt.size : 110, &f)) return;
+  if (!pfont(p, fnt.name, fnt.bold, fnt.italic, (fnt.size ? fnt.size : 110) * (fnt.vert ? 2 : 3) / 3, &f)) return;
   if (p->opt->formulas && cell->f) { book_edit_text(bk, si, r, c, t, sizeof t); isnum = 0; }
   else if (v->t == V_NUM && st->numfmt == 0) {
     /* General shows as many digits as the column has room for */
@@ -307,6 +307,7 @@ static void cell_text(Pdf *p, Buf *b, Sheet *s, int si, i32 r, i32 c, double x0,
     if (st->valign == VA_TOP) ty = y0 + 1 + i * lh + f.z->ascent / 20.0;
     else if (st->valign == VA_CENTER) ty = y0 + (y1 - y0 - nl * lh) / 2 + i * lh + f.z->ascent / 20.0;
     else ty = y1 - 1.5 - (nl - 1 - i) * lh - f.z->descent / 20.0;
+    if (fnt.vert) ty += fnt.vert == 1 ? -f.pt / 2 : f.pt / 4;
     text_at(p, b, &f, fnt.bold, fnt.italic, ls, ll, tx, ty, col);
     if (fnt.underline || fnt.strike) decorate(b, &f, tx, ty, w, fnt.underline, fnt.strike, col);
   }

@@ -12,6 +12,7 @@
 #include "zip.h"
 #include "xml.h"
 #include "pagesetup.h"
+#include "comments.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -247,6 +248,7 @@ static void read_styles(Rd *rd, ZipReader *z)
       else if (!strcmp(n, "strike")) { const char *v = xml_attr(&x, "val"); cf->strike = !v || (strcmp(v, "0") && strcmp(v, "false")); }
       else if (!strcmp(n, "u")) { const char *v = xml_attr(&x, "val"); cf->underline = !v || !strcmp(v, "single") || !strcmp(v, "singleAccounting") ? 1 : !strcmp(v, "none") ? 0 : 2; }
       else if (!strcmp(n, "sz")) { const char *v = xml_attr(&x, "val"); if (v) { double s = strtod(v, NULL); if (s > 0 && s < 410) cf->size = (u16)(s * 10 + 0.5); } }
+      else if (!strcmp(n, "vertAlign")) { const char *v = xml_attr(&x, "val"); cf->vert = (u8)(v && !strcmp(v, "superscript") ? 1 : v && !strcmp(v, "subscript") ? 2 : 0); }
       else if (!strcmp(n, "name")) { const char *v = xml_attr(&x, "val"); if (v) { strncpy(cf->name, v, sizeof cf->name - 1); cf->name[sizeof cf->name - 1] = 0; } }
       else if (!strcmp(n, "color")) cf->color = read_color(&x, COLOR_AUTO);
       continue;
@@ -761,7 +763,7 @@ static void read_comments(Rd *rd, ZipReader *z, const char *path, int sheet)
         if (*tx) {
           Sheet *s = rd->b->sh[sheet];
           Note *nn = (Note *)realloc(s->notes, (size_t)(s->nnotes + 1) * sizeof *nn);
-          if (nn) { s->notes = nn; nn[s->nnotes].r = r; nn[s->nnotes].c = c; nn[s->nnotes].text = str_dup(tx); nn[s->nnotes].author = str_dup(who); s->nnotes++; }
+          if (nn) { s->notes = nn; memset(&nn[s->nnotes], 0, sizeof *nn); nn[s->nnotes].r = r; nn[s->nnotes].c = c; nn[s->nnotes].text = str_dup(tx); nn[s->nnotes].author = str_dup(who); s->nnotes++; }
         }
       }
       buf_free(&t);
@@ -785,6 +787,7 @@ static void read_sheet_rels(Rd *rd, ZipReader *z, const char *sheetpath, int she
   snprintf(rp, sizeof rp, "%s_rels/%s.rels", base, sl ? sl + 1 : sheetpath);
   n = read_rels(z, rp, base, &rels);
   for (k = 0; k < n; k++) if (!strcmp(rels[k].type, "comments")) read_comments(rd, z, rels[k].target, sheet);
+  for (k = 0; k < n; k++) if (!strcmp(rels[k].type, "threadedComment")) cm_read(rd->b, z, rels[k].target, sheet);
   {
     /* links out: their addresses from the relationships (an external link is written as it is) */
     Sheet *s = rd->b->sh[sheet];
@@ -1109,6 +1112,7 @@ static void write_styles(Book *b, Buf *o, int **fillmap_out, int **bordermap_out
     if (f->italic) buf_adds(o, "<i/>");
     if (f->strike) buf_adds(o, "<strike/>");
     if (f->underline) buf_adds(o, f->underline == 2 ? "<u val=\"double\"/>" : "<u/>");
+    if (f->vert) buf_adds(o, f->vert == 1 ? "<vertAlign val=\"superscript\"/>" : "<vertAlign val=\"subscript\"/>");
     buf_printf(o, "<sz val=\"%g\"/>", f->size / 10.0);
     if (f->color != COLOR_AUTO) color_attr(o, "color", f->color);
     buf_adds(o, "<name val=\""); xesc(o, f->name); buf_adds(o, "\"/>");
@@ -1380,19 +1384,25 @@ static void write_comments(Book *b, int si, Buf *o)
   int na = 0, i, k;
   buf_adds(o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
               "<comments xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><authors>");
+  char (*tc)[64] = (char (*)[64])calloc((size_t)s->nnotes + 1, 64);
+  Buf lt;
+  buf_init(&lt);
+  /* threaded comments: their author is the thread's id, their text a summary (comments.c) */
+  for (i = 0; i < s->nnotes && tc; i++) if (s->notes[i].threaded) { lt.len = 0; cm_legacy(&s->notes[i], si, i, &lt, tc[i], 64); }
   for (i = 0; i < s->nnotes && au; i++) {
-    const char *a = s->notes[i].author ? s->notes[i].author : "";
+    const char *a = tc && tc[i][0] ? tc[i] : s->notes[i].author ? s->notes[i].author : "";
     for (k = 0; k < na && strcmp(au[k], a); k++) ;
     if (k == na) { au[na++] = (char *)a; buf_adds(o, "<author>"); xesc(o, a); buf_adds(o, "</author>"); }
   }
   buf_adds(o, "</authors><commentList>");
   for (i = 0; i < s->nnotes; i++) {
     const Note *n = &s->notes[i];
-    const char *a = n->author ? n->author : "";
+    const char *a = tc && tc[i][0] ? tc[i] : n->author ? n->author : "";
     char ref[16];
     for (k = 0; au && k < na && strcmp(au[k], a); k++) ;
     ref_text(n->r, n->c, 0, 0, ref);
     buf_printf(o, "<comment ref=\"%s\" authorId=\"%d\"><text>", ref, au ? k : 0);
+    if (tc && tc[i][0]) { lt.len = 0; cm_legacy(n, si, i, &lt, tc[i], 64); buf_add(o, lt.data, lt.len); buf_adds(o, "</text></comment>"); continue; }
     /* as Excel writes them: the author in bold, then the text on the next line */
     if (a[0]) { buf_adds(o, "<r><rPr><b/><sz val=\"9\"/><rFont val=\"Tahoma\"/></rPr><t>"); xesc(o, a); buf_adds(o, ":</t></r>"); }
     buf_adds(o, "<r><rPr><sz val=\"9\"/><rFont val=\"Tahoma\"/></rPr><t xml:space=\"preserve\">");
@@ -1401,7 +1411,8 @@ static void write_comments(Book *b, int si, Buf *o)
     buf_adds(o, "</t></r></text></comment>");
   }
   buf_adds(o, "</commentList></comments>");
-  free(au);
+  free(au); free(tc);
+  buf_free(&lt);
 }
 static void write_vml(Book *b, int si, Buf *o)
 {
@@ -1434,6 +1445,7 @@ static int write_sheet_rels(Book *b, int si, Buf *o)
   if (s->nnotes)
     buf_printf(o, "<Relationship Id=\"rIdN1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments\" Target=\"../comments%d.xml\"/>"
                   "<Relationship Id=\"rIdN2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing\" Target=\"../drawings/vmlDrawing%d.vml\"/>", si + 1, si + 1);
+  cm_sheet_rels(s, si, o);
   for (i = 0; i < s->nlinks; i++) {
     if (s->links[i].target[0] == '#') continue;
     buf_printf(o, "<Relationship Id=\"rIdL%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"", i + 1);
@@ -1470,6 +1482,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   }
   for (i = 0; i < b->nsh && !b->sh[i]->nnotes; i++) ;
   if (i < b->nsh) buf_adds(&o, "<Default Extension=\"vml\" ContentType=\"application/vnd.openxmlformats-officedocument.vmlDrawing\"/>");
+  cm_types(b, &o);
   buf_adds(&o, "</Types>");
   zip_add(&w, "[Content_Types].xml", o.data, o.len);
   o.len = 0;
@@ -1539,6 +1552,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>", b->nsh + 1);
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>", b->nsh + 2);
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\"/>", b->nsh + 3);
+  cm_book_rels(b, &o, b->nsh + 4);
   buf_adds(&o, "</Relationships>");
   zip_add(&w, "xl/_rels/workbook.xml.rels", o.data, o.len);
   /* sheets (they fill the string table) */
@@ -1554,6 +1568,7 @@ u8 *xlsx_save(Book *b, size_t *len)
       o.len = 0; write_vml(b, i, &o); sprintf(path, "xl/drawings/vmlDrawing%d.vml", i + 1); zip_add(&w, path, o.data, o.len);
     }
   }
+  cm_parts(b, &w);
   o.len = 0;
   page_write_theme(b, &o);
   zip_add(&w, "xl/theme/theme1.xml", o.data, o.len);

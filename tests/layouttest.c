@@ -7,6 +7,8 @@
 #include "../core/fonts.h"
 #include "../core/spell.h"
 #include "../core/audit.h"
+#include "../core/comments.h"
+#include "../core/htmlout.h"
 
 static Book *roundtrip(Book *b)
 {
@@ -282,8 +284,41 @@ static void iterate_tests(void)
   ok("iterate: one iteration only", cell_value(b, 0, 1, 0)->n <= 2);
   book_free(b);
 }
+static void comment_tests(void)
+{
+  Book *b = book_new(), *d;
+  char a[64], t[128], *h;
+  int sh = 0;
+  i32 r = 0, c = 0;
+  book_set_note(b, 0, 4, 1, "a plain note", "Ann");
+  ok("comments: new", book_set_comment(b, 0, 1, 1, "Is this right?", "Bob"));
+  ok("comments: reply", book_add_reply(b, 0, 1, 1, "Yes, checked", "Ann") && book_add_reply(b, 0, 1, 1, "Thanks & done", "Bob"));
+  ok("comments: no reply to a note", !book_add_reply(b, 0, 4, 1, "x", "y"));
+  ok("comments: replies read back", comment_nreplies(sheet_note(b->sh[0], 1, 1)) == 2 && comment_reply(sheet_note(b->sh[0], 1, 1), 1, a, sizeof a, t, sizeof t) && !strcmp(a, "Bob") && !strcmp(t, "Thanks & done"));
+  book_resolve_comment(b, 0, 1, 1, 1);
+  ok("comments: next comment skips notes", comment_step(b, 1, 1, &sh, &r, &c) && r == 1 && c == 1 && !comment_step(b, 1, 1, &sh, &r, &c) == 0 && r == 1);
+  sh = 0; r = 2; c = 0;
+  ok("comments: next note", comment_step(b, 0, 1, &sh, &r, &c) && r == 4);
+  d = roundtrip(b);
+  if (d) {
+    const Note *n = sheet_note(d->sh[0], 1, 1), *p = sheet_note(d->sh[0], 4, 1);
+    ok("comments: thread kept", n && n->threaded && n->resolved && !strcmp(n->text, "Is this right?") && !strcmp(n->author, "Bob") && comment_nreplies(n) == 2);
+    ok("comments: reply kept", n && comment_reply(n, 0, a, sizeof a, t, sizeof t) && !strcmp(a, "Ann") && !strcmp(t, "Yes, checked"));
+    ok("comments: note stays a note", p && !p->threaded && !strcmp(p->text, "a plain note"));
+    book_free(d);
+  } else ok("comments: roundtrip", 0);
+  ok("comments: convert notes", book_convert_notes(b, -1) == 1 && sheet_note(b->sh[0], 4, 1)->threaded);
+  { int us; Rect ua; book_undo(b, &us, &ua); }
+  ok("comments: convert undone", !sheet_note(b->sh[0], 4, 1)->threaded);
+  book_input(b, 0, 0, 0, "<b>Total</b>", NULL);
+  h = html_book(b, -1);
+  ok("html: escaped and a table", h && strstr(h, "&lt;b&gt;Total&lt;/b&gt;") && strstr(h, "<table>"));
+  free(h);
+  book_free(b);
+}
 static void layout_tests(void)
 {
+  comment_tests();
   iterate_tests();
   audit_tests();
   spell_tests();

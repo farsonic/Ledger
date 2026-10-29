@@ -481,7 +481,8 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
   int st = sheet_cell_style(s, r, c);
   const Style *sty = &b->styles[st];
   const Font *fnt = &b->fonts[sty->font];
-  Font cfnt;
+  Font cfnt, vfnt;
+  LONG vsh = 0;
   CondLook lk;
   struct TextFont *tf;
   char t[1100];
@@ -518,6 +519,12 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
     } else grid_cell_text(b, SI(d), r, c, 0, t, sizeof t, &col);
     isnum = v->t == V_NUM;
     if (v->t == V_NUM && v->n == 0 && !s->showzeros) return;
+  }
+  /* superscript and subscript: two thirds the size, raised or lowered */
+  if (fnt->vert) {
+    vfnt = *fnt; vfnt.size = (u16)(fnt->size * 2 / 3);
+    vsh = fnt->vert == 1 ? -(LONG)fnt->size * zoom(d) / 2400 : (LONG)fnt->size * zoom(d) / 6000;
+    fnt = &vfnt;
   }
   tf = cell_font(d, fnt);
   if (!tf) tf = theme_font();
@@ -574,7 +581,7 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
     else if (sty->valign == VA_CENTER) ty = y0 + (y1 - y0 + 1 - lines * lh) / 2 + li * lh;
     else ty = y1 - 1 - (lines - li) * lh;
     if (ty < y0 && lines == 1) ty = y0;
-    Move(rp, tx, ty + tf->tf_Baseline);
+    Move(rp, tx, ty + tf->tf_Baseline + vsh);
     Text(rp, (STRPTR)ls, n);
     if (fnt->strike) { Move(rp, tx, ty + tf->tf_Baseline - tf->tf_Baseline / 3); Draw(rp, tx + te.te_Width - 1, ty + tf->tf_Baseline - tf->tf_Baseline / 3); }
     if (fnt->underline == 2) { Move(rp, tx, ty + tf->tf_Baseline + 3); Draw(rp, tx + te.te_Width - 1, ty + tf->tf_Baseline + 3); }

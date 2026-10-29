@@ -9,6 +9,9 @@
 #include <string.h>
 #include "pagesetup.h"
 
+/* s copied into d (cap bytes), cut short if need be */
+static void scopy(char *d, size_t cap, const char *s) { size_t n = strlen(s); if (n >= cap) n = cap - 1; memcpy(d, s, n); d[n] = 0; }
+
 /* ------------------------------------------------------------------ paper */
 #define MM(x) ((x) * 72.0 / 25.4)
 const Paper page_papers[] = {
@@ -442,7 +445,7 @@ static void rename_fonts(Book *b, const char *from, const char *to)
   int i;
   if (!to[0]) return;
   for (i = 0; i < b->nfonts; i++)
-    if (str_ieq(b->fonts[i].name, from) || (b->nstyles && b->styles[0].font == i)) { strncpy(b->fonts[i].name, to, sizeof b->fonts[i].name - 1); b->fonts[i].name[sizeof b->fonts[i].name - 1] = 0; }
+    if (str_ieq(b->fonts[i].name, from) || (b->nstyles && b->styles[0].font == i)) scopy(b->fonts[i].name, sizeof b->fonts[i].name, to);
 }
 void book_set_theme_fonts(Book *b, const char *major, const char *minor)
 {
@@ -450,9 +453,9 @@ void book_set_theme_fonts(Book *b, const char *major, const char *minor)
   char old[48];
   if (!x) return;
   strcpy(old, x->theme.minor[0] ? x->theme.minor : "Calibri");
-  if (major && major[0]) { strncpy(x->theme.major, major, sizeof x->theme.major - 1); x->theme.major[sizeof x->theme.major - 1] = 0; }
+  if (major && major[0]) scopy(x->theme.major, sizeof x->theme.major, major);
   if (minor && minor[0]) {
-    strncpy(x->theme.minor, minor, sizeof x->theme.minor - 1); x->theme.minor[sizeof x->theme.minor - 1] = 0;
+    scopy(x->theme.minor, sizeof x->theme.minor, minor);
     rename_fonts(b, old, x->theme.minor);
   }
   b->dirty = 1; b->changes++;
@@ -464,7 +467,7 @@ void book_set_theme(Book *b, const Theme *t)
   u32 oldc[12];
   if (!x) return;
   memcpy(oldc, x->theme.color, sizeof oldc);
-  strncpy(x->theme.name, t->name, sizeof x->theme.name - 1);
+  scopy(x->theme.name, sizeof x->theme.name, t->name);
   memcpy(x->theme.color, t->color, sizeof t->color);
   /* colours that were the old theme's accents (cells that used theme colours) take the new ones */
   for (i = 0; i < b->nstyles; i++)

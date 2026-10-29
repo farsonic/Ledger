@@ -19,7 +19,7 @@ enum {
   ID_LX_FIRST = 2000,
   /* Page Layout */
   ID_LX_THEMEDD = ID_LX_FIRST, ID_LX_COLORSDD, ID_LX_FONTSDD, ID_LX_MARGINSDD, ID_LX_ORIENTDD, ID_LX_SIZEDD, ID_LX_AREADD, ID_LX_BREAKSDD,
-  ID_LX_TITLES, ID_LX_PAGESETUP, ID_LX_FITWDD, ID_LX_FITHDD, ID_LX_SCALEDD, ID_LX_PRINTGRID, ID_LX_PRINTHEAD, ID_LX_VIEWGRID, ID_LX_VIEWHEAD,
+  ID_LX_TITLES, ID_LX_PAGESETUP, ID_LX_HEADERFOOTER, ID_LX_FITWDD, ID_LX_FITHDD, ID_LX_SCALEDD, ID_LX_PRINTGRID, ID_LX_PRINTHEAD, ID_LX_VIEWGRID, ID_LX_VIEWHEAD,
   /* File */
   ID_LX_EXPORTPDF, ID_LX_EXPORTHTML, ID_LX_PROPS, ID_LX_CALCOPTS, ID_LX_SAVEPDF,
   /* View */
@@ -33,7 +33,7 @@ enum {
   ID_LX_COMMENTSHOW, ID_LX_CONVERTNOTES,
   /* Home */
   ID_LX_GOTOSPECIAL, ID_LX_MOVECOPY, ID_LX_PASTESPECIAL, ID_LX_CLEARNOTES, ID_LX_CLEARLINKS, ID_LX_JUSTIFY, ID_LX_ACCOUNTING, ID_LX_DBLUNDER,
-  ID_LX_TEXTORIENTDD, ID_LX_NEWCELLSTYLE,
+  ID_LX_TEXTORIENTDD, ID_LX_NEWCELLSTYLE, ID_LX_SUPER, ID_LX_SUB,
   /* windows and buttons of the modeless windows (spelling, watch window, error checking) */
   ID_LX_REFRESH, ID_LX_SPCHANGE, ID_LX_SPCHANGEALL, ID_LX_SPIGNORE, ID_LX_SPIGNOREALL, ID_LX_SPADD, ID_LX_SPPICK, ID_LX_SPCLOSE,
   ID_LX_WATCHADD, ID_LX_WATCHDEL, ID_LX_WATCHPICK, ID_LX_ERRNEXT, ID_LX_ERRPREV, ID_LX_ERRHELP, ID_LX_ERREDIT, ID_LX_ERRIGNORE, ID_LX_ERREVAL,
@@ -107,11 +107,11 @@ Clip *app_clip(void);              /* what was copied last */
   I("Clear Hyperlinks", 0, ID_LX_CLEARLINKS), I("Fill Justify", 0, ID_LX_JUSTIFY),
 #define LX_FORMAT_ITEMS \
   I("Move or Copy Sheet...", 0, ID_LX_MOVECOPY), I("Accounting Format", 0, ID_LX_ACCOUNTING), I("Double Underline", 0, ID_LX_DBLUNDER), \
-  I("Text Orientation...", 0, ID_LX_TEXTORIENTDD), I("New Cell Style...", 0, ID_LX_NEWCELLSTYLE),
+  I("Superscript", 0, ID_LX_SUPER), I("Subscript", 0, ID_LX_SUB), I("Text Orientation...", 0, ID_LX_TEXTORIENTDD), I("New Cell Style...", 0, ID_LX_NEWCELLSTYLE),
 #define LX_MENUS \
   M("Page"), \
   I("Page Setup...", 0, ID_LX_PAGESETUP), I("Themes...", 0, ID_LX_THEMEDD), I("Margins...", 0, ID_LX_MARGINSDD), I("Orientation...", 0, ID_LX_ORIENTDD), \
-  I("Paper Size...", 0, ID_LX_SIZEDD), I("Print Area...", 0, ID_LX_AREADD), I("Page Breaks...", 0, ID_LX_BREAKSDD), I("Print Titles...", 0, ID_LX_TITLES), \
+  I("Paper Size...", 0, ID_LX_SIZEDD), I("Print Area...", 0, ID_LX_AREADD), I("Page Breaks...", 0, ID_LX_BREAKSDD), I("Print Titles...", 0, ID_LX_TITLES), I("Header & Footer...", 0, ID_LX_HEADERFOOTER), \
   I("Scale to Fit...", 0, ID_LX_SCALEDD), BAR, \
   T("Print Gridlines", 0, ID_LX_PRINTGRID), T("Print Headings", 0, ID_LX_PRINTHEAD), BAR, \
   T("Normal View", 0, ID_LX_NORMAL), T("Page Break Preview", 0, ID_LX_PBP), T("Page Layout View", 0, ID_LX_PAGELAYOUT), T("Ruler", 0, ID_LX_RULER), \
@@ -123,7 +123,9 @@ Clip *app_clip(void);              /* what was copied last */
   I("Calculate Sheet", 0, ID_LX_CALCSHEET), \
   M("Review"), \
   I("Spelling...", 0, ID_LX_SPELLING), I("Thesaurus...", 0, ID_LX_THESAURUS), I("Check Accessibility...", 0, ID_LX_ACCESS), BAR, \
-  T("Show/Hide Note", 0, ID_LX_NOTESHOWHIDE), \
+  T("Show/Hide Note", 0, ID_LX_NOTESHOWHIDE), I("Convert Notes to Comments", 0, ID_LX_CONVERTNOTES), BAR, \
+  I("New Comment...", 0, ID_LX_COMMENTNEW), I("Delete Comment", 0, ID_LX_COMMENTDEL), I("Previous Comment", 0, ID_LX_COMMENTPREV), \
+  I("Next Comment", 0, ID_LX_COMMENTNEXT), I("Show Comments...", 0, ID_LX_COMMENTSHOW), \
   M("Window"), \
   I("New Window", 0, ID_LX_NEWWIN), I("Arrange All...", 0, ID_LX_ARRANGE), I("Switch Windows...", 0, ID_LX_SWITCHDD), BAR, \
   I("Hide", 0, ID_LX_HIDEWIN), I("Unhide...", 0, ID_LX_UNHIDEWIN), BAR, \

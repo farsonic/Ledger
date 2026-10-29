@@ -198,10 +198,13 @@ static const Item h_font[] = {
   { K_FIELD, S_SMALL, 0, L_SIZES, NULL, ID_SIZEDD, 0, 0, 0, 34, "Font size" },
   { K_BUTTON, S_ICON, IC_GROW, 0, NULL, ID_GROW, 0, 0, 0, 0, "Increase font size" },
   { K_BUTTON, S_ICON, IC_SHRINK, 0, NULL, ID_SHRINK, 0, 0, 0, 0, "Decrease font size" },
+  { K_BUTTON, S_ICON, IC_SUPER, 0, NULL, ID_LX_SUPER, 0, 0, 0, 0, "Superscript" },
+  { K_BUTTON, S_ICON, IC_SUB, 0, NULL, ID_LX_SUB, 0, 0, 0, 0, "Subscript" },
   { K_BUTTON, S_ICON, IC_BOLD, 0, NULL, ID_BOLD, RB_BOLD, 0, F_ROW1, 0, "Bold (Amiga-B)" },
   { K_BUTTON, S_ICON, IC_ITALIC, 0, NULL, ID_ITALIC, RB_ITALIC, 0, F_ROW1, 0, "Italic (Amiga-I)" },
   { K_BUTTON, S_ICON, IC_UNDERLINE, 0, NULL, ID_UNDERLINE, RB_UNDERLINE, 0, F_ROW1, 0, "Underline (Amiga-U)" },
   { K_BUTTON, S_ICON, IC_STRIKE, 0, NULL, ID_STRIKE, RB_STRIKE, 0, F_ROW1, 0, "Strikethrough" },
+  { K_BUTTON, S_ICON, IC_DBLUNDER, 0, NULL, ID_LX_DBLUNDER, 0, 0, F_ROW1, 0, "Double underline" },
   { K_DROP, S_ICON, IC_TBORDERS, L_BORDERS, NULL, ID_BORDERDD, 0, 0, F_ROW1, 0, "Borders" },
   { K_DROP, S_ICON, IC_FILLCOLOR, L_FILLS, NULL, ID_FILLCOLOR, 0, 0, F_ROW1, 0, "Fill colour" },
   { K_DROP, S_ICON, IC_FONTCOLOR, L_COLORS, NULL, ID_FONTCOLOR, 0, 0, F_ROW1, 0, "Font colour" },
@@ -211,6 +214,7 @@ static const Item h_align[] = {
   { K_BUTTON, S_ICON, IC_ALIGNMID, 0, NULL, ID_AMIDDLE, RB_AMIDDLE, 0, 0, 0, "Middle align" },
   { K_BUTTON, S_ICON, IC_ALIGNBOT, 0, NULL, ID_ABOTTOM, RB_ABOTTOM, 0, 0, 0, "Bottom align" },
   { K_BUTTON, S_ICON, IC_WRAPTEXT, 0, NULL, ID_WRAP, RB_WRAP, 0, 0, 0, "Wrap text" },
+  { K_DROP, S_ICON, IC_TEXTORIENT, LXL_TEXTORIENT, NULL, ID_LX_TEXTORIENTDD, 0, 0, 0, 0, "Orientation: text at an angle or upright" },
   { K_BUTTON, S_ICON, IC_LEFT, 0, NULL, ID_LEFT, RB_ALEFT, 0, F_ROW1, 0, "Align left" },
   { K_BUTTON, S_ICON, IC_CENTER, 0, NULL, ID_CENTER, RB_ACENTER, 0, F_ROW1, 0, "Centre" },
   { K_BUTTON, S_ICON, IC_RIGHT, 0, NULL, ID_RIGHT, RB_ARIGHT, 0, F_ROW1, 0, "Align right" },
@@ -221,6 +225,7 @@ static const Item h_align[] = {
 static const Item h_num[] = {
   { K_FIELD, S_SMALL, 0, L_NUMFMTS, NULL, ID_NUMFMTDD, 0, 0, 0, 104, "Number format" },
   { K_BUTTON, S_ICON, IC_CURRENCY, 0, NULL, ID_CURRENCY, 0, 0, F_ROW1, 0, "Currency format" },
+  { K_BUTTON, S_ICON, IC_ACCOUNTING, 0, NULL, ID_LX_ACCOUNTING, 0, 0, F_ROW1, 0, "Accounting number format" },
   { K_BUTTON, S_ICON, IC_PERCENT, 0, NULL, ID_PERCENT, 0, 0, F_ROW1, 0, "Percent style" },
   { K_BUTTON, S_ICON, IC_COMMA, 0, NULL, ID_COMMA, 0, 0, F_ROW1, 0, "Comma style: thousands separators" },
   { K_BUTTON, S_ICON, IC_INCDEC, 0, NULL, ID_INCDEC, 0, 0, F_ROW1, 0, "Increase decimal" },
@@ -265,9 +270,13 @@ static const Item i_names[] = {
 static const Item i_links[] = {
   { K_BUTTON, S_LARGE, IC_LINK, 0, "Link", ID_LINK, 0, 0, 0, 0, "A link to a web page, a mail address or a place in the workbook" },
   { K_BUTTON, S_LARGE, IC_COMMENT, 0, "Note", ID_NOTENEW, 0, 0, 0, 0, "A note on the active cell" },
+  { K_BUTTON, S_LARGE, IC_SHOWCOMMENTS, 0, "Comment", ID_LX_COMMENTNEW, 0, 0, 0, 0, "A comment on the active cell: a conversation others can reply to" },
+};
+static const Item i_text[] = {
+  { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
 };
 static const Group insert[] = { { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Functions", G_COLS, i_fn, N(i_fn) },
-                                { "Links", G_COLS, i_links, N(i_links) }, { "Names", G_COLS, i_names, N(i_names) } };
+                                { "Links", G_COLS, i_links, N(i_links) }, { "Names", G_COLS, i_names, N(i_names) }, { "Text", G_COLS, i_text, N(i_text) } };
 /* Page Layout: themes, the page setup (Ledger doesn't print, but PDF export, Page Break Preview and
    Excel use it), scaling, the sheet options, and Ledger's sheet tools */
 static const Item p_themes[] = {
@@ -387,9 +396,17 @@ static const Item r_notes[] = {
   { K_BUTTON, S_SMALL, IC_NEXT, 0, "Next", ID_NOTENEXT, 0, 0, 0, 0, "Go to the next note" },
   { K_BUTTON, S_SMALL, IC_SHOWNOTE, 0, "Show/Hide Note", ID_LX_NOTESHOWHIDE, LXB_NOTESHOWN, RB_HASNOTE, F_NEWCOL, 0, "Keep the active cell's note shown, or hide it again" },
   { K_BUTTON, S_SMALL, IC_SHOWCOMMENTS, 0, "Show All Notes", ID_NOTESHOW, RB_NOTES, 0, 0, 0, "Show every note beside its cell" },
+  { K_BUTTON, S_SMALL, IC_COMMENT, 0, "Convert to Comments", ID_LX_CONVERTNOTES, 0, 0, 0, 0, "Turn the workbook's notes into comments that can have replies" },
+};
+static const Item r_comments[] = {
+  { K_BUTTON, S_LARGE, IC_COMMENT, 0, "New Comment", ID_LX_COMMENTNEW, 0, 0, 0, 0, "Start a conversation on the active cell, or reply to its comment" },
+  { K_BUTTON, S_SMALL, IC_DELETE, 0, "Delete", ID_LX_COMMENTDEL, 0, LXB_COMMENTS, 0, 0, "Delete the active cell's comment and its replies" },
+  { K_BUTTON, S_SMALL, IC_PREV, 0, "Previous", ID_LX_COMMENTPREV, 0, 0, 0, 0, "Go to the comment before this one" },
+  { K_BUTTON, S_SMALL, IC_NEXT, 0, "Next", ID_LX_COMMENTNEXT, 0, 0, 0, 0, "Go to the next comment" },
+  { K_BUTTON, S_LARGE, IC_SHOWCOMMENTS, 0, "Show Comments", ID_LX_COMMENTSHOW, 0, 0, 0, 0, "Every comment of the workbook with its replies" },
 };
 static const Group review[] = { { "Proofing", G_COLS, r_proof, N(r_proof) }, { "Accessibility", G_COLS, r_access, N(r_access) },
-                                { "Notes", G_COLS, r_notes, N(r_notes) }, { "Find", G_COLS, r_find, N(r_find) } };
+                                { "Comments", G_COLS, r_comments, N(r_comments) }, { "Notes", G_COLS, r_notes, N(r_notes) }, { "Find", G_COLS, r_find, N(r_find) } };
 /* View */
 static const Item v_views[] = {
   { K_BUTTON, S_LARGE, IC_NORMALVIEW, 0, "Normal", ID_LX_NORMAL, LXB_NORMAL, 0, 0, 0, "The sheet as cells, without pages" },
