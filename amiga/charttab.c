@@ -550,9 +550,9 @@ static int chart_elems(const Chart *c)
   static const char *const fixed[4] = { "Chart Area", "Plot Area", "Chart Title", "Legend" };
   CData d;
   int n = 0, k;
-  for (k = 0; k < 4; k++) { strcpy(elab[n], fixed[k]); eptr[n] = elab[n]; n++; }
+  for (k = 0; k < 4; k++) { strcpy(elab[n], tr(fixed[k])); eptr[n] = elab[n]; n++; }
   if (c && chart_resolve(book, cur_index(), c, &d)) {
-    for (k = 0; k < d.ns && n < 44; k++) { char t[40]; utf8_latin(d.s[k].name, t, sizeof t); snprintf(elab[n], sizeof elab[n], "Series \"%s\"", t); eptr[n] = elab[n]; n++; }
+    for (k = 0; k < d.ns && n < 44; k++) { char t[40]; utf8_latin(d.s[k].name, t, sizeof t); snprintf(elab[n], sizeof elab[n], tr("Series \"%s\""), t); eptr[n] = elab[n]; n++; }
     cdata_free(&d);
   }
   eptr[n] = NULL;

@@ -50,7 +50,7 @@ Column Headers	Spaltenkopf	En-têtes de colonnes	Encabezados de columna	Intestaz
 Sum	Summe	Somme	Suma	Somma
 Average	Mittelwert	Moyenne	Promedio	Media
 Count	Anzahl	Nombre	Cuenta	Conteggio
-Count Numbers	Anzahl Zahlen	Chiffres	Contar números	Conta numeri
+Count Numbers	Anzahl	Nombres	Contar números	Conta numeri
 Max	Max	Max	Máx.	Max
 Min	Min	Min	Mín.	Min
 Product	Produkt	Produit	Producto	Prodotto
@@ -151,12 +151,12 @@ Banded PivotTable Rows	Gebänderte PivotTable-Zeilen	Lignes à bandes du tableau
 Banded PivotTable Columns	Gebänderte PivotTable-Spalten	Colonnes à bandes du tableau croisé	Columnas con bandas de la tabla dinámica	Colonne alternate tabella pivot
 Clipboard	Zwischenablage	Presse-papiers	Portapapeles	Appunti
 Font	Schriftart	Police	Fuente	Carattere
-Styles	Vorlagen	Styles	Estilos	Stili
+Styles	Formatvorlagen	Styles	Estilos	Stili
 Editing	Bearbeiten	Édition	Edición	Modifica
 Tables	Tabellen	Tableaux	Tablas	Tabelle
 Illustrations	Illustrationen	Illustrations	Ilustraciones	Illustrazioni
 Comments	Kommentare	Commentaires	Comentarios	Commenti
-Header & Footer	Kopf- und Fußzeile	En-tête et pied	Encabezado y pie	Intestazione e piè
+Header & Footer	Kopf- und Fußzeile	En-tête/Pied	Encabezado y pie	Intestaz. e piè di pagina
 Text	Text	Texte	Texto	Testo
 Page Setup	Seite einrichten	Mise en page	Configurar página	Imposta pagina
 Proofing	Dokumentprüfung	Vérification	Revisión	Strumenti di correzione
@@ -167,7 +167,7 @@ Alignment	Ausrichtung	Alignement	Alineación	Allineamento
 Paste	Einfügen	Coller	Pegar	Incolla
 Cut	Ausschneiden	Couper	Cortar	Taglia
 Copy	Kopieren	Copier	Copiar	Copia
-Format	Format	Reproduire	Copiar formato	Copia formato
+Format	Format	Format	Formato	Formato
 Find	Suchen	Rechercher	Buscar	Trova
 Replace	Ersetzen	Remplacer	Reemplazar	Sostituisci
 Select	Markieren	Sélectionner	Seleccionar	Seleziona
@@ -178,7 +178,7 @@ Date	Datum	Date	Fecha	Data
 Symbol	Symbol	Symbole	Símbolo	Simbolo
 Margins	Seitenränder	Marges	Márgenes	Margini
 Orientation	Ausrichtung	Orientation	Orientación	Orientamento
-Breaks	Umbrüche	Sauts	Saltos	Interruzioni
+Breaks	Umbrüche	Sauts de page	Saltos	Interruzioni
 Left:	Links:	Gauche :	Izquierda:	Sinistra:
 Right:	Rechts:	Droite :	Derecha:	Destra:
 Spelling	Rechtschreibung	Orthographe	Ortografía	Ortografia
@@ -189,7 +189,7 @@ Next	Nächster	Suivant	Siguiente	Successivo
 Show Comments	Kommentare anzeigen	Afficher les commentaires	Mostrar comentarios	Mostra commenti
 Ruler	Lineal	Règle	Regla	Righello
 Gridlines	Gitternetzlinien	Quadrillage	Cuadrícula	Griglia
-Merge Cells	Zellen verbinden	Fusionner	Combinar celdas	Unisci celle
+Merge Cells	Zellen verbinden	Fusionner les cellules	Combinar celdas	Unisci celle
 Top	Oben	Haut	Arriba	In alto
 Centre	Zentriert	Centre	Centro	Al centro
 Bottom	Unten	Bas	Abajo	In basso
@@ -229,9 +229,9 @@ Landscape	Querformat	Paysage	Horizontal	Orizzontale
 Delete Rows	Zeilen löschen	Supprimer les lignes	Eliminar filas	Elimina righe
 Delete Columns	Spalten löschen	Supprimer les colonnes	Eliminar columnas	Elimina colonne
 Normal	Standard	Normal	Normal	Normale
-Heading 1	Überschrift 1	Titre 1	Título 1	Titolo 1
-Heading 2	Überschrift 2	Titre 2	Título 2	Titolo 2
-Heading 3	Überschrift 3	Titre 3	Título 3	Titolo 3
+Heading 1	Überschrift 1	Titre 1	Encabezado 1	Titolo 1
+Heading 2	Überschrift 2	Titre 2	Encabezado 2	Titolo 2
+Heading 3	Überschrift 3	Titre 3	Encabezado 3	Titolo 3
 Title	Titel	Titre	Título	Titolo
 New	Neu	Nouveau	Nuevo	Nuovo
 Open	Öffnen	Ouvrir	Abrir	Apri
@@ -241,7 +241,7 @@ Save As	Speichern unter	Enregistrer sous	Guardar como	Salva con nome
 Print	Drucken	Imprimer	Imprimir	Stampa
 Export	Exportieren	Exporter	Exportar	Esporta
 Options	Optionen	Options	Opciones	Opzioni
-About	Info über Quill	À propos	Acerca de	Informazioni su Quill
+About	Info	À propos	Acerca de	Informazioni
 Blank	Leer	Vide	En blanco	Vuoto
 Recent	Zuletzt verwendet	Récents	Recientes	Recenti
 Browse	Durchsuchen	Parcourir	Examinar	Sfoglia
@@ -261,12 +261,12 @@ Custom	Benutzerdefiniert	Personnalisé	Personalizado	Personalizzato
 Headings	Überschriften	Titres	Títulos	Titoli
 Open...	Öffnen...	Ouvrir...	Abrir...	Apri...
 Save As...	Speichern unter...	Enregistrer sous...	Guardar como...	Salva con nome...
-About...	Über Quill...	À propos...	Acerca de...	Informazioni...
+About...	Über Ledger...	À propos...	Acerca de...	Informazioni...
 Quit	Beenden	Quitter	Salir	Esci
 Edit	Bearbeiten	Édition	Edición	Modifica
 Undo	Rückgängig	Annuler	Deshacer	Annulla
 Redo	Wiederholen	Rétablir	Rehacer	Ripeti
-Find Next	Weitersuchen	Suivant	Buscar siguiente	Trova successivo
+Find Next	Weitersuchen	Rechercher le suivant	Buscar siguiente	Trova successivo
 Picture...	Bild...	Image...	Imagen...	Immagine...
 Bold	Fett	Gras	Negrita	Grassetto
 Italic	Kursiv	Italique	Cursiva	Corsivo
@@ -347,7 +347,7 @@ Edit Text	Text bearbeiten	Modifier le texte	Editar texto	Modifica testo
 Border	Rahmen	Bordure	Borde	Bordo
 Shape Fill	Fülleffekt	Remplissage	Relleno de forma	Riempimento forma
 Shape Outline	Formkontur	Contour de forme	Contorno de forma	Contorno forma
-Wrap Text	Textumbruch	Habillage	Ajustar texto	Disposizione testo
+Wrap Text	Textumbruch	Renvoyer à la ligne automatiquement	Ajustar texto	Testo a capo
 Rotate	Drehen	Faire pivoter	Girar	Ruota
 Rectangle	Rechteck	Rectangle	Rectángulo	Rettangolo
 Rounded Rectangle	Abgerundetes Rechteck	Rectangle arrondi	Rectángulo redondeado	Rettangolo arrotondato
@@ -2516,3 +2516,20 @@ Slicers that filter the PivotTable by a field's items	Datenschnitte, die die Piv
 Calculated Field: a formula over the other fields' sums	Berechnetes Feld: eine Formel über die Summen der anderen Felder	Champ calculé : une formule sur les sommes des autres champs	Campo calculado: una fórmula sobre las sumas de los demás campos	Campo calcolato: una formula sulle somme degli altri campi
 A chart of the PivotTable's report, which follows it	Ein Diagramm des PivotTable-Berichts, das ihm folgt	Un graphique du rapport du tableau croisé, qui le suit	Un gráfico del informe de la tabla dinámica, que lo sigue	Un grafico del rapporto della tabella pivot, che lo segue
 PivotTables that suit the source data	Zu den Quelldaten passende PivotTables	Les tableaux croisés adaptés aux données source	Tablas dinámicas adecuadas a los datos de origen	Tabelle pivot adatte ai dati di origine
+## the menu titles: short forms, so the ten fit the 640-pixel menu bar (main.c menu_titles[])
+Project (menu title)	Datei	Projet	Archivo	File
+Edit (menu title)	Bearb.	Édit.	Editar	Modif.
+Insert (menu title)	Einfg.	Insér.	Insert.	Inser.
+Format (menu title)	Format	Format	Formato	Formato
+Data (menu title)	Daten	Données	Datos	Dati
+View (menu title)	Ansicht	Affich.	Ver	Vista
+Page (menu title)	Seite	Page	Página	Pagina
+Formulas (menu title)	Formel	Formul.	Fórm.	Formule
+Review (menu title)	Prüfen	Révis.	Revisar	Revis.
+Table (menu title)	Tabelle	Tabl.	Tabla	Tabella
+## (words with a slash)
+Day/Month/Year	Tag/Monat/Jahr	Jour/Mois/Année	Día/Mes/Año	Giorno/Mese/Anno
+Month/Day/Year	Monat/Tag/Jahr	Mois/Jour/Année	Mes/Día/Año	Mese/Giorno/Anno
+Win/Loss	Gewinn/Verlust	Positif/Négatif	Ganancia/Pérdida	Positivi/Negativi
+Win/Loss...	Gewinn/Verlust...	Positif/Négatif...	Ganancia/Pérdida...	Positivi/Negativi...
+Header/Footer	Kopf-/Fußzeile	En-tête/Pied	Encabezado/Pie	Intestaz./Piè di pag.

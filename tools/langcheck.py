@@ -94,7 +94,7 @@ def not_words(t):
     if re.fullmatch(r'[A-Z][A-Z0-9_.]*[A-Z0-9]?(\(\)?)?', t) and len(t) >= 3: return True   # FUNCTION names, IDs
     if ' ' not in t and re.fullmatch(r'[A-Za-z0-9_]+:\S+', t): return True           # PROGDIR:file, FONTS:...
     if ' ' not in t and re.search(r'\.[a-z]{2,9}$', t) and not t.endswith('...'): return True  # file names
-    if ' ' not in t and re.fullmatch(r'[a-z0-9_/.\-]+', t) and len(t) >= 2 and '_' in t or '/' in t and ' ' not in t: return True
+    if ' ' not in t and re.fullmatch(r'[a-z0-9_/.\-]+', t) and ('_' in t or '/' in t): return True   # paths, ids
     return False
 
 def read_ignore():

@@ -144,6 +144,19 @@ static struct NewMenu menus[] = {
 
 /* the menus' labels in the language chosen (lang_set), for the menu strips made after: the English
    kept from the first call, so a new language can be put in later */
+/* the ten menu titles fill the 640-pixel menu bar in English, so each language has short forms of
+   its own for them, under these keys ("Data (menu title)"); a title without one takes the word's
+   usual translation */
+static const char *const menu_titles[] = { "Project (menu title)", "Edit (menu title)", "Insert (menu title)", "Format (menu title)",
+  "Data (menu title)", "View (menu title)", "Page (menu title)", "Formulas (menu title)", "Review (menu title)", "Table (menu title)" };
+static const char *menu_title(const char *en)
+{
+  size_t n = strlen(en);
+  int k;
+  for (k = 0; k < (int)(sizeof menu_titles / sizeof menu_titles[0]); k++)
+    if (!strncmp(menu_titles[k], en, n) && menu_titles[k][n] == ' ') { const char *t = tr(menu_titles[k]); if (t != menu_titles[k]) return t; }
+  return tr(en);
+}
 static void menus_translate(void)
 {
   static CONST_STRPTR en[sizeof menus / sizeof menus[0]];
@@ -151,7 +164,8 @@ static void menus_translate(void)
   int i;
   for (i = 0; menus[i].nm_Type != NM_END; i++) {
     if (!kept) en[i] = menus[i].nm_Label;
-    if (en[i] && en[i] != NM_BARLABEL) menus[i].nm_Label = (STRPTR)tr((const char *)en[i]);
+    if (en[i] && en[i] != NM_BARLABEL)
+      menus[i].nm_Label = (STRPTR)(menus[i].nm_Type == NM_TITLE ? menu_title((const char *)en[i]) : tr((const char *)en[i]));
   }
   kept = 1;
 }
