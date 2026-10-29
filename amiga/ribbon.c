@@ -293,9 +293,7 @@ static const Item i_fn[] = {
   { K_BUTTON, S_SMALL, IC_DATE, 0, "Date", ID_DATE, 0, 0, F_NEWCOL, 0, "Today's date (Amiga-;)" },
   { K_BUTTON, S_SMALL, IC_TIME, 0, "Time", ID_TIME, 0, 0, 0, 0, "The time now (Amiga-:)" },
   { K_DROP, S_SMALL, IC_SYMBOL, L_SYMBOLS, "Symbol", ID_SYMBOLDD, 0, 0, 0, 0, "A symbol" },
-};
-static const Item i_ctl[] = {
-  { K_BUTTON, S_LARGE, IC_CHECKBOX, 0, "Checkbox", ID_AN_CHECKBOX, 0, 0, 0, 0, "Checkboxes in the selected cells: TRUE ticked, FALSE not; click or Space to tick" },
+  { K_BUTTON, S_SMALL, IC_CHECKBOX, 0, "Checkbox", ID_AN_CHECKBOX, 0, 0, F_NEWCOL, 0, "Cell controls: checkboxes in the selected cells (TRUE ticked, FALSE not; click or Space to tick)" },
 };
 static const Item i_names[] = {
   { K_BUTTON, S_LARGE, IC_DEFNAME, 0, "Name", ID_DEFNAME, 0, 0, 0, 0, "Give the selection a name to use in formulas" },
@@ -316,7 +314,7 @@ static const Item i_textx[] = {
 static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Illustrations", G_COLS, ix_illus, N(ix_illus) },
                                 { "Charts", G_COLS, ix_charts, N(ix_charts) }, { "Sparklines", G_COLS, ix_spark, N(ix_spark) }, { "Filters", G_COLS, i_filters, N(i_filters) },
                                 { "Functions", G_COLS, i_fn, N(i_fn) }, { "Links", G_COLS, i_links, N(i_links) }, { "Text", G_COLS, i_textx, N(i_textx) },
-                                { "Names", G_COLS, i_names, N(i_names) }, { "Cell Controls", G_COLS, i_ctl, N(i_ctl) } };
+                                { "Names", G_COLS, i_names, N(i_names) } };
 /* Page Layout: themes, the page setup (Ledger doesn't print, but PDF export, Page Break Preview and
    Excel use it), scaling, the sheet options, and Ledger's sheet tools */
 static const Item p_themes[] = {
