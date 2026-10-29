@@ -76,6 +76,8 @@ static int history(Book *b, int sheet, const char *tl, const char *vl, Pt **pts,
     double q = ((*pts)[i].t - (*pts)[i - 1].t) / st;
     if (fabs(q - floor(q + 0.5)) > 1e-6) { *why = "The timeline needs a constant step between its points."; free(*pts); *pts = NULL; return 0; }
   }
+  /* more than 30% of the points missing: no constant step after all (as FORECAST.ETS sees it) */
+  if (((*pts)[*np - 1].t - (*pts)[0].t) / st + 1 > *np / 0.7 + 1e-9) { *why = "The timeline needs a constant step between its points."; free(*pts); *pts = NULL; return 0; }
   *step = st;
   return 1;
 }
