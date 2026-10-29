@@ -521,7 +521,7 @@ static int tool_form(int tool)
     if (tf[i].off == O(dist)) notify_id(o, MUIA_Cycle_Active, ID_DLG1);
   }
   tpf.n = i;
-  outs[0] = tr("Output Range:"); outs[1] = tr("New Worksheet Ply:"); outs[2] = NULL;
+  outs[0] = tr("Output Range"); outs[1] = tr("New Worksheet Ply"); outs[2] = NULL;
   {
     char o1[80], o2[40];
     utf8_l1(tpp.out, o1, sizeof o1); utf8_l1(tpp.newsheet, o2, sizeof o2);
@@ -529,7 +529,9 @@ static int tool_form(int tool)
           Child, form,
           Child, QTitleObject(tr("Output options")),
           Child, ColGroup(2),
-            Child, outmode = cycle_obj(outs, tpp.outnew ? 1 : 0), Child, HGroup, Child, out = str_obj(o1, 60), Child, newsh = str_obj(o2, 31), End,
+            Child, Label1(tr("Output to:")), Child, outmode = cycle_obj(outs, tpp.outnew ? 1 : 0),
+            Child, Label1(tr("Output Range:")), Child, out = str_obj(o1, 60),
+            Child, Label1(tr("New Worksheet Ply:")), Child, newsh = str_obj(o2, 31),
           End,
         End, NULL);
   }
@@ -590,7 +592,7 @@ static void dlg_toolpak(void)
   LONG a;
   w = dialog_window("Data Analysis", VGroup,
         Child, LLabel1(tr("Analysis Tools")),
-        Child, ListviewObject, MUIA_Listview_Input, TRUE, MUIA_FixHeightTxt, (ULONG)"\n\n\n\n\n\n\n\n\n\n\n\n", MUIA_FixWidthTxt, (ULONG)"MMMMMMMMMMMMMMMMMMMMMMMMMMMMMM",
+        Child, ListviewObject, MUIA_Listview_Input, TRUE, MUIA_FixHeightTxt, (ULONG)"\n\n\n\n\n\n\n\n\n\n\n\n", MUIA_FixWidthTxt, (ULONG)"MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM",
           MUIA_Listview_List, list = ListObject, InputListFrame,
           MUIA_List_ConstructHook, MUIV_List_ConstructHook_String, MUIA_List_DestructHook, MUIV_List_DestructHook_String, End, End,
       End, NULL);

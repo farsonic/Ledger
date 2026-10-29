@@ -41,7 +41,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Properties (Info) `file.properties`
 - ✅ Options (Options) `file.options`
 
-### Home (67 of 94 by name)
+### Home (68 of 94 by name)
 
 - ✅ Paste (Clipboard) `edit.paste`
 - ✅ Paste Special (Clipboard) `edit.pasteSpecial`
@@ -112,7 +112,7 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Move or Copy Sheet (Cells) `sheet.move`
 - ✅ Tab Color (Cells) `sheet.tabColor`
 - ✅ Protect Sheet (Cells) `review.protectSheet`
-- ⬜ Lock Cell (Cells) `home.lockCell`
+- ✅ Lock Cell (Cells) `home.lockCell`
 - ✅ Format Cells (Cells) `home.formatCells`
 - ✅ AutoSum (Editing) `formulas.autoSum`
 - ✅ Fill Down (Editing) `edit.fillDown`
@@ -138,9 +138,9 @@ GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Belo
 - ✅ Go To Special (Editing) `edit.goToSpecial`
 - ➖ Add-ins (Add-ins) `home.addIns`
 
-New Cell Style keeps the active cell's look under a name in Home > My Styles while Ledger runs (not saved in the file). Format as Table, Flash Fill, Protect Sheet and Lock Cell are the table and data work's. Orientation sets and saves the angle; PDF export draws the text at its angle, the screen shows it upright. Draw Border (in the Borders list) draws on the next cells dragged over, one stroke at a time. Add-ins: Ledger has none.
+New Cell Style keeps the active cell's look under a name in Home > My Styles while Ledger runs (not saved in the file). Format as Table, Flash Fill and Protect Sheet are the table and data work's. Lock Cell (in the Format list and the Format menu) locks the selected cells, or unlocks them when the active cell is locked; a protected sheet refuses it unless Format cells is allowed. Orientation sets and saves the angle; PDF export draws the text at its angle, the screen shows it upright. Draw Border (in the Borders list) draws on the next cells dragged over, one stroke at a time. Add-ins: Ledger has none.
 
-### Insert (9 of 17 by name)
+### Insert (10 of 17 by name)
 
 - ✅ PivotTable (Tables) `insert.pivotTable`
 - ⬜ Recommended PivotTables (Tables) `insert.recommendedPivotTables`
@@ -158,7 +158,9 @@ New Cell Style keeps the active cell's look under a name in Home > My Styles whi
 - ✅ Text Box (Text) `insert.textBox`
 - ✅ Header & Footer (Text) `pageLayout.headerFooter`
 - ✅ Symbol (Symbols) `insert.symbol`
-- ⬜ Checkbox (Cell Controls) `insert.checkbox`
+- ✅ Checkbox (Cell Controls) `insert.checkbox`
+
+Checkbox makes the selected cells checkboxes, as GridCraft and Excel do: the cell holds TRUE or FALSE and shows a box (empty cells start FALSE; a formula's TRUE/FALSE shows too); a click on the cell or Space ticks it. It is kept as the cell format "checkbox" (GridCraft's way) and saved in .xlsx as Excel saves it: General plus the xf's feature property bag extension (featurePropertyBag.xml, [MS-XLSX] 2.1.22), read back from Excel's files.
 
 ### Draw (4 of 4 by name)
 
@@ -221,7 +223,7 @@ Not done on Page Layout: Effects only matter to charts and shapes (GridCraft kee
 - ✅ Calculate Now (Calculation) `formulas.calculateNow`
 - ✅ Calculate Sheet (Calculation) `formulas.calculateSheet`
 
-### Data (17 of 23 by name; 3 not applicable)
+### Data (20 of 23 by name; 3 not applicable)
 
 - ✅ Get Data (Get & Transform Data) `data.getData`
 - ✅ From Text/CSV (Get & Transform Data) `data.fromTextCsv`
@@ -238,16 +240,18 @@ Not done on Page Layout: Effects only matter to charts and shapes (GridCraft kee
 - ✅ Scenario Manager (Forecast) `data.scenarioManager`
 - ✅ Goal Seek (Forecast) `data.goalSeek`
 - ✅ Data Table (Forecast) `data.dataTable`
-- ⬜ Forecast Sheet (Forecast) `data.forecastSheet`
+- ✅ Forecast Sheet (Forecast) `data.forecastSheet`
 - ✅ Group (Outline) `data.group`
 - ✅ Ungroup (Outline) `data.ungroup`
 - ✅ Subtotal (Outline) `data.subtotal`
 - ✅ Show Detail (Outline) `data.showDetail`
 - ✅ Hide Detail (Outline) `data.hideDetail`
-- ⬜ Solver (Analysis) `data.solver`
-- ⬜ Data Analysis (Analysis) `data.analysisToolPak`
+- ✅ Solver (Analysis) `data.solver`
+- ✅ Data Analysis (Analysis) `data.analysisToolPak`
 
-### Review (3 of 15 by name)
+Forecast Sheet makes a new sheet before the data's: the timeline and values (sorted), FORECAST.ETS and the FORECAST.ETS.CONFINT bounds as live formulas, optional FORECAST.ETS.STAT statistics, a table and a line (or column) chart; the dialog sets the end, seasonality (automatic, none, a length), the confidence interval, how missing points are filled and duplicates aggregated. Solver has GridCraft's three methods: Simplex LP (linearised and checked, a two-phase simplex, branch and bound for int, bin and dif), GRG Nonlinear (an augmented Lagrangian with projected gradient steps, and Multistart from random points) and Evolutionary; Solver Results keeps or restores the solution and writes Answer and Limits reports; the model is saved in the sheet's hidden solver_ names as Excel saves it. Data Analysis has all nineteen of Excel's tools (GridCraft's thirteen, plus two-factor Anova with and without replication, Fourier Analysis, Random Number Generation, Sampling and the z-Test), writing values to an output range (asking before replacing data) or a new sheet.
+
+### Review (15 of 15 by name)
 
 - ✅ Spelling (Proofing) `review.spelling`
 - ✅ Thesaurus (Proofing) `review.thesaurus`
@@ -263,9 +267,9 @@ Not done on Page Layout: Effects only matter to charts and shapes (GridCraft kee
 - ✅ Convert to Comments (Notes) `review.convertToComments`
 - ✅ Unprotect Sheet (Protect) `review.unprotectSheet`
 - ✅ Protect Workbook (Protect) `review.protectWorkbook`
-- ⬜ Allow Edit Ranges (Protect) `review.allowEditRanges`
+- ✅ Allow Edit Ranges (Protect) `review.allowEditRanges`
 
-The Protect group (Unprotect Sheet, Protect Workbook, Allow Edit Ranges) is the data work's. Thesaurus offers words sharing the word's stem in the dictionary, as GridCraft's does; Check Accessibility makes GridCraft's checks (merged cells, default sheet names).
+The Protect group's Unprotect Sheet and Protect Workbook are the data work's. Allow Edit Ranges keeps ranges (with a password or none) that stay editable on a protected sheet; a password range asks for its password once; they are saved as <protectedRanges> in .xlsx. Thesaurus offers words sharing the word's stem in the dictionary, as GridCraft's does; Check Accessibility makes GridCraft's checks (merged cells, default sheet names).
 
 ### View (13 of 20 by name)
 

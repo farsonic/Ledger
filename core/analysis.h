@@ -6,7 +6,7 @@
  *
  * The behaviour follows GridCraft's (crates/engine/src/cmd/solver*, analysis.rs, forecast.rs,
  * extra/cells.rs and its xlsx crate's feature property bags), which follows Excel's; the C here is
- * written from that documented behaviour (GridCraft is MIT licensed, see Licenses.txt).
+ * written from that documented behaviour; none of GridCraft's code is copied.
  */
 #ifndef LEDGER_ANALYSIS_H
 #define LEDGER_ANALYSIS_H

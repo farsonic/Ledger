@@ -244,6 +244,7 @@ int forecast_sheet(Book *b, int sheet, const ForecastOpts *o, const char **why)
       }
       c->legend = LG_BOTTOM;
       c->hgrid = 1;
+      c->has_title = 0;
       if ((ob = drw_new(s, OB_CHART))) {
         ob->chart = c; c = NULL;
         x = sheet_col_px(s, ccol); y = sheet_row_px(s, 1);
