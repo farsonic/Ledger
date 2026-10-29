@@ -40,7 +40,7 @@ for row, name, fl, fr in meta:
             if name == 'RANDBETWEEN': ok = ours in ('N:%d' % i for i in range(1, 7))
             if name == 'NOW': ok = ok and theirs.startswith('N:') and abs(float(ours[2:]) - float(theirs[2:])) < 0.01
         else: ok = same(ours, theirs)
-        if not ok and form in known: explained += 1
+        if not ok and (form in known or (k == 1 and fl in known)): explained += 1   # (the cells form of a known literal one)
         elif not ok: bad.append((row, name, 'literal' if k == 0 else 'cells', form, ours, theirs))
     # the two forms against each other
     if fl and name not in VOLATILE and not same(lv[0], lv[1]) and 'LIT:' + name in known: explained += 1

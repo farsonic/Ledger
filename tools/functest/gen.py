@@ -4,6 +4,10 @@ from cases import C, R
 # functions Excel only takes ranges for (it won't accept array constants there)
 RANGE_ONLY = {'ROW','COLUMN','COUNTIF','COUNTIFS','SUMIF','SUMIFS','AVERAGEIF','AVERAGEIFS','MAXIFS','MINIFS','OFFSET','COUNTBLANK'}
 XLFN = {'CEILING.MATH','CONCAT','DAYS','FLOOR.MATH','IFNA','IFS','ISFORMULA','MAXIFS','MINIFS','MODE.SNGL','NUMBERVALUE','PERCENTILE.EXC','PERCENTILE.INC','QUARTILE.INC','RANK.EQ','STDEV.P','STDEV.S','SWITCH','TEXTJOIN','UNICHAR','VAR.P','VAR.S','XLOOKUP','XOR'}
+# and every function whose table entry in core/func*.c is flagged FF_XLFN
+import glob, os
+for _f in glob.glob(os.path.join(sys.argv[1], '..', '..', 'core', 'func*.c')):
+    XLFN |= set(re.findall(r'\{ "([A-Z0-9._]+)", \d+, \d+, [^,}]*FF_XLFN', open(_f).read()))
 wb = openpyxl.Workbook(); T = wb.active; T.title = 'T'; D = wb.create_sheet('Data')
 num = re.compile(r'^-?\d+(\.\d+)?$')
 def put(ws, cell, frag):
