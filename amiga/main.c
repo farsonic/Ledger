@@ -56,7 +56,7 @@
 #define MUIKEYF_WINDOW_CLOSE (1UL << MUIKEY_WINDOW_CLOSE)
 #endif
 
-const char verstag[] = "$VER: Ledger 0.2.2 (28.10.2026) a spreadsheet for the Amiga (MUI)";
+const char verstag[] = "$VER: Ledger 0.3 (29.10.2026) a spreadsheet for the Amiga (MUI)";
 
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
@@ -1352,7 +1352,7 @@ static void command(ULONG id)
   case ID_SAVEAS: save_as(0); break;
   case ID_SAVECSV: save_as(1); break;
   case ID_ABOUT:
-    ask("OK", "%s", "Ledger 0.2.2\nA spreadsheet for the Amiga (68040 or better, MUI)\n\nReads and writes Excel workbooks (.xlsx) and CSV.\nIts look follows GridCraft's; its icons are its own.");
+    ask("OK", "%s", "Ledger 0.3\nA spreadsheet for the Amiga (68040 or better, MUI)\n\nReads and writes Excel workbooks (.xlsx) and CSV.\nIts look follows GridCraft's; its icons are its own.");
     break;
   case ID_NEXTWIN: break;          /* (main's loop) */
   case ID_UNDO: case ID_REDO: {
@@ -1892,7 +1892,7 @@ int main(int argc, char **argv)
   lang_set(LANG_EN);
   theme_set_dark(pref_dark);
   theme_set_large(pref_large);
-  splash_open(pub_screen, "Ledger 0.2.2");
+  splash_open(pub_screen, "Ledger 0.3");
   splash_step(3, tr("Adding Ledger's fonts drawer"));
   DiskfontBase = OpenLibrary((STRPTR)"diskfont.library", 39);
   add_fonts();
