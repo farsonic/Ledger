@@ -181,7 +181,7 @@ python3 tools/mkicons.py <package-dir>      # the Workbench icons (needs Pillow)
 ## Licences
 
 - **Ledger:** the code is new, written for this project. It borrows GridCraft's ideas but none of its code. The interface code it shares with Quill is the same author's.
-- **Its licence:** not chosen yet; the author will choose one before the code is published.
+- **Its licence:** the GNU General Public License, version 2 (GPL-2.0-only); see `LICENSE`. The parts by other people listed here keep their own licences, all of which allow this.
 - **TrueType fonts:** Liberation (Red Hat, Google), Carlito and Caladea, under the SIL Open Font License 1.1. See `TrueType/LICENSE-fonts.txt`.
 - **Spelling dictionary:** `Dict/british-english` is SCOWL's British English word list (Copyright 2000-2011 Kevin Atkinson and others; see `Dict/LICENSE-dict.txt`), shared with Quill, as is the spelling checker's code.
 - **GridCraft's theme palettes:** the colours of the Craft, Slate, Meadow, Ember, Ocean, Orchid and Graphite themes (Page Layout > Themes) are GridCraft's (MIT licence, (c) the GridCraft authors).
