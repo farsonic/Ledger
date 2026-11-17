@@ -1,5 +1,7 @@
 # Ledger: a spreadsheet for the Amiga
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-farsonic-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/farsonic)
+
 Ledger 0.3 is a native spreadsheet for AmigaOS with a MUI interface. It reads and writes Excel workbooks (.xlsx) and CSV files, opens old Excel (.xls) and OpenDocument (.ods) files, exports PDF, and works out formulas as Excel does, with 514 functions (every one GridCraft has), dynamic arrays and LAMBDA. It is written in C for a 68040 or better (it uses the 68040's floating-point unit). Its design and look follow GridCraft, an open-source spreadsheet in Rust, the way Quill, Ledger's word-processing sibling, follows WordCraft (see "Why C, not a port"). It shares Quill's ribbon, File page, dialogs, icons and screen fonts, so the two look and work alike.
 
 ![Ledger with its example workbook](docs/ledger-example.png)
