@@ -70,7 +70,7 @@ Before a package ships, search it for certificate or key material and refuse if 
 
 Ledger 0.3 is released: it closed the gap with GridCraft (every function, every ribbon command but the
 scripting tools, and the big features; see the README's "What's new in 0.3"). All feature branches are
-merged into `main`. `FEATURES.md` and `docs/gridcraft-gap.md` mark anything still to do; beyond them,
+merged into `master`. `FEATURES.md` and `docs/gridcraft-gap.md` mark anything still to do; beyond them,
 likely next steps are speed on large sheets on a real 68040, more file-format fidelity (charts and pivots
 written by other programs), and checks on real AmigaOS 3.x with MUI.
 
