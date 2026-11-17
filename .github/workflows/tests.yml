@@ -1,0 +1,13 @@
+# Native tests of Ledger's portable core (ASan/UBSan) and the interface-string checks. The Amiga build
+# needs vbcc, the NDK and the MUI headers, which are not installed here; see CLAUDE.md.
+name: tests
+on:
+  push:
+  pull_request:
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native tests
+        run: TMP=$RUNNER_TEMP sh tools/test.sh
