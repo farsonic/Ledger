@@ -476,8 +476,8 @@ void dlg_define_name(void)
 void dlg_sort(void)
 {
   static const ULONG ends[] = { ID_DLGOK, 0 };
-  static const char *orders_en[] = { "A to Z (smallest first)", "Z to A (largest first)", NULL };
-  static const char *cols[3][66], *ord[3][4];
+  static const char *orders_en[] = { "A to Z (smallest first)", "Z to A (largest first)", "Sun, Mon, Tue...", "Jan, Feb, Mar...", NULL };
+  static const char *cols[3][66], *ord[3][6];
   static char colname[64][48];
   Object *w, *key[3], *dir[3], *hdr;
   Rect a = cur_sel();
@@ -527,7 +527,10 @@ void dlg_sort(void)
     for (k = 0; k < 3; k++) {
       int v = (int)xget(key[k], MUIA_Cycle_Active) - (k ? 1 : 0);
       if (v < 0) continue;
-      keys[nk].col = a.c1 + v; keys[nk].desc = (int)xget(dir[k], MUIA_Cycle_Active); nk++;
+      {
+        int o = (int)xget(dir[k], MUIA_Cycle_Active);
+        keys[nk].col = a.c1 + v; keys[nk].desc = o == 1; keys[nk].list = o == 2 ? SL_DAYS : o == 3 ? SL_MONTHS : SL_NONE; nk++;
+      }
     }
     if (nk) book_sort(book, cur_index(), a, keys, nk, xget(hdr, MUIA_Selected) != 0);
     refresh_all();
@@ -1074,6 +1077,7 @@ void dlg_filter(i32 col)
   id = run_modal(w, ends, fl_each);
   if (id == ID_DLG1 || id == ID_DLG2) {
     SortKey key;
+    memset(&key, 0, sizeof key);
     key.col = col; key.desc = id == ID_DLG2;
     book_begin(book);
     book_sort(book, cur_index(), s->filter, &key, 1, 1);

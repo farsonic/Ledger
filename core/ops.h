@@ -45,7 +45,11 @@ int   book_fill(Book *b, int sheet, Rect src, Rect dst);
 int   book_series(Book *b, int sheet, Rect area, int across, double step, double stop);
 
 /* ------------------------------------------------------------------ sort, duplicates */
-typedef struct { i32 col; int desc; } SortKey;   /* (col: the sheet's column, within the area) */
+typedef struct { i32 col; int desc; int list; } SortKey;   /* (col: the sheet's column, within the area) */
+/* SortKey.list: a custom list's order (Excel's built-in lists): 0 none (A to Z), SL_DAYS the days of the
+   week, SL_MONTHS the months (their short or long names, case ignored). Values not in the list come
+   after the listed ones, A to Z (GridCraft #3949); empty cells last */
+enum { SL_NONE, SL_DAYS, SL_MONTHS };
 /* the rows of area (the first one left where it is if header) put in order by the keys: numbers
    before text before TRUE/FALSE before errors, empty cells last whichever way; text ignoring case;
    equal rows keep their order. Formulas move with their rows */

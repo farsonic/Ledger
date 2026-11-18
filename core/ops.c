@@ -341,10 +341,28 @@ static int sort_cmp(const Value *a, const Value *b, int desc)
 }
 typedef struct { Value *keys; i32 row; } SortRow;
 static const SortKey *s_keys; static int s_nkeys;
+/* a value's place in a custom list (-1 not in it) */
+static int list_pos(const Value *v, int list)
+{
+  int pos, k;
+  if (v->t != V_STR || !v->s) return -1;
+  k = name_list(v->s, &pos);
+  if (k < 0 || (list == SL_DAYS) != (k < 2)) return -1;
+  return pos;
+}
+static int key_cmp(const Value *a, const Value *b, const SortKey *key)
+{
+  if (key->list) {
+    int pa = list_pos(a, key->list), pb = list_pos(b, key->list), d;
+    if (pa >= 0 && pb >= 0) { d = pa - pb; return key->desc ? -d : d; }
+    if (pa >= 0 || pb >= 0) return pa >= 0 ? -1 : 1;
+  }
+  return sort_cmp(a, b, key->desc);
+}
 static int row_cmp(const SortRow *a, const SortRow *b)
 {
   int k, d;
-  for (k = 0; k < s_nkeys; k++) if ((d = sort_cmp(&a->keys[k], &b->keys[k], s_keys[k].desc))) return d;
+  for (k = 0; k < s_nkeys; k++) if ((d = key_cmp(&a->keys[k], &b->keys[k], &s_keys[k]))) return d;
   return a->row < b->row ? -1 : a->row > b->row;
 }
 /* a stable merge sort of n rows (qsort isn't stable) */

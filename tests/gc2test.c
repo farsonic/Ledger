@@ -268,8 +268,24 @@ static void gc2_rtl(void)
   book_free(b);
 }
 
+static void gc2_listsort(void)
+{
+  Book *b = book_new();
+  SortKey k = { 0, 0, SL_MONTHS };
+  put(b, "A1", "Mar"); put(b, "A2", "zebra"); put(b, "A3", "january"); put(b, "A4", "Dec"); put(b, "A5", "apple"); put(b, "A6", "February");
+  put(b, "B1", "3"); put(b, "B4", "12");
+  ok("custom list sort: months in order, others after A to Z", book_sort(b, 0, R("A1:B6"), &k, 1, 0) && text_at(b, "A1", "january") && text_at(b, "A2", "February") &&
+     text_at(b, "A3", "Mar") && num_at(b, "B3") == 3 && text_at(b, "A4", "Dec") && text_at(b, "A5", "apple") && text_at(b, "A6", "zebra"));
+  k.list = SL_DAYS; k.desc = 1;
+  put(b, "C1", "Mon"); put(b, "C2", "Sunday"); put(b, "C3", "Fri"); put(b, "C4", "x");
+  k.col = 2;
+  ok("custom list sort: days, the list reversed", book_sort(b, 0, R("C1:C4"), &k, 1, 0) && text_at(b, "C1", "Fri") && text_at(b, "C2", "Mon") && text_at(b, "C3", "Sunday") && text_at(b, "C4", "x"));
+  book_free(b);
+}
+
 static void gc2_tests(void)
 {
+  gc2_listsort();
   gc2_rtl();
   gc2_html();
   gc2_equation();

@@ -952,6 +952,7 @@ static void sort_quick(int desc)
 {
   Rect a = current_region();
   SortKey k;
+  memset(&k, 0, sizeof k);
   k.col = cur_sheet()->cur_c; k.desc = desc;
   book_sort(book, cur_index(), a, &k, 1, has_header(a));
   refresh_all();

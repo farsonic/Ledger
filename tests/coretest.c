@@ -478,7 +478,7 @@ static void ops(void)
   Rect out;
   char t[256];
   int n;
-  SortKey k;
+  SortKey k = { 0, 0, 0 };
   /* copy and paste: formulas move, values and formats */
   put(b, "A1", "1"); put(b, "A2", "2"); put(b, "B1", "=A1*10"); put(b, "B2", "=A2*10");
   cl = clip_copy(b, 0, R("A1:B2"));
@@ -735,7 +735,7 @@ static void notes(void)
   Book *b = book_new(), *d;
   const Note *n;
   u8 *x; size_t len; char err[100];
-  SortKey k;
+  SortKey k = { 0, 0, 0 };
   put(b, "A1", "Name"); put(b, "A2", "Zed"); put(b, "A3", "Amy");
   ok("note: written", book_set_note(b, 0, 1, 0, "Joined in May", "Pat") && (n = sheet_note(b->sh[0], 1, 0)) && !strcmp(n->text, "Joined in May") && !strcmp(n->author, "Pat"));
   ok("note: none elsewhere", !sheet_note(b->sh[0], 2, 0));

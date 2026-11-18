@@ -2752,3 +2752,6 @@
   { { "The sheet is protected: unprotect it to insert an equation.", "Das Blatt ist gesch\374tzt: Heben Sie den Blattschutz auf, um eine Formel einzuf\374gen.", "La feuille est prot\351g\351e : \364tez la protection pour ins\351rer une \351quation.", "La hoja est\341 protegida: desprot\351jala para insertar una ecuaci\363n.", "Il foglio \350 protetto: rimuovere la protezione per inserire un'equazione." } },
   /* a web page's table opened (main.c) */
   { { "This file is a web page, not the kind its name says: Ledger opened the page's first table.", "Diese Datei ist eine Webseite und nicht das, was ihr Name sagt: Ledger hat die erste Tabelle der Seite ge\366ffnet.", "Ce fichier est une page web, pas le type qu'indique son nom : Ledger a ouvert le premier tableau de la page.", "Este archivo es una p\341gina web, no del tipo que indica su nombre: Ledger ha abierto la primera tabla de la p\341gina.", "Questo file \350 una pagina web, non del tipo indicato dal nome: Ledger ha aperto la prima tabella della pagina." } },
+  /* Sort: custom lists (dialogs.c; the days and months as cells hold them, in English) */
+  { { "Sun, Mon, Tue...", "Sun, Mon, Tue...", "Sun, Mon, Tue...", "Sun, Mon, Tue...", "Sun, Mon, Tue..." } },
+  { { "Jan, Feb, Mar...", "Jan, Feb, Mar...", "Jan, Feb, Mar...", "Jan, Feb, Mar...", "Jan, Feb, Mar..." } },
