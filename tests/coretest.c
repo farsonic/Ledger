@@ -550,7 +550,7 @@ static void ops(void)
   {
     int sh = 0; i32 r = 0, c = 0;
     ok("find: next", book_find(b, &sh, &r, &c, "apple", 0) && r == 1 && c == 1);
-    ok("find: wraps to the start", book_find(b, &sh, &r, &c, "apple", 0) && r == 0 && c == 0);
+    ok("find: wraps to the start", book_find(b, &sh, &r, &c, "apple", 0) && sh == 0 && r == 0 && c == 0);
     ok("find: whole cell", book_find(b, &sh, &r, &c, "APPLE", FIND_WHOLE) && r == 0 && c == 0);
     ok("find: in formulas", book_find(b, &sh, &r, &c, "LEN", FIND_FORMULAS) && r == 2);
     sh = 0; r = 1; c = 1;
@@ -1814,6 +1814,7 @@ static void stat_functions(void)
 
 #include "analysistest.c"
 #include "synctest.c"
+#include "gc2test.c"
 int main(void)
 {
   values_dates();
@@ -1847,6 +1848,7 @@ int main(void)
   ui_tests();
   analysis_tests();
   sync_tests();
+  gc2_tests();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }

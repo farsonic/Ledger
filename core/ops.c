@@ -503,10 +503,17 @@ static i32 *occupied(Sheet *s, long *n)
 }
 int book_find(Book *b, int *sheet, i32 *r, i32 *c, const char *what, int flags)
 {
+  return book_find_in(b, sheet, r, c, what, flags, NULL);
+}
+/* a cell inside area (all cells when area is NULL) */
+static int in_area(const Rect *a, i32 r, i32 c) { return !a || (r >= a->r1 && r <= a->r2 && c >= a->c1 && c <= a->c2); }
+int book_find_in(Book *b, int *sheet, i32 *r, i32 *c, const char *what, int flags, const Rect *area)
+{
   int sh = *sheet, k, back = (flags & FIND_BACK) != 0, nsh = flags & FIND_BOOK ? b->nsh : 1;
   /* the start sheet after (before) the cell, the other sheets in turn, then the start sheet up to the cell */
+  if (area) nsh = 1;                    /* a selection is on one sheet */
   for (k = 0; k <= nsh; k++) {
-    int s = ((sh + (back ? -k : k)) % b->nsh + b->nsh) % b->nsh, part = k == 0 ? 1 : k == nsh ? 2 : 0;
+    int s = k == nsh ? sh : ((sh + (back ? -k : k)) % b->nsh + b->nsh) % b->nsh, part = k == 0 ? 1 : k == nsh ? 2 : 0;
     long n, i;
     i32 *v;
     if (sh < 0 || sh >= b->nsh) return 0;
@@ -517,6 +524,7 @@ int book_find(Book *b, int *sheet, i32 *r, i32 *c, const char *what, int flags)
       int after = rr > *r || (rr == *r && cc > *c), before = rr < *r || (rr == *r && cc < *c);
       if (part == 1 && !(back ? before : after)) continue;
       if (part == 2 && (back ? before : after)) continue;
+      if (!in_area(area, rr, cc)) continue;
       if (cell_matches(b, s, rr, cc, what, flags)) { *sheet = s; *r = rr; *c = cc; free(v); return 1; }
     }
     free(v);
@@ -547,14 +555,18 @@ int book_replace_cell(Book *b, int sheet, i32 r, i32 c, const char *what, const 
 }
 int book_replace_all(Book *b, int sheet, const char *what, const char *with, int flags)
 {
+  return book_replace_all_in(b, sheet, what, with, flags, NULL);
+}
+int book_replace_all_in(Book *b, int sheet, const char *what, const char *with, int flags, const Rect *area)
+{
   int s, changed = 0, m = hold(b);
   for (s = 0; s < b->nsh; s++) {
     long n, i;
     i32 *v;
-    if (!(flags & FIND_BOOK) && s != sheet) continue;
+    if ((area || !(flags & FIND_BOOK)) && s != sheet) continue;
     v = occupied(b->sh[s], &n);
     for (i = 0; i < n; i++)
-      if (cell_matches(b, s, v[i * 2], v[i * 2 + 1], what, flags | FIND_FORMULAS) && book_replace_cell(b, s, v[i * 2], v[i * 2 + 1], what, with, flags)) changed++;
+      if (in_area(area, v[i * 2], v[i * 2 + 1]) && cell_matches(b, s, v[i * 2], v[i * 2 + 1], what, flags | FIND_FORMULAS) && book_replace_cell(b, s, v[i * 2], v[i * 2 + 1], what, with, flags)) changed++;
     free(v);
   }
   release(b, m);

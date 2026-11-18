@@ -1104,7 +1104,9 @@ out0:
 /* ------------------------------------------------------------------ Find and Replace */
 static char find_what[200], find_with[200];
 static int find_flags;
-static Object *fd_what, *fd_with, *fd_case, *fd_whole, *fd_book, *fd_formulas, *fd_msg;
+static Object *fd_what, *fd_with, *fd_case, *fd_whole, *fd_book, *fd_formulas, *fd_msg, *fd_sel;
+static Rect fd_area;                    /* the selection the dialog searches (fd_sel ticked) */
+static const Rect *fd_in(void) { return fd_sel && xget(fd_sel, MUIA_Selected) ? &fd_area : NULL; }
 static void fd_read(void)
 {
   strncpy(find_what, sget(fd_what), sizeof find_what - 1);
@@ -1120,13 +1122,16 @@ static int find_next(int back)
   i32 r = cur_sheet()->cur_r, c = cur_sheet()->cur_c;
   if (!find_what[0]) return 0;
   latin1_utf8(find_what, u, sizeof u);
-  if (!book_find(book, &sh, &r, &c, u, find_flags | (back ? FIND_BACK : 0))) {
+  if (!book_find_in(book, &sh, &r, &c, u, find_flags | (back ? FIND_BACK : 0), fd_in())) {
     if (fd_msg) set(fd_msg, MUIA_Text_Contents, (ULONG)tr("Not found."));
     else ask("OK", "Ledger couldn't find \"%s\".", find_what);
     return 0;
   }
   if (sh != cur_index()) { book->active = sh; set(grid, MUIA_Grid_Book, (ULONG)book); }
-  DoMethod(grid, MUIM_Grid_Select, r, c, r, c, r, c);
+  if (fd_in()) {                        /* the selection stays, the active cell moves in it */
+    Rect a = fd_area;
+    DoMethod(grid, MUIM_Grid_Select, a.r1, a.c1, a.r2, a.c2, r, c);
+  } else DoMethod(grid, MUIM_Grid_Select, r, c, r, c, r, c);
   refresh_all();
   if (fd_msg) set(fd_msg, MUIA_Text_Contents, (ULONG)"");
   return 1;
@@ -1146,7 +1151,7 @@ static void fd_each(ULONG id)
     break;
   case ID_REPLACEALL: {
     static char msg[80];
-    int n = book_replace_all(book, cur_index(), u1, u2, find_flags);
+    int n = book_replace_all_in(book, cur_index(), u1, u2, find_flags, fd_in());
     refresh_all();
     snprintf(msg, sizeof msg, tr(n == 1 ? "%d cell changed." : "%d cells changed."), n);
     set(fd_msg, MUIA_Text_Contents, (ULONG)msg);
@@ -1156,9 +1161,13 @@ static void fd_each(ULONG id)
 void dlg_find(int mode)
 {
   static const ULONG ends[] = { ID_DLGOK, 0 };
-  Object *w, *next, *prev, *rep = NULL, *repall = NULL, *row2, *bt;
-  if (mode == 2) { if (find_what[0]) { fd_msg = NULL; find_next(0); } else dlg_find(0); return; }
-  fd_with = NULL;
+  Object *w, *next, *prev, *rep = NULL, *repall = NULL, *row2, *bt, *row3;
+  Rect a = cur_sel();
+  if (mode == 2) { if (find_what[0]) { fd_msg = NULL; fd_sel = NULL; find_next(0); } else dlg_find(0); return; }
+  fd_with = NULL; fd_sel = NULL;
+  /* as Excel: more than one cell selected, the search keeps to the selection (untick for the sheet) */
+  fd_area = a;
+  row3 = a.r1 != a.r2 || a.c1 != a.c2 ? HGroup, Child, fd_sel = check_obj(1), Child, LLabel1(tr("Within the selection")), Child, HSpace(0), End : HSpace(0);
   row2 = mode == 1 ? HGroup, Child, Label1(tr("Replace with:")), Child, fd_with = str_obj(find_with, 190), End : HSpace(0);
   bt = mode == 1 ? HGroup, Child, prev = QButton(tr("Previous")), Child, next = QButton(tr("Find Next")), Child, rep = QButton(tr("Replace")), Child, repall = QButton(tr("Replace All")), End
                  : HGroup, Child, prev = QButton(tr("Previous")), Child, next = QButton(tr("Find Next")), Child, HSpace(0), End;
@@ -1171,6 +1180,7 @@ void dlg_find(int mode)
           Child, fd_book = check_obj(find_flags & FIND_BOOK), Child, LLabel1(tr("Every sheet")),
           Child, fd_formulas = check_obj(find_flags & FIND_FORMULAS), Child, LLabel1(tr("Look in formulas")),
         End,
+        Child, row3,
         Child, bt,
         Child, fd_msg = TextObject, MUIA_Text_Contents, (ULONG)"", End,
       End, "Close");
@@ -1184,7 +1194,7 @@ void dlg_find(int mode)
   run_modal(w, ends, fd_each);
   fd_read();
   MUI_DisposeObject(w);
-  fd_msg = NULL; fd_with = NULL;
+  fd_msg = NULL; fd_with = NULL; fd_sel = NULL;
 }
 
 /* ------------------------------------------------------------------ Go To */

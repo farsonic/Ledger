@@ -1041,6 +1041,7 @@
   { { "Replace All", "Alle ersetzen", "Remplacer tout", "Reemplazar todos", "Sostituisci tutto" } },
   { { "Find what:", "Suchen nach:", "Rechercher :", "Buscar:", "Trova:" } },
   { { "Match entire cell", "Gesamten Zellinhalt vergleichen", "Totalit\351 du contenu de la cellule", "Coincidir con el contenido de toda la celda", "Confronta intero contenuto cella" } },
+  { { "Within the selection", "Nur in der Markierung", "Dans la s\351lection", "Dentro de la selecci\363n", "Nella selezione" } },
   { { "Every sheet", "Alle Bl\344tter", "Toutes les feuilles", "Todas las hojas", "Tutti i fogli" } },
   { { "Look in formulas", "In Formeln suchen", "Chercher dans les formules", "Buscar en f\363rmulas", "Cerca nelle formule" } },
   { { "Cell, range or name:", "Zelle, Bereich oder Name:", "Cellule, plage ou nom :", "Celda, rango o nombre:", "Cella, intervallo o nome:" } },

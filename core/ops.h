@@ -65,6 +65,10 @@ int   book_find(Book *b, int *sheet, i32 *r, i32 *c, const char *what, int flags
 int   book_replace_cell(Book *b, int sheet, i32 r, i32 c, const char *what, const char *with, int flags);
 /* every match in the sheet (or the book): how many cells changed */
 int   book_replace_all(Book *b, int sheet, const char *what, const char *with, int flags);
+/* the same within area of the sheet (Excel's search of a selection of more than one cell: that sheet
+   only, whatever FIND_BOOK says); area NULL is the whole sheet (book) as above */
+int   book_find_in(Book *b, int *sheet, i32 *r, i32 *c, const char *what, int flags, const Rect *area);
+int   book_replace_all_in(Book *b, int sheet, const char *what, const char *with, int flags, const Rect *area);
 
 /* the text that would be typed to make the cell as it is (UTF-8): "=formula", a number in full, a
    date or time as dates are written, a percentage with %, text with ' if it would read as a number */

@@ -1047,6 +1047,7 @@ Replace with:	Ersetzen durch:	Remplacer par :	Reemplazar con:	Sostituisci con:
 Replace All	Alle ersetzen	Remplacer tout	Reemplazar todos	Sostituisci tutto
 Find what:	Suchen nach:	Rechercher :	Buscar:	Trova:
 Match entire cell	Gesamten Zellinhalt vergleichen	Totalité du contenu de la cellule	Coincidir con el contenido de toda la celda	Confronta intero contenuto cella
+Within the selection	Nur in der Markierung	Dans la sélection	Dentro de la selección	Nella selezione
 Every sheet	Alle Blätter	Toutes les feuilles	Todas las hojas	Tutti i fogli
 Look in formulas	In Formeln suchen	Chercher dans les formules	Buscar en fórmulas	Cerca nelle formule
 Cell, range or name:	Zelle, Bereich oder Name:	Cellule, plage ou nom :	Celda, rango o nombre:	Cella, intervallo o nome:
