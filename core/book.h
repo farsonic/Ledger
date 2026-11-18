@@ -95,6 +95,7 @@ typedef struct {
   u8 legacy, cse, arrayeval, spillblocked;
   i32 arows, acols, sr, sc;
   int *lz;                        /* (calc.c) where each token's operand begins, for lazy functions */
+  Arr *pycache;                   /* a Python cell's result as the file gave it (pycell.c), NULL none */
 } Formula;
 
 /* ------------------------------------------------------------------ styles */
@@ -364,6 +365,19 @@ int    book_spill_range(Book *b, int sheet, i32 r, i32 c, Rect *area, int *block
 /* after loading: cells inside a dynamic or {=...} array formula's range become its spilled cells */
 void   book_adopt_spills(Book *b);
 void   calc_lambda_ref(void *lambda, int delta);   /* (calc.c) a lambda value's references counted */
+/* Python cells (pycell.c): PY("code",type) kept with the result the file holds, never run */
+int    py_is(const Formula *f);
+Value  py_result(const Formula *f);        /* the kept result (an array spills), #GETTING_DATA if none */
+void   py_adopt(Book *b);                  /* (after loading) each Python cell's result from its cells */
+void   py_scripts_read(const char *data, size_t len);   /* (xlsx) the workbook's Python part */
+void   py_scripts_free(void);
+char  *py_from_file(const char *text);     /* _xlfn._xlws.PY(0,1) as PY("code",1) (malloc'd); NULL if not one */
+void   py_save_begin(void);
+char  *py_to_file(const char *text);       /* PY("code",1) as _xlfn._xlws.PY(k,1), the code noted (malloc'd); NULL if not one */
+int    py_saved(void);                     /* how many were noted */
+void   py_save_part(Buf *o);               /* the Python part of them */
+void   py_save_end(void);
+int    py_used(Book *b);
 /* formula_text writes the file form (_xlfn.SINGLE, _xlpm. names, _xlws. and _xleta. prefixes) while set */
 extern int formula_file_mode;
 

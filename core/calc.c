@@ -222,7 +222,7 @@ static void compute_cell(Book *b, int sheet, i32 r, i32 c, Cell *cell, int depth
   cx.b = b; cx.sheet = sheet; cx.row = r; cx.col = c; cx.depth = depth;
   cx.dyn = !f->legacy; cx.arrayish = &arrayish;
   if (f->legacy) { cx.amask = legacy_mask(f); cx.amask_f = f; }
-  v = eval_f(&cx, f);
+  v = py_is(f) ? py_result(f) : eval_f(&cx, f);     /* (a Python cell keeps its result: pycell.c) */
   free((void *)cx.amask); cx.amask = NULL;
   if (f->cse && f->arows > 0 && f->acols > 0) {
     /* {=...}: the result fitted to the formula's range, a single row or column repeated, #N/A past its end */

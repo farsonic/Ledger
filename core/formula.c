@@ -490,6 +490,7 @@ void formula_free(Formula *f)
   int i;
   if (!f) return;
   for (i = 0; i < f->n; i++) { free(f->t[i].s); arr_free(f->t[i].arr); }
+  arr_free(f->pycache);
   free(f->t);
   if (f->lz != &formula_lz_none) free(f->lz);
   free(f);
@@ -502,6 +503,12 @@ Formula *formula_copy(const Formula *f)
   c->volatile_ = f->volatile_;
   c->legacy = f->legacy; c->cse = f->cse; c->arrayeval = f->arrayeval;
   c->arows = f->arows; c->acols = f->acols; c->sr = f->sr; c->sc = f->sc;
+  if (f->pycache) {
+    Value v, cp;
+    v = val_empty(); v.t = V_ARR; v.a = f->pycache;
+    cp = val_copy(&v);
+    c->pycache = cp.t == V_ARR ? cp.a : NULL;
+  }
   if (f->n && !(c->t = (Tok *)malloc((size_t)f->n * sizeof(Tok)))) { free(c); return NULL; }
   for (i = 0; i < f->n; i++) {
     c->t[i] = f->t[i];

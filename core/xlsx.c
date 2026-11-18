@@ -574,7 +574,10 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
         Formula *f = NULL;
         int pos;
         if (ftxt.len) {
-          f = unwrap_dummy(rd->b, sheet, ftxt.data);
+          char *pyt = py_from_file(ftxt.data);      /* a Python cell: its code from the Python part (pycell.c) */
+          f = pyt ? formula_parse(rd->b, sheet, pyt, &pos) : NULL;
+          free(pyt);
+          if (!f) f = unwrap_dummy(rd->b, sheet, ftxt.data);
           if (!f) f = formula_parse(rd->b, sheet, ftxt.data, &pos);
           if (f && shared_si >= 0 && is_master && nsh < 100000) {
             Shared *ns = (Shared *)realloc(sh, (size_t)(nsh + 1) * sizeof(Shared));
@@ -949,6 +952,12 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
   { size_t fl; u8 *fp = part(&z, CHECKBOX_PART, &fl); if (fp) { rd.ncbx = checkbox_complements((const char *)fp, fl, rd.cbx, 64); free(fp); } }
   read_styles(&rd, &z);
   nrels = read_rels(&z, "xl/_rels/workbook.xml.rels", "xl/", &rels);
+  py_scripts_free();
+  for (i = 0; i < nrels; i++) if (!strcmp(rels[i].type, "Python")) {
+    size_t pl;
+    u8 *pd = part(&z, rels[i].target, &pl);
+    if (pd) { py_scripts_read((const char *)pd, pl); free(pd); }
+  }
   /* make the sheets first, so formulas can refer to any of them */
   {
     char first[32];
@@ -1034,6 +1043,8 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap)
     book_forget_undo(b);
   }
   if (b->active >= b->nsh) b->active = 0;
+  py_scripts_free();
+  py_adopt(b);
   book_adopt_spills(b);
   book_recalc(b);
   b->dirty = 0;
@@ -1440,6 +1451,11 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
           buf_init(&ft);
           table_home_r = r; table_home_c = c->col;    /* (structured references name their table) */
           file_formula(b, si, c->f, &ft);
+          if (py_is(c->f)) {
+            /* a Python cell: its code to the Python part, the formula naming it (pycell.c) */
+            char *pt = py_to_file(ft.data ? ft.data : "");
+            if (pt) { ft.len = 0; buf_adds(&ft, pt); free(pt); }
+          }
           xml_escape(o, ft.data ? ft.data : "", ft.len);
           buf_free(&ft);
         }
@@ -1608,7 +1624,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   ZipWriter w;
   Buf o;
   SST sst;
-  int i, *fillmap = NULL, *bordermap = NULL, dynamic = book_has_dynamic(b);
+  int i, *fillmap = NULL, *bordermap = NULL, dynamic = book_has_dynamic(b), python = py_used(b);
   char path[64];
   memset(&sst, 0, sizeof sst);
   table_file_mode = 1;     /* structured references in their file form */
@@ -1637,6 +1653,7 @@ u8 *xlsx_save(Book *b, size_t *len)
   fc_xlsx_types(b, &o);
   cm_types(b, &o);
   if (dynamic) buf_adds(&o, "<Override PartName=\"/xl/metadata.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml\"/>");
+  if (python) buf_adds(&o, "<Override PartName=\"/xl/python.xml\" ContentType=\"application/vnd.ms-excel.python+xml\"/>");
   if (checkbox_used(b)) buf_adds(&o, "<Override PartName=\"/" CHECKBOX_PART "\" ContentType=\"application/vnd.ms-excel.featurepropertybag+xml\"/>");
   buf_adds(&o, "</Types>");
   zip_add(&w, "[Content_Types].xml", o.data, o.len);
@@ -1716,10 +1733,12 @@ u8 *xlsx_save(Book *b, size_t *len)
   buf_printf(&o, "<Relationship Id=\"rId%d\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\"/>", b->nsh + 3);
   cm_book_rels(b, &o, b->nsh + 4);
   if (dynamic) buf_adds(&o, "<Relationship Id=\"rIdMeta1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata\" Target=\"metadata.xml\"/>");
+  if (python) buf_adds(&o, "<Relationship Id=\"rIdPy1\" Type=\"http://schemas.microsoft.com/office/2023/09/relationships/Python\" Target=\"python.xml\"/>");
   if (checkbox_used(b)) buf_adds(&o, "<Relationship Id=\"rIdFpb1\" Type=\"http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag\" Target=\"featurePropertyBag/featurePropertyBag.xml\"/>");
   buf_adds(&o, "</Relationships>");
   zip_add(&w, "xl/_rels/workbook.xml.rels", o.data, o.len);
-  /* sheets (they fill the string table) */
+  /* sheets (they fill the string table, and the Python part's list) */
+  py_save_begin();
   for (i = 0; i < b->nsh; i++) {
     o.len = 0;
     write_sheet(b, i, &sst, &o);
@@ -1737,6 +1756,8 @@ u8 *xlsx_save(Book *b, size_t *len)
     xd_write_parts(b, i, &w);
 
   }
+  if (python) { o.len = 0; py_save_part(&o); zip_add(&w, "xl/python.xml", o.data, o.len); }
+  py_save_end();
   tablexml_parts(b, &w, file_formula);
   table_home_r = table_home_c = -1;
   cm_parts(b, &w);

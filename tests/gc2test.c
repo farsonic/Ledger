@@ -126,8 +126,57 @@ static void gc2_controls(void)
   book_free(b);
 }
 
+static char *zip_part(const u8 *x, size_t len, const char *name)
+{
+  ZipReader z;
+  char *t = NULL;
+  if (zip_open(&z, x, len)) {
+    size_t l;
+    int k = zip_find(&z, name);
+    if (k >= 0) t = (char *)zip_read(&z, k, &l);
+    zip_close(&z);
+  }
+  return t;
+}
+static void gc2_python(void)
+{
+  Book *b = book_new(), *d;
+  Cell *c;
+  u8 *x;
+  size_t len;
+  char *p1, *p2;
+  put(b, "A1", "=PY(\"df = xl(\"\"B1:B2\"\")\",0)");
+  ok("python: a new cell has no result", cell_value(b, 0, 0, 0)->t == V_ERR && cell_value(b, 0, 0, 0)->e == E_GETTING && text_at(b, "A1", "=PY(\"df = xl(\"\"B1:B2\"\")\",0)"));
+  /* as if read from a file: a result of two rows */
+  c = sheet_cell(b->sh[0], 0, 0);
+  c->f->pycache = arr_new(2, 1);
+  c->f->pycache->v[0] = val_num(3); c->f->pycache->v[1] = val_str("four");
+  book_recalc(b);
+  ok("python: the kept result spills", num_at(b, "A1") == 3 && text_at(b, "A2", "four"));
+  put(b, "C1", "=A1*2");
+  ok("python: other cells use it, it isn't run", num_at(b, "C1") == 6 && num_at(b, "A1") == 3);
+  x = xlsx_save(b, &len);
+  p1 = x ? zip_part(x, len, "xl/python.xml") : NULL;
+  p2 = x ? zip_part(x, len, "xl/worksheets/sheet1.xml") : NULL;
+  ok("python: saved as Excel's", p1 && strstr(p1, "<pythonScript><code>df = xl(&quot;B1:B2&quot;)</code></pythonScript>") && p2 && strstr(p2, "_xlfn._xlws.PY(0,0)"));
+  free(p1); free(p2);
+  d = x ? xlsx_load(x, len, NULL, 0) : NULL;
+  ok("python: read back with its code and result", d && text_at(d, "A1", "=PY(\"df = xl(\"\"B1:B2\"\")\",0)") && num_at(d, "A1") == 3 && text_at(d, "A2", "four") && num_at(d, "C1") == 6);
+  if (d) book_free(d);
+  free(x);
+  book_free(b);
+  /* the index form with arguments */
+  py_scripts_read("<python><pythonScripts><pythonScript><code>1 + 1</code></pythonScript><pythonScript><code>xl(\"%P2%\") + %P3%_x000D_</code></pythonScript></pythonScripts></python>", 161);
+  p1 = py_from_file("_xlfn._xlws.PY(1,1,A1:B3,Sheet2!$C$4)");
+  ok("python: %Px% arguments", p1 && !strcmp(p1, "PY(\"xl(\"\"A1:B3\"\") + Sheet2!$C$4\r\",1)"));
+  free(p1);
+  ok("python: no such script", !py_from_file("_xlfn._xlws.PY(7,0)") && !py_from_file("SUM(1,2)"));
+  py_scripts_free();
+}
+
 static void gc2_tests(void)
 {
+  gc2_python();
   gc2_controls();
   gc2_sylk();
   gc2_find();
