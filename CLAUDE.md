@@ -4,8 +4,9 @@ Ledger is a spreadsheet for AmigaOS 3.x (68040/68060 with FPU, MUI 3.8, AROS or 
 and laid out the way GridCraft (an Excel-like program) is: ribbon, formula bar, grid, sheet tabs. It
 reads and writes Excel .xlsx (and opens .xls, .ods, SYLK and web pages' tables, writes .csv, SYLK, PDF
 and web pages), has 516 worksheet functions (every one of GridCraft's) with dynamic arrays, LET/LAMBDA,
-charts, sparklines, pictures, shapes, equations and form controls, tables, pivot tables and slicers, data validation, the Data tab's tools (Solver, Analysis ToolPak, Goal Seek,
-scenarios, Forecast Sheet), protection, page layout and PDF export, in five interface languages.
+charts, sparklines, pictures, shapes, equations and form controls, tables, pivot tables and slicers,
+data validation, the Data tab's tools (Solver, Analysis ToolPak, Goal Seek, scenarios, Forecast Sheet),
+protection, page layout and PDF export, in five interface languages.
 GPL-2.0-only (see `LICENSE`). This file is for anyone, person or agent, picking the work up. Read it
 first, then `README.md` (what Ledger does) and `FEATURES.md` / `docs/gridcraft-gap.md` (what's missing).
 
