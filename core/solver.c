@@ -23,6 +23,7 @@
  * (solver_opt, solver_adj, solver_lhs1...) as Excel saves it, so it travels in .xlsx files.
  */
 #include "analysis.h"
+#include "ops.h"
 #include "calc.h"
 #include <stdlib.h>
 #include <string.h>
@@ -504,6 +505,208 @@ out:
   return ok;
 }
 
+/* ------------------------------------------------------------------ Load/Save Model */
+/* references as abs_text writes them, without the model sheet's own name ("$B$2:$B$4,$D$1") */
+static int abs_local(Book *b, int sheet, const char *text, char *out, size_t cap)
+{
+  char t[600], pre[80];
+  const char *p;
+  size_t o = 0, pl;
+  if (!abs_text(b, sheet, text, t, sizeof t)) return 0;
+  sheet_prefix(b->sh[sheet]->name, pre, sizeof pre);
+  pl = strlen(pre);
+  for (p = t; *p && o + 1 < cap; ) {
+    if ((p == t || p[-1] == ',') && !strncmp(p, pre, pl)) { p += pl; continue; }
+    out[o++] = *p++;
+  }
+  out[o] = 0;
+  return 1;
+}
+static int one_area(const char *t) { int q = 0; for (; *t; t++) { if (*t == '\'') q = !q; else if (*t == ',' && !q) return 0; } return 1; }
+/* the model's formulas, one per cell down a column (GridCraft's Save Model: the objective and goal,
+   the variable cells, one AND() per constraint that shows TRUE while it holds, the options as an array
+   constant); how many (at most cap), 0 with *why if it can't be written */
+static int model_rows(Book *b, const SolverModel *m, char rows[][400], int cap, const char **why)
+{
+  char t[170], u[170];
+  int i, n = 0;
+  if (!abs_local(b, m->sheet, m->objective, t, sizeof t)) { *why = "Enter the objective cell (Set Objective)."; return 0; }
+  if (m->goal == SG_VALUE) snprintf(rows[n++], 400, "=%s=%.15g", t, m->value);
+  else snprintf(rows[n++], 400, "=%s(%s)", m->goal == SG_MIN ? "MIN" : "MAX", t);
+  if (!abs_local(b, m->sheet, m->vars, t, sizeof t)) { *why = "The variable cells must be a reference like B2:B4."; return 0; }
+  snprintf(rows[n++], 400, "=COUNT(%s)", t);
+  for (i = 0; i < m->ncons && n < cap - 1; i++) {
+    const SolverCons *c = &m->cons[i];
+    double v;
+    if (!abs_local(b, m->sheet, c->lhs, t, sizeof t) || !one_area(t)) { *why = "Save Model needs each side of a constraint to be one range."; return 0; }
+    if (c->rel == SR_INT) snprintf(rows[n++], 400, "=AND(%s=INT(%s))", t, t);
+    else if (c->rel == SR_BIN) snprintf(rows[n++], 400, "=AND((%s=0)+(%s=1))", t, t);
+    else if (c->rel == SR_DIF) snprintf(rows[n++], 400, "=AND(ROWS(UNIQUE(TOCOL(%s)))=COUNT(%s))", t, t);
+    else {
+      if (parse_number_text(c->rhs, &v)) snprintf(u, sizeof u, "%.15g", v);
+      else if (!abs_local(b, m->sheet, c->rhs, u, sizeof u) || !one_area(u)) { *why = "Save Model needs each side of a constraint to be one range."; return 0; }
+      snprintf(rows[n++], 400, "=AND(%s%s%s)", t, rel_text[c->rel], u);
+    }
+  }
+  /* method, non-negative, population, mutation rate, seed, require bounds, convergence, stall
+     generations, evaluations, integer optimality (%), and Ledger's Multistart */
+  snprintf(rows[n++], 400, "={%d,%d,%d,0.075,%lu,1,0.0001,30,%ld,%.15g,%d}", m->method == SM_SIMPLEX ? 2 : m->method == SM_EVO ? 3 : 1,
+           m->nonneg ? 1 : 2, m->population > 0 ? m->population : 100, (unsigned long)m->seed, m->maxevals > 0 ? m->maxevals : DEFAULT_EVALS,
+           m->intgap, m->multistart ? 1 : 2);
+  return n;
+}
+#define MODEL_CAP (MAX_ROWS + 3)
+int solver_save_model(Book *b, const SolverModel *m, i32 r, i32 c, int overwrite, const char **why)
+{
+  char (*rows)[400];
+  int n, i, k;
+  Sheet *s;
+  *why = NULL;
+  if (m->sheet < 0 || m->sheet >= b->nsh) { *why = "The model's sheet is gone."; return 0; }
+  s = b->sh[m->sheet];
+  if (!(rows = (char (*)[400])malloc(MODEL_CAP * sizeof *rows))) { *why = "Not enough memory."; return 0; }
+  if (!(n = model_rows(b, m, rows, MODEL_CAP, why))) { free(rows); return 0; }
+  if (r + n > MAXROW || c + 11 > MAXCOL) { free(rows); *why = "The saved model doesn't fit below that cell."; return 0; }
+  /* not over the model's own cells, nor where the options spill */
+  {
+    Ev e;
+    const char *w2;
+    if (build(b, m, &e, &w2)) {
+      int j;
+      for (j = 0; j < e.n; j++) if (e.vc[j] == c && e.vr[j] >= r && e.vr[j] < r + n) { *why = "The range overlaps the model's cells; choose another place to save it."; break; }
+      if (e.objc == c && e.objr >= r && e.objr < r + n) *why = "The range overlaps the model's cells; choose another place to save it.";
+      for (j = 0; j < e.nrows && !*why; j++) if ((e.rows[j].lc == c && e.rows[j].lr >= r && e.rows[j].lr < r + n) || (e.rows[j].hasrhs && e.rows[j].rc == c && e.rows[j].rr >= r && e.rows[j].rr < r + n))
+        *why = "The range overlaps the model's cells; choose another place to save it.";
+    }
+    ev_free(&e);
+    if (*why) { free(rows); return 0; }
+  }
+  for (k = 1; k < 11; k++) {
+    Cell *x = sheet_cell(s, r + n - 1, c + k);
+    if (x && (x->f || (x->v.t != V_EMPTY && !x->spill))) { free(rows); *why = "The saved model's options need the 10 cells to the right of its last cell; choose another place to save it."; return 0; }
+  }
+  if (!overwrite)
+    for (i = 0; i < n; i++) {
+      Cell *x = sheet_cell(s, r + i, c);
+      if (x && (x->f || x->v.t != V_EMPTY) && !x->spill) { free(rows); *why = "overwrite"; return -1; }
+    }
+  book_begin(b);
+  for (i = 0; i < n; i++) book_input(b, m->sheet, r + i, c, rows[i], NULL);
+  book_end(b);
+  free(rows);
+  return n;
+}
+/* one constraint row's AND(...) inside read back */
+static int read_cons(const char *in, SolverCons *c)
+{
+  char t[300];
+  size_t n = strlen(in);
+  const char *p;
+  int q = 0, depth = 0;
+  memset(c, 0, sizeof *c);
+  if (n >= sizeof t) return 0;
+  if (str_nieq(in, "ROWS(UNIQUE(TOCOL(", 18)) {
+    const char *e = strchr(in + 18, ')');
+    if (!e) return 0;
+    copy_trim(t, sizeof t, in + 18, (size_t)(e - in - 18)); local_text(t, c->lhs, sizeof c->lhs); c->rel = SR_DIF;
+    return c->lhs[0] != 0;
+  }
+  if (in[0] == '(' && (p = strstr(in, "=0)+("))) {
+    copy_trim(t, sizeof t, in + 1, (size_t)(p - in - 1)); local_text(t, c->lhs, sizeof c->lhs); c->rel = SR_BIN;
+    return c->lhs[0] != 0;
+  }
+  if ((p = strstr(in, "=INT(")) && in[n - 1] == ')') {
+    copy_trim(t, sizeof t, in, (size_t)(p - in)); local_text(t, c->lhs, sizeof c->lhs); c->rel = SR_INT;
+    return c->lhs[0] != 0;
+  }
+  for (p = in; *p; p++) {
+    if (*p == '\'' || *p == '"') q = !q;
+    if (q) continue;
+    if (*p == '(') depth++;
+    else if (*p == ')') depth--;
+    else if (!depth && (*p == '<' || *p == '>' || *p == '=')) {
+      int two = (p[0] == '<' || p[0] == '>') && p[1] == '=';
+      c->rel = (u8)(*p == '<' ? SR_LE : *p == '>' ? SR_GE : SR_EQ);
+      if ((*p == '<' || *p == '>') && !two) return 0;
+      copy_trim(t, sizeof t, in, (size_t)(p - in)); local_text(t, c->lhs, sizeof c->lhs);
+      local_text(p + (two ? 2 : 1), c->rhs, sizeof c->rhs);
+      return c->lhs[0] && c->rhs[0];
+    }
+  }
+  return 0;
+}
+/* "NAME(inner)" -> inner (case ignored); 0 if it isn't that call */
+static int call_inner(const char *t, const char *name, char *out, size_t cap)
+{
+  size_t k = strlen(name), n = strlen(t);
+  if (n < k + 2 || !str_nieq(t, name, k) || t[k] != '(' || t[n - 1] != ')') return 0;
+  copy_trim(out, cap, t + k + 1, n - k - 2);
+  return 1;
+}
+int solver_load_model(Book *b, int sheet, Rect area, SolverModel *m, const char **why)
+{
+  char t[600], in[600];
+  int n, last;
+  i32 r;
+  *why = "The range doesn't hold a Solver model saved with Save Model.";
+  if (sheet < 0 || sheet >= b->nsh) return 0;
+  solver_model_init(m, sheet);
+  /* a single cell: down from it to the options row */
+  last = area.r1 == area.r2 ? area.r1 + MODEL_CAP - 1 : area.r2;
+  for (r = area.r1, n = 0; r <= last && r < MAXROW; r++, n++) {
+    Cell *x = sheet_cell(b->sh[sheet], r, area.c1);
+    if (!x || !x->f) goto bad;
+    book_edit_text(b, sheet, r, area.c1, t, sizeof t);
+    copy_trim(in, sizeof in, t + 1, strlen(t + 1));
+    if (n == 0) {
+      char *eq;
+      if (call_inner(in, "MAX", t, sizeof t)) { m->goal = SG_MAX; local_text(t, m->objective, sizeof m->objective); }
+      else if (call_inner(in, "MIN", t, sizeof t)) { m->goal = SG_MIN; local_text(t, m->objective, sizeof m->objective); }
+      else if ((eq = strchr(in, '='))) {
+        double v;
+        *eq = 0;
+        if (!parse_number_text(eq + 1, &v)) goto bad;
+        m->goal = SG_VALUE; m->value = v; local_text(in, m->objective, sizeof m->objective);
+      } else goto bad;
+    } else if (n == 1) {
+      if (!call_inner(in, "COUNT", t, sizeof t)) goto bad;
+      local_text(t, m->vars, sizeof m->vars);
+    } else if (in[0] == '{') {
+      double v[16];
+      int k = 0;
+      char *p = in + 1, *e;
+      while (k < 16) {
+        v[k] = strtod(p, &e);
+        if (e == p) break;
+        k++;
+        while (*e == ' ') e++;
+        if (*e != ',' && *e != ';') break;
+        p = e + 1;
+      }
+      if (k < 8) { *why = "The model's options row doesn't hold the 8 or more numbers Save Model writes."; goto bad; }
+      m->method = (u8)(v[0] == 2 ? SM_SIMPLEX : v[0] == 3 ? SM_EVO : SM_GRG);
+      m->nonneg = v[1] != 2;
+      m->population = v[2] > 0 && v[2] < 100000 ? (int)v[2] : 0;
+      if (m->population == 100) m->population = 0;
+      m->seed = v[4] > 0 && v[4] < 4294967296.0 ? (u32)v[4] : 0;
+      if (k > 8) m->maxevals = v[8] > 0 && v[8] < 1e9 ? (long)v[8] : 0;
+      if (m->maxevals == DEFAULT_EVALS) m->maxevals = 0;
+      if (k > 9) m->intgap = v[9] >= 0 && v[9] <= 100 ? v[9] : 0;
+      if (k > 10) m->multistart = v[10] == 1;
+      *why = NULL;
+      return 1;
+    } else {
+      SolverCons c;
+      if (!call_inner(in, "AND", t, sizeof t) || !read_cons(t, &c)) goto bad;
+      if (!solver_add(m, c.lhs, c.rel, c.rhs)) { *why = "Not enough memory."; goto bad; }
+    }
+  }
+bad:
+  if (!*why) *why = "The range doesn't hold a Solver model saved with Save Model.";
+  solver_model_free(m);
+  solver_model_init(m, sheet);
+  return 0;
+}
 /* ------------------------------------------------------------------ outcomes */
 enum { OUT_SOLVED, OUT_INFEASIBLE, OUT_UNBOUNDED, OUT_LIMIT };
 /* a relaxation: within lo..hi, x gets the point, *obj the objective to minimise, *conv whether it
@@ -1252,6 +1455,214 @@ int an_add_sheet(Book *b, const char *base, int at)
   book_unique_sheet_name(b, base, nm);
   return book_add_sheet(b, nm, at);
 }
+/* ------------------------------------------------------------------ the Sensitivity report */
+/* n x n system a x = r solved in place by elimination with partial pivoting (x in r); 0 if singular */
+static int lsolve(int n, double *a, double *r)
+{
+  int i, j, k;
+  double big = 0;
+  for (i = 0; i < n * n; i++) big = dmax(big, fabs(a[i]));
+  for (k = 0; k < n; k++) {
+    int p = k;
+    for (i = k + 1; i < n; i++) if (fabs(a[i * n + k]) > fabs(a[p * n + k])) p = i;
+    if (fabs(a[p * n + k]) <= 1e-11 * (big > 0 ? big : 1)) return 0;
+    if (p != k) { double t; for (j = 0; j < n; j++) { t = a[k * n + j]; a[k * n + j] = a[p * n + j]; a[p * n + j] = t; } t = r[k]; r[k] = r[p]; r[p] = t; }
+    for (i = k + 1; i < n; i++) {
+      double f = a[i * n + k] / a[k * n + k];
+      if (f == 0) continue;
+      for (j = k; j < n; j++) a[i * n + j] -= f * a[k * n + j];
+      r[i] -= f * r[k];
+    }
+  }
+  for (k = n - 1; k >= 0; k--) { double t = r[k]; for (j = k + 1; j < n; j++) t -= a[k * n + j] * r[j]; r[k] = t / a[k * n + k]; }
+  return 1;
+}
+#define SENS_INF 1e30
+typedef struct {
+  double *gf;                      /* the objective's gradient (the coefficients for a linear model) */
+  double *rc;                      /* each variable's reduced cost (gradient) */
+  double *oinc, *odec;             /* Simplex: the objective coefficient's allowable increase and decrease */
+  double *sp;                      /* each constraint row's shadow price (Lagrange multiplier) */
+  double *rinc, *rdec;             /* Simplex: the right side's allowable increase and decrease (NAN: not known) */
+} Sens;
+/* the active constraints at x, the normals of each (rows: the row's gradient; bounds: a unit
+   vector), and the multipliers' signs for maximising (+1 >= 0, -1 <= 0, 0 either). Excel's Sensitivity
+   report from them: shadow prices by least squares over the free variables (constraints whose
+   multiplier has the wrong sign dropped, as GridCraft does), and for a linear model at a vertex the
+   ranges from the active set's square system */
+static int sensitivity(Ev *e, const SolverModel *m, const double *x, int linear, Sens *o)
+{
+  int n = e->n, mr = e->nrows, i, j, k, na = 0, ok = 0, nf;
+  double sigma = m->goal == SG_MIN ? -1 : 1, f0, f1, f2;
+  double *G = NULL, *gv = NULL, *xx = NULL, *N = NULL, *sg = NULL, *M = NULL, *r = NULL, *w = NULL;
+  int *kind = NULL, *idx = NULL, *fr = NULL;      /* active k: kind 0 a row (idx its row), 1 a lower bound, 2 an upper bound (idx the variable) */
+  u8 *drop = NULL;
+  G = (double *)calloc((size_t)mr * n + 1, sizeof(double)); gv = (double *)calloc((size_t)mr + 1, sizeof(double));
+  xx = (double *)malloc(((size_t)n + 1) * sizeof(double));
+  kind = (int *)malloc(((size_t)mr + 2 * n + 1) * sizeof(int)); idx = (int *)malloc(((size_t)mr + 2 * n + 1) * sizeof(int));
+  sg = (double *)malloc(((size_t)mr + 2 * n + 1) * sizeof(double)); fr = (int *)malloc(((size_t)n + 1) * sizeof(int));
+  drop = (u8 *)calloc((size_t)mr + 2 * n + 1, 1);
+  if (!G || !gv || !xx || !kind || !idx || !sg || !fr || !drop) goto out;
+  for (j = 0; j < n; j++) { o->rc[j] = 0; o->oinc[j] = o->odec[j] = NAN; }
+  for (i = 0; i < mr; i++) { o->sp[i] = 0; o->rinc[i] = o->rdec[i] = NAN; }
+  if (!ev_eval(e, x, &f0)) goto out;
+  memcpy(gv, e->g, (size_t)mr * sizeof(double));
+  /* gradients: a unit step for a linear model (exact), central differences otherwise */
+  for (j = 0; j < n; j++) {
+    double h = linear ? 1 : 1e-6 * (1 + fabs(x[j]));
+    memcpy(xx, x, (size_t)n * sizeof(double));
+    xx[j] = x[j] + h;
+    if (!ev_eval(e, xx, &f1)) goto out;
+    for (i = 0; i < mr; i++) G[i * n + j] = e->g[i];
+    if (linear) { o->gf[j] = f1 - f0; for (i = 0; i < mr; i++) G[i * n + j] -= gv[i]; continue; }
+    xx[j] = x[j] - h;
+    if (!ev_eval(e, xx, &f2)) goto out;
+    o->gf[j] = (f1 - f2) / (2 * h);
+    for (i = 0; i < mr; i++) G[i * n + j] = (G[i * n + j] - e->g[i]) / (2 * h);
+  }
+  ev_eval(e, x, &f0);
+  /* the active set */
+  for (i = 0; i < mr; i++) {
+    double sc = PRECISION * (1 + fabs(as_num(cell_value(e->b, e->sheet, e->rows[i].lr, e->rows[i].lc))));
+    if (e->rows[i].sense == SR_EQ || fabs(gv[i]) <= sc) { kind[na] = 0; idx[na] = i; sg[na] = e->rows[i].sense == SR_LE ? 1 : e->rows[i].sense == SR_GE ? -1 : 0; na++; }
+  }
+  for (j = 0; j < n; j++) {
+    int atlo = finite_(e->lo[j]) && fabs(x[j] - e->lo[j]) <= PRECISION * (1 + fabs(e->lo[j]));
+    int athi = finite_(e->hi[j]) && fabs(x[j] - e->hi[j]) <= PRECISION * (1 + fabs(e->hi[j]));
+    if (atlo && athi) { kind[na] = 1; idx[na] = j; sg[na] = 0; na++; }          /* fixed: either sign */
+    else if (atlo) { kind[na] = 1; idx[na] = j; sg[na] = -1; na++; }
+    else if (athi) { kind[na] = 2; idx[na] = j; sg[na] = 1; na++; }
+  }
+  /* the multipliers of the active rows by least squares on the variables not at a bound */
+  for (j = nf = 0; j < n; j++) {
+    int at = 0;
+    for (k = 0; k < na; k++) if (kind[k] && idx[k] == j) at = 1;
+    if (!at) fr[nf++] = j;
+  }
+  {
+    int nr = 0, pass;
+    for (k = 0; k < na; k++) nr += kind[k] == 0;
+    M = (double *)malloc(((size_t)nr * nr + 1) * sizeof(double)); r = (double *)malloc(((size_t)nr + 1) * sizeof(double));
+    w = (double *)malloc(((size_t)n * n + n + 1) * sizeof(double));
+    if (!M || !r || !w) goto out;
+    for (pass = 0; pass <= nr; pass++) {
+      int rows[MAX_ROWS], q = 0, a2, b2, worst = -1;
+      double wv = 0;
+      for (k = 0; k < na; k++) if (kind[k] == 0 && !drop[k]) rows[q++] = k;
+      for (i = 0; i < mr; i++) o->sp[i] = 0;
+      if (!q) break;
+      for (a2 = 0; a2 < q; a2++) {
+        const double *ga = &G[idx[rows[a2]] * n];
+        double t = 0;
+        for (j = 0; j < nf; j++) t += ga[fr[j]] * sigma * o->gf[fr[j]];
+        r[a2] = t;
+        for (b2 = 0; b2 < q; b2++) {
+          const double *gb = &G[idx[rows[b2]] * n];
+          double u = 0;
+          for (j = 0; j < nf; j++) u += ga[fr[j]] * gb[fr[j]];
+          M[a2 * q + b2] = u + (a2 == b2 ? 1e-12 : 0);
+        }
+      }
+      if (!lsolve(q, M, r)) for (a2 = 0; a2 < q; a2++) r[a2] = 0;
+      for (a2 = 0; a2 < q; a2++) {
+        double v = r[a2] * sg[rows[a2]];
+        if (v < -1e-9 * (1 + fabs(r[a2])) && -v > wv) { wv = -v; worst = rows[a2]; }
+        o->sp[idx[rows[a2]]] = sigma * r[a2];
+      }
+      if (worst < 0) break;
+      drop[worst] = 1;
+    }
+  }
+  /* reduced costs: the objective's gradient less the active rows' share */
+  for (j = 0; j < n; j++) {
+    double t = o->gf[j];
+    for (i = 0; i < mr; i++) if (o->sp[i] != 0) t -= o->sp[i] * G[i * n + j];
+    o->rc[j] = fabs(t) <= 1e-9 * (1 + fabs(o->gf[j])) ? 0 : t;
+  }
+  for (j = 0; j < nf; j++) o->rc[fr[j]] = 0;
+  /* the ranges, for a linear model at a nondegenerate vertex */
+  if (linear && na == n && (N = (double *)malloc(((size_t)n * n + 1) * sizeof(double)))) {
+    double *nu = w, *t1 = w + n;
+    int good = 1;
+    /* the normals N (row k: active constraint k), multipliers nu: N^T nu = sigma gf */
+    for (k = 0; k < n; k++) for (j = 0; j < n; j++) N[j * n + k] = kind[k] == 0 ? G[idx[k] * n + j] : (idx[k] == j);
+    for (j = 0; j < n; j++) nu[j] = sigma * o->gf[j];
+    if (!lsolve(n, N, nu)) good = 0;
+    for (k = 0; k < n && good; k++) if (nu[k] * sg[k] < -1e-9 * (1 + fabs(nu[k]))) good = 0;   /* not optimal there */
+    if (good) {
+      for (k = 0; k < n; k++) {
+        if (kind[k] == 0) o->sp[idx[k]] = sigma * nu[k];
+        else o->rc[idx[k]] = sigma * nu[k];
+      }
+      for (j = 0; j < n; j++) if (o->rc[j] == 0) { for (k = 0; k < n; k++) if (kind[k] && idx[k] == j) o->rc[j] = sigma * nu[k]; }
+      /* the objective coefficient of j changed by delta: nu + sigma delta w, N^T w = e_j */
+      for (j = 0; j < n; j++) {
+        double up = SENS_INF, dn = SENS_INF;
+        for (k = 0; k < n; k++) for (i = 0; i < n; i++) N[i * n + k] = kind[k] == 0 ? G[idx[k] * n + i] : (idx[k] == i);
+        for (i = 0; i < n; i++) t1[i] = i == j;
+        if (!lsolve(n, N, t1)) continue;
+        for (k = 0; k < n; k++) {
+          double wk = sigma * t1[k];
+          if (!sg[k] || fabs(wk) < 1e-12) continue;
+          /* need sg[k] * (nu[k] + delta * wk) >= 0 */
+          if (sg[k] * wk < 0) up = dmin(up, fabs(nu[k] / wk));
+          else dn = dmin(dn, fabs(nu[k] / wk));
+        }
+        o->oinc[j] = up; o->odec[j] = dn;
+      }
+      /* a row's right side changed by t: x + t d, N d = e_k; until another constraint or bound is met */
+      for (i = 0; i < mr; i++) {
+        int kk = -1, g;
+        for (k = 0; k < n; k++) if (kind[k] == 0 && idx[k] == i) kk = k;
+        if (kk < 0) {
+          double slack = -gv[i];
+          if (e->rows[i].sense == SR_LE) { o->rinc[i] = SENS_INF; o->rdec[i] = slack; }
+          else { o->rinc[i] = -slack; o->rdec[i] = SENS_INF; }
+          continue;
+        }
+        for (k = 0; k < n; k++) for (j = 0; j < n; j++) N[k * n + j] = kind[k] == 0 ? G[idx[k] * n + j] : (idx[k] == j);
+        for (k = 0; k < n; k++) t1[k] = k == kk;
+        if (!lsolve(n, N, t1)) continue;
+        for (g = 0; g < 2; g++) {
+          double dir = g ? -1 : 1, lim = SENS_INF;
+          int i2;
+          /* the right side up by t moves lhs - rhs of row i by -t: x moves by -t d... as the row stays
+             binding, lhs follows; the other rows' and the free variables' room */
+          for (i2 = 0; i2 < mr; i2++) {
+            double rate = 0;
+            int act = 0;
+            for (k = 0; k < n; k++) if (kind[k] == 0 && idx[k] == i2) act = 1;
+            if (act) continue;
+            for (j = 0; j < n; j++) rate += G[i2 * n + j] * t1[j] * dir;
+            if (e->rows[i2].sense == SR_LE && rate > 1e-12) lim = dmin(lim, -gv[i2] / rate);
+            if (e->rows[i2].sense == SR_GE && rate < -1e-12) lim = dmin(lim, gv[i2] / -rate);
+          }
+          for (j = 0; j < n; j++) {
+            double rate = t1[j] * dir;
+            if (rate > 1e-12 && finite_(e->hi[j])) lim = dmin(lim, (e->hi[j] - x[j]) / rate);
+            if (rate < -1e-12 && finite_(e->lo[j])) lim = dmin(lim, (x[j] - e->lo[j]) / -rate);
+          }
+          if (lim < 0) lim = 0;
+          if (g) o->rdec[i] = lim; else o->rinc[i] = lim;
+        }
+      }
+    }
+  }
+  ok = 1;
+out:
+  free(G); free(gv); free(xx); free(kind); free(idx); free(sg); free(fr); free(drop); free(N); free(M); free(r); free(w);
+  return ok;
+}
+/* whether a Sensitivity report applies to the model (no integers, not Evolutionary, Max or Min) */
+int solver_sensitivity_applies(const SolverModel *m, const char **why)
+{
+  int i;
+  for (i = 0; i < m->ncons; i++) if (m->cons[i].rel >= SR_INT) { *why = "Sensitivity Reports are not meaningful on problems with integer constraints."; return 0; }
+  if (m->method == SM_EVO) { *why = "The Sensitivity report is available for Simplex LP and GRG Nonlinear."; return 0; }
+  if (m->goal == SG_VALUE) { *why = "The Sensitivity report needs a Max or Min objective."; return 0; }
+  return 1;
+}
+
 int solver_report(Book *b, const SolverModel *m, const SolverResult *res, int kind, const char **why)
 {
   Ev e;
@@ -1263,6 +1674,7 @@ int solver_report(Book *b, const SolverModel *m, const SolverResult *res, int ki
   if (!res->sol) { *why = "There is no solution to report."; return -1; }
   if (b->lockstruct) { *why = "The workbook is protected and cannot be changed."; return -1; }
   if (!build(b, m, &e, why)) { ev_free(&e); return -1; }
+  if (kind == 2 && !solver_sensitivity_applies(m, why)) { ev_free(&e); return -1; }
   if (kind == 1) {
     for (j = 0; j < e.n; j++) if (e.integer[j]) { *why = "The Limits report doesn't apply to models with integer, binary or all-different constraints."; ev_free(&e); return -1; }
     if (m->method == SM_EVO) { *why = "The Limits report is available for Simplex LP and GRG Nonlinear."; ev_free(&e); return -1; }
@@ -1270,7 +1682,7 @@ int solver_report(Book *b, const SolverModel *m, const SolverResult *res, int ki
   sh = m->sheet;
   b->manualcalc = 0;
   /* the values at the solution: the objective, the constraints' cells */
-  if (!(vals = (double *)malloc(((size_t)e.nrows * 2 + 4 + (size_t)e.n * 4) * sizeof(double))) || !ev_begin(&e)) {
+  if (!(vals = (double *)malloc(((size_t)e.nrows * 5 + 4 + (size_t)e.n * 5) * sizeof(double))) || !ev_begin(&e)) {
     ev_end(&e); free(vals); ev_free(&e); b->manualcalc = manual; *why = "Not enough memory."; return -1;
   }
   e.budget = 1L << 30;
@@ -1303,16 +1715,30 @@ int solver_report(Book *b, const SolverModel *m, const SolverResult *res, int ki
       free(x);
     }
   }
+  if (kind == 2) {
+    /* vals: after the rows' values, gf rc oinc odec per variable, then sp rinc rdec per row */
+    Sens sn;
+    double *v2 = vals + 1 + 2 * e.nrows;
+    sn.gf = v2; sn.rc = v2 + e.n; sn.oinc = v2 + 2 * e.n; sn.odec = v2 + 3 * e.n;
+    sn.sp = v2 + 4 * e.n; sn.rinc = sn.sp + e.nrows; sn.rdec = sn.rinc + e.nrows;
+    e.budget = e.evals + 4L * e.n + 8;
+    if (!sensitivity(&e, m, res->sol, m->method == SM_SIMPLEX, &sn)) {
+      ev_end(&e); free(vals); ev_free(&e); b->manualcalc = manual; *why = "Not enough memory."; return -1;
+    }
+    ev_eval(&e, res->sol, &f);
+  }
   ev_end(&e);
   b->manualcalc = manual;
   book_begin(b);
   book_note_book(b);
-  strcpy(base, kind ? "Limits Report 1" : "Answer Report 1");
-  for (k = 1; k < 1000; k++) { sprintf(base, "%s Report %d", kind ? "Limits" : "Answer", k); if (book_find_sheet(b, base) < 0) break; }
+  {
+    static const char *const kinds[] = { "Answer", "Limits", "Sensitivity" };
+    for (k = 1; k < 1000; k++) { sprintf(base, "%s Report %d", kinds[kind], k); if (book_find_sheet(b, base) < 0) break; }
+  }
   if ((at = an_add_sheet(b, base, sh)) < 0) { book_end(b); free(vals); ev_free(&e); *why = "A new sheet couldn't be added."; return -1; }
   if (at <= sh) sh++;
   b->manualcalc = 1;
-  snprintf(t, sizeof t, "Ledger %s Report", kind ? "Limits" : "Answer");
+  snprintf(t, sizeof t, "Ledger %s Report", kind == 2 ? "Sensitivity" : kind ? "Limits" : "Answer");
   put_text(b, at, 0, 0, t); bold(b, at, 0, 0, 0);
   snprintf(t, sizeof t, "Worksheet: %s", b->sh[sh]->name); put_text(b, at, 1, 0, t);
   row = 3;
@@ -1380,6 +1806,60 @@ int solver_report(Book *b, const SolverModel *m, const SolverResult *res, int ki
         row++;
       }
     }
+  } else if (kind == 2) {
+    /* Excel's: the variables' final values and reduced costs, the constraints' shadow prices; for
+       Simplex LP the ranges, for GRG reduced gradients and Lagrange multipliers */
+    int lp = m->method == SM_SIMPLEX;
+    double *v2 = vals + 1 + 2 * e.nrows, *sp = v2 + 4 * e.n, *rinc = sp + e.nrows, *rdec = rinc + e.nrows;
+    static const char *const hv[] = { "Cell", "Name", "Final Value", "Reduced Cost", "Objective Coefficient", "Allowable Increase", "Allowable Decrease" };
+    static const char *const hc[] = { "Cell", "Name", "Final Value", "Shadow Price", "Constraint R.H. Side", "Allowable Increase", "Allowable Decrease" };
+    int cols = lp ? 7 : 4;
+    snprintf(t, sizeof t, "Engine: %s", solver_method_name(m->method)); put_text(b, at, row, 0, t);
+    row += 2;
+    put_text(b, at, row, 0, "Variable Cells"); bold(b, at, row, 0, 0); row++;
+    for (k = 0; k < cols; k++) put_text(b, at, row, 1 + k, k == 3 && !lp ? "Reduced Gradient" : hv[k]);
+    bold(b, at, row, 1, cols); row++;
+    for (j = 0; j < e.n; j++, row++) {
+      absref(e.vr[j], e.vc[j], ref); put_text(b, at, row, 1, ref);
+      cell_label(b, sh, e.vr[j], e.vc[j], lab, sizeof lab); if (lab[0]) put_text(b, at, row, 2, lab);
+      put_num(b, at, row, 3, res->sol[j]); put_num(b, at, row, 4, v2[e.n + j]);
+      if (lp) {
+        put_num(b, at, row, 5, v2[j]);
+        for (k = 0; k < 2; k++) { double d = v2[(2 + k) * e.n + j]; if (d == d) put_num(b, at, row, 6 + k, d); else { Value na = val_err(E_NA); book_set_value(b, at, row, 6 + k, &na); } }
+      }
+    }
+    row += 2;
+    put_text(b, at, row, 0, "Constraints"); bold(b, at, row, 0, 0); row++;
+    for (k = 0; k < cols; k++) put_text(b, at, row, 1 + k, k == 3 && !lp ? "Lagrange Multiplier" : hc[k]);
+    bold(b, at, row, 1, cols); row++;
+    for (i = 0; i < e.nrows; i++, row++) {
+      absref(e.rows[i].lr, e.rows[i].lc, ref); put_text(b, at, row, 1, ref);
+      cell_label(b, sh, e.rows[i].lr, e.rows[i].lc, lab, sizeof lab); if (lab[0]) put_text(b, at, row, 2, lab);
+      put_num(b, at, row, 3, vals[1 + 2 * i]); put_num(b, at, row, 4, sp[i]);
+      if (lp) {
+        put_num(b, at, row, 5, vals[2 + 2 * i]);
+        for (k = 0; k < 2; k++) { double d = (k ? rdec : rinc)[i]; if (d == d) put_num(b, at, row, 6 + k, d); else { Value na = val_err(E_NA); book_set_value(b, at, row, 6 + k, &na); } }
+      }
+    }
+    /* bounds on the variable cells typed as constraints (B1 <= 4), as Excel lists them; not the
+       non-negativity Ledger adds */
+    for (j = 0; j < e.n; j++) {
+      int g;
+      for (g = 0; g < 2; g++) {
+        double bnd = g ? e.hi[j] : e.lo[j], v = res->sol[j];
+        int at_b = fabs(v - bnd) <= PRECISION * (1 + fabs(bnd));
+        if (!finite_(bnd) || (!g && bnd == 0 && m->nonneg)) continue;
+        absref(e.vr[j], e.vc[j], ref); put_text(b, at, row, 1, ref);
+        cell_label(b, sh, e.vr[j], e.vc[j], lab, sizeof lab); if (lab[0]) put_text(b, at, row, 2, lab);
+        put_num(b, at, row, 3, v); put_num(b, at, row, 4, at_b ? v2[e.n + j] : 0);
+        if (lp) {
+          put_num(b, at, row, 5, bnd);
+          if (at_b) { Value na = val_err(E_NA); book_set_value(b, at, row, 6, &na); book_set_value(b, at, row, 7, &na); }
+          else { put_num(b, at, row, 6 + !g, SENS_INF); put_num(b, at, row, 7 - !g, fabs(v - bnd)); }
+        }
+        row++;
+      }
+    }
   } else {
     static const char *const h1[] = { "Objective Cell", "Name", "Value" };
     static const char *const h2[] = { "Variable Cell", "Name", "Value", "Lower Limit", "Objective Result", "Upper Limit", "Objective Result" };
@@ -1405,7 +1885,7 @@ int solver_report(Book *b, const SolverModel *m, const SolverResult *res, int ki
     }
   }
   book_set_col_width(b, at, 0, 14);
-  for (k = 1; k <= 7; k++) book_set_col_width(b, at, k, (u16)(k == 1 ? 80 : k == 4 && kind == 0 ? 130 : 100));
+  for (k = 1; k <= 7; k++) book_set_col_width(b, at, k, (u16)(k == 1 ? 80 : (k == 4 && kind == 0) || (k >= 5 && kind == 2) ? 130 : 100));
   book_end(b);
   b->manualcalc = manual;
   if (!manual) book_recalc(b);

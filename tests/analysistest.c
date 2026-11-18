@@ -150,7 +150,51 @@ static void solver_tests(void)
     at = solver_report(b, &m, &r, 1, &why);
     ok("solver: limits report", at >= 0 && num_at(b, "'Limits Report 1'!D9") == 2 && fabs(num_at(b, "'Limits Report 1'!E9")) < 1e-9 &&
        close_to(num_at(b, "'Limits Report 1'!F9"), 30, 1e-6) && close_to(num_at(b, "'Limits Report 1'!G9"), 2, 1e-6) && close_to(num_at(b, "'Limits Report 1'!H9"), 36, 1e-6));
+    at = solver_report(b, &m, &r, 2, &why);
+    {
+      const char *S = "'Sensitivity Report 1'!";
+      char a[80];
+#define SN(c) (snprintf(a, sizeof a, "%s%s", S, c), num_at(b, a))
+      ok("solver: sensitivity report, variables", at >= 0 && !strcmp(b->sh[at]->name, "Sensitivity Report 1") && close_to(SN("D8"), 2, 1e-6) && fabs(SN("E8")) < 1e-9 &&
+         close_to(SN("F8"), 3, 1e-9) && close_to(SN("G8"), 4.5, 1e-6) && close_to(SN("H8"), 3, 1e-6) && close_to(SN("F9"), 5, 1e-9) && SN("G9") == 1e30 && close_to(SN("H9"), 3, 1e-6));
+      ok("solver: sensitivity report, constraints", close_to(SN("E14"), 1.5, 1e-6) && close_to(SN("G14"), 6, 1e-6) && close_to(SN("H14"), 6, 1e-6) &&
+         close_to(SN("E15"), 1, 1e-6) && close_to(SN("G15"), 6, 1e-6) && close_to(SN("H15"), 6, 1e-6) &&
+         close_to(SN("D16"), 2, 1e-6) && SN("E16") == 0 && SN("F16") == 4 && SN("G16") == 1e30 && close_to(SN("H16"), 2, 1e-6));
+    }
     solver_result_free(&r);
+    /* GRG: reduced gradients and Lagrange multipliers */
+    m.method = SM_GRG;
+    solver_solve(b, &m, &r);
+    at = solver_report(b, &m, &r, 2, &why);
+    {
+      const char *S = "'Sensitivity Report 2'!";
+      char a[80];
+      ok("solver: sensitivity report, GRG", at >= 0 && close_to(SN("E14"), 1.5, 1e-4) && close_to(SN("E15"), 1, 1e-4) && text_at(b, "'Sensitivity Report 2'!E13", "Lagrange Multiplier"));
+    }
+#undef SN
+    solver_result_free(&r);
+    m.method = SM_EVO;
+    ok("solver: no sensitivity report for Evolutionary", !solver_sensitivity_applies(&m, &why));
+    /* Save Model and Load Model */
+    {
+      SolverModel m2;
+      Rect a;
+      m.method = SM_SIMPLEX; m.intgap = 2; m.seed = 7;
+      solver_add(&m, "B1:B2", SR_INT, "");
+      ok("solver: save model refuses its own cells", solver_save_model(b, &m, 0, 2, 0, &why) == 0 && why);
+      ok("solver: save model", solver_save_model(b, &m, 10, 5, 0, &why) == 7 && text_at(b, "F11", "=MAX($B$4)") && text_at(b, "F12", "=COUNT($B$1:$B$2)") &&
+         text_at(b, "F14", "=AND($C$2<=12)") && text_at(b, "F16", "=AND($B$1:$B$2=INT($B$1:$B$2))") && cell_value(b, 0, 12, 5)->t == V_BOOL);
+      ok("solver: saved options spill", num_at(b, "F17") == 2 && num_at(b, "G17") == 1 && num_at(b, "O17") == 2);
+      ok("solver: save model asks before replacing", solver_save_model(b, &m, 10, 5, 0, &why) == -1 && solver_save_model(b, &m, 10, 5, 1, &why) == 7);
+      a.r1 = a.r2 = 10; a.c1 = a.c2 = 5;
+      ok("solver: load model", solver_load_model(b, 0, a, &m2, &why) && !strcmp(m2.objective, "B4") && m2.goal == SG_MAX && !strcmp(m2.vars, "B1:B2") &&
+         m2.ncons == 4 && m2.cons[1].rel == SR_LE && !strcmp(m2.cons[1].lhs, "C2") && !strcmp(m2.cons[1].rhs, "12") && m2.cons[3].rel == SR_INT &&
+         m2.method == SM_SIMPLEX && m2.intgap == 2 && m2.seed == 7 && m2.nonneg);
+      solver_model_free(&m2);
+      a.r1 = 11;
+      ok("solver: load model refuses other cells", !solver_load_model(b, 0, a, &m2, &why) && why);
+      solver_model_free(&m2);
+    }
     solver_model_free(&m);
   }
   /* a constraint typed as text */

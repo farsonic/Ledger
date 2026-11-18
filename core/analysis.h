@@ -47,6 +47,14 @@ int  solver_parse_cons(const char *text, SolverCons *c);
 int  solver_load(Book *b, int sheet, SolverModel *m);
 int  solver_save(Book *b, const SolverModel *m);
 
+/* Load/Save Model (GridCraft's): the model written down a column from r, c of its sheet as formulas
+   (=MAX(objective), =COUNT(variables), one =AND(constraint) each, the options as ={...} spilling 10
+   cells right), one undo step. Returns how many cells, 0 refused (*why), -1 when cells there hold data
+   and overwrite is 0 (ask, then call again with overwrite 1). Load reads such a range (one cell: down
+   from it) into m; 0 with *why if it isn't one */
+int  solver_save_model(Book *b, const SolverModel *m, i32 r, i32 c, int overwrite, const char **why);
+int  solver_load_model(Book *b, int sheet, Rect area, SolverModel *m, const char **why);
+
 /* what a solve came to */
 enum { SS_OPTIMAL, SS_CONVERGED, SS_CANNOTIMPROVE, SS_LIMITFEAS, SS_LIMIT, SS_INFEASIBLE, SS_UNBOUNDED, SS_NOTLINEAR, SS_BADMODEL };
 typedef struct {
@@ -63,10 +71,12 @@ int  solver_solve(Book *b, const SolverModel *m, SolverResult *r);
 /* Solver Results' OK: the solution kept in the variable cells (keep; else the original values
    stay) and the model saved, one undo step */
 int  solver_finish(Book *b, const SolverModel *m, const SolverResult *r, int keep, int save);
-/* an Answer (kind 0) or Limits (kind 1) report on a new sheet before the model's; its index, or
-   -1 (*why says why) */
+/* an Answer (kind 0), Limits (kind 1) or Sensitivity (kind 2) report on a new sheet before the
+   model's; its index, or -1 (*why says why) */
 int  solver_report(Book *b, const SolverModel *m, const SolverResult *r, int kind, const char **why);
 const char *solver_method_name(int method);
+/* whether the Sensitivity report applies (no integer constraints, not Evolutionary, Max or Min) */
+int  solver_sensitivity_applies(const SolverModel *m, const char **why);
 
 /* the dense simplex and branch and bound underneath, for the tests: minimise c.x subject to
    rows (a[i] . x  sense[i]  rhs[i], sense SR_LE/SR_EQ/SR_GE) and lo <= x <= hi, integer[j] for

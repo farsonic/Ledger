@@ -2718,3 +2718,16 @@ The dates in column %s could be day first or month first: they were read month f
 Save Sheet as SYLK...	Blatt als SYLK speichern...	Enregistrer la feuille en SYLK...	Guardar hoja como SYLK...	Salva foglio come SYLK...
 Save Sheet as SYLK	Blatt als SYLK speichern	Enregistrer la feuille en SYLK	Guardar hoja como SYLK	Salva foglio come SYLK
 %d records of this SYLK file couldn't be read and were left out.	%d Datensätze dieser SYLK-Datei konnten nicht gelesen werden und wurden ausgelassen.	%d enregistrements de ce fichier SYLK n'ont pas pu être lus et ont été omis.	No se pudieron leer %d registros de este archivo SYLK y se omitieron.	Non è stato possibile leggere %d record di questo file SYLK, che sono stati omessi.
+## Solver: Options, Load/Save Model, the Sensitivity report (anatab.c)
+Sensitivity	Sensitivität	Sensibilité	Confidencialidad	Sensibilità
+Options...	Optionen...	Options...	Opciones...	Opzioni...
+Load/Save...	Laden/Speichern...	Charger/Enregistrer...	Cargar/Guardar...	Carica/Salva...
+Solver Options	Solver-Optionen	Options du solveur	Opciones de Solver	Opzioni Risolutore
+Integer Optimality (%):	Ganzzahlige Optimalität (%):	Optimalité des entiers (%) :	Optimalidad de enteros (%):	Ottimalità numeri interi (%):
+Population Size:	Populationsgröße:	Taille de la population :	Tamaño de población:	Dimensioni popolazione:
+Random Seed:	Zufällige Ausgangszahl:	Valeur initiale aléatoire :	Inicialización aleatoria:	Valore di inizializzazione casuale:
+Multistart and the population are for GRG Nonlinear and Evolutionary; a seed of 0 is a fixed one.	Multistart und die Population gelten für GRG-Nichtlinear und Evolutionär; die Ausgangszahl 0 ist eine feste.	Multistart et la population servent à GRG non linéaire et à Évolutionnaire ; une valeur initiale de 0 est fixe.	Multistart y la población son para GRG no lineal y Evolutionary; una inicialización de 0 es fija.	Multistart e la popolazione valgono per GRG non lineare ed Evolutivo; un valore di inizializzazione 0 è fisso.
+Load/Save Model	Modell laden/speichern	Charger/Enregistrer le modèle	Cargar o guardar modelo	Carica/Salva modello
+Select Model Area:	Modellbereich auswählen:	Sélectionnez la zone du modèle :	Seleccionar área del modelo:	Seleziona area modello:
+Enter cells of this sheet, as A20 or A20:A30.	Geben Sie Zellen dieses Blatts ein, etwa A20 oder A20:A30.	Entrez des cellules de cette feuille, comme A20 ou A20:A30.	Escriba celdas de esta hoja, como A20 o A20:A30.	Immettere celle di questo foglio, come A20 o A20:A30.
+Replace the contents of the cells below with the model?	Den Inhalt der Zellen darunter durch das Modell ersetzen?	Remplacer le contenu des cellules ci-dessous par le modèle ?	¿Reemplazar el contenido de las celdas de abajo por el modelo?	Sostituire il contenuto delle celle sottostanti con il modello?

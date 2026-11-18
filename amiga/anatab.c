@@ -291,27 +291,29 @@ static int solver_results(SolverResult *res)
 {
   static const ULONG ends[] = { ID_DLGOK, 0 };
   static const char *keeps[3];
-  Object *w, *keep, *ans, *lim, *back;
+  Object *w, *keep, *ans, *lim, *sen, *back;
   char msg[300];
-  int again = 0, solved = res->sol != NULL, id;
+  const char *nosens;
+  int again = 0, solved = res->sol != NULL, id, sens = solver_sensitivity_applies(&sm, &nosens);
   utf8_l1(res->message, msg, sizeof msg);
   keeps[0] = tr("Keep Solver Solution"); keeps[1] = tr("Restore Original Values"); keeps[2] = NULL;
   w = dialog_window("Solver Results", VGroup,
         Child, TextObject, MUIA_Text_Contents, (ULONG)msg, MUIA_Text_SetMax, FALSE, End,
         Child, HGroup, Child, keep = cycle_obj(keeps, 0), Child, HSpace(0), End,
-        Child, HGroup, Child, LLabel1(tr("Reports:")), Child, ans = check_obj(0), Child, LLabel1(tr("Answer")), Child, lim = check_obj(0), Child, LLabel1(tr("Limits")), Child, HSpace(0), End,
+        Child, HGroup, Child, LLabel1(tr("Reports:")), Child, ans = check_obj(0), Child, LLabel1(tr("Answer")), Child, lim = check_obj(0), Child, LLabel1(tr("Limits")),
+          Child, sen = check_obj(0), Child, LLabel1(tr("Sensitivity")), Child, HSpace(0), End,
         Child, checkrow(&back, 0, "Return to Solver Parameters Dialog"),
       End, NULL);
   if (!w) return 0;
   set(keep, MUIA_Disabled, !solved);
-  set(ans, MUIA_Disabled, !solved); set(lim, MUIA_Disabled, !solved);
+  set(ans, MUIA_Disabled, !solved); set(lim, MUIA_Disabled, !solved); set(sen, MUIA_Disabled, !solved || !sens);
   id = (int)run_modal(w, ends, NULL);
   if (id == ID_DLGOK) {
     int k = solved && xget(keep, MUIA_Cycle_Active) == 0, rep;
     again = checked(back);
     solver_finish(book, &sm, res, k, 1);
-    for (rep = 0; rep < 2 && solved; rep++)
-      if (checked(rep ? lim : ans)) {
+    for (rep = 0; rep < 3 && solved; rep++)
+      if (checked(rep == 2 ? sen : rep ? lim : ans)) {
         const char *why;
         int at = solver_report(book, &sm, res, rep, &why);
         if (at < 0) sayu(why); else { again = 0; show_sheet(at); }
@@ -321,9 +323,80 @@ static int solver_results(SolverResult *res)
   refresh_all();
   return again;
 }
+/* Solver Options: what the methods may spend and how close integers must come */
+static void solver_options(void)
+{
+  static const ULONG ends[] = { ID_DLGOK, 0 };
+  Object *w, *gap, *evals, *multi, *pop, *seed;
+  char g[40], e[20], p[20], sd[20];
+  snprintf(g, sizeof g, "%.15g", sm.intgap);
+  snprintf(e, sizeof e, "%ld", sm.maxevals > 0 ? sm.maxevals : 20000L);
+  snprintf(p, sizeof p, "%d", sm.population > 0 ? sm.population : 100);
+  snprintf(sd, sizeof sd, "%lu", (unsigned long)sm.seed);
+  w = dialog_window("Solver Options", VGroup,
+        Child, ColGroup(2),
+          Child, Label1(tr("Integer Optimality (%):")), Child, gap = str_obj(g, 20),
+          Child, Label1(tr("Max evaluations:")), Child, evals = str_obj(e, 10),
+          Child, Label1(tr("Population Size:")), Child, pop = str_obj(p, 10),
+          Child, Label1(tr("Random Seed:")), Child, seed = str_obj(sd, 12),
+        End,
+        Child, checkrow(&multi, sm.multistart, "Multistart"),
+        Child, TextObject, MUIA_Text_Contents, (ULONG)tr("Multistart and the population are for GRG Nonlinear and Evolutionary; a seed of 0 is a fixed one."), MUIA_Text_SetMax, FALSE, End,
+      End, NULL);
+  if (!w) return;
+  if (run_modal(w, ends, NULL) == ID_DLGOK) {
+    double v = numof(gap, 0);
+    sm.intgap = v >= 0 && v <= 100 ? v : 0;
+    v = numof(evals, 0); sm.maxevals = v >= 1 && v <= 2000000 ? (long)v : 0;
+    if (sm.maxevals == 20000L) sm.maxevals = 0;
+    v = numof(pop, 0); sm.population = v >= 2 && v <= 10000 ? (int)v : 0;
+    if (sm.population == 100) sm.population = 0;
+    v = numof(seed, 0); sm.seed = v >= 0 && v < 4294967296.0 ? (u32)v : 0;
+    sm.multistart = (u8)checked(multi);
+  }
+  MUI_DisposeObject(w);
+}
+/* Load/Save Model: the model's area on the sheet, read or written there */
+static void solver_load_save(void)
+{
+  static const ULONG ends[] = { ID_DLGOK, ID_DLG1, ID_DLG2, 0 };
+  Object *w, *area, *load, *save;
+  char t[60], u[100];
+  ULONG id;
+  sel_text(t);
+  w = dialog_window("Load/Save Model", VGroup,
+        Child, LLabel1(tr("Select Model Area:")),
+        Child, area = str_obj(t, 50),
+        Child, HGroup, Child, load = QButton(tr("Load")), Child, save = QButton(tr("Save")), Child, HSpace(0), End,
+      End, "Close");
+  if (!w) return;
+  press_id(load, ID_DLG1); press_id(save, ID_DLG2);
+  set(w, MUIA_Window_ActiveObject, (ULONG)area);
+  for (;;) {
+    u16 shn; Rect r; u8 fl;
+    const char *why;
+    int n;
+    id = run_modal(w, ends, NULL);
+    if (id != ID_DLG1 && id != ID_DLG2) break;
+    l1_utf8(sget(area), u, sizeof u);
+    n = parse_ref(book, u, &shn, &r, &fl);
+    if (!n || u[n] || (shn != SHEET_SELF && shn != (u16)cur_index())) { say("Enter cells of this sheet, as A20 or A20:A30."); continue; }
+    if (id == ID_DLG1) {
+      SolverModel m2;
+      if (!solver_load_model(book, cur_index(), r, &m2, &why)) { sayu(why); solver_model_free(&m2); continue; }
+      solver_model_free(&sm); sm = m2;
+      break;
+    }
+    n = solver_save_model(book, &sm, r.r1, r.c1, 0, &why);
+    if (n < 0 && ask("OK|Cancel", "%s", tr("Replace the contents of the cells below with the model?")) == 1) n = solver_save_model(book, &sm, r.r1, r.c1, 1, &why);
+    if (n == 0) { sayu(why); continue; }
+    if (n > 0) { refresh_all(); break; }
+  }
+  MUI_DisposeObject(w);
+}
 static void dlg_solver(void)
 {
-  static const ULONG ends[] = { ID_DLGOK, ID_DLG1, ID_DLG2, ID_DLG3, ID_DLG4, ID_DLG5, 0 };
+  static const ULONG ends[] = { ID_DLGOK, ID_DLG1, ID_DLG2, ID_DLG3, ID_DLG4, ID_DLG5, ID_DLG6, ID_DLG7, 0 };
   static const char *goals[4], *methods[4];
   int sel = -1;
   if (sm_book != book || sm_book_sheet != cur_index()) {
@@ -337,7 +410,7 @@ static void dlg_solver(void)
     sm_book = book; sm_book_sheet = cur_index();
   }
   for (;;) {
-    Object *w, *obj, *goal, *val, *vars, *list, *add, *chg, *del, *reset, *nonneg, *meth, *multi, *evals, *help;
+    Object *w, *obj, *goal, *val, *vars, *list, *add, *chg, *del, *reset, *nonneg, *meth, *opts, *ls, *help;
     char t[300], vtext[40];
     ULONG id;
     LONG a;
@@ -356,22 +429,20 @@ static void dlg_solver(void)
               MUIA_Listview_List, list = ListObject, InputListFrame,
               MUIA_List_ConstructHook, MUIV_List_ConstructHook_String, MUIA_List_DestructHook, MUIV_List_DestructHook_String, End, End,
             Child, VGroup, Child, add = QButton(tr("Add...")), Child, chg = QButton(tr("Change...")), Child, del = QButton(tr("Delete")),
-              Child, reset = QButton(tr("Reset All")), Child, VSpace(0), End,
+              Child, reset = QButton(tr("Reset All")), Child, ls = QButton(tr("Load/Save...")), Child, VSpace(0), End,
           End,
           Child, checkrow(&nonneg, sm.nonneg, "Make Unconstrained Variables Non-Negative"),
           Child, HGroup, Child, Label1(tr("Select a Solving Method:")), Child, meth = cycle_obj(trl(methods_en, methods), sm.method),
-            Child, multi = check_obj(sm.multistart), Child, LLabel1(tr("Multistart")), End,
-          Child, HGroup, Child, Label1(tr("Max evaluations:")), Child, evals = str_obj("", 10), Child, HSpace(0), End,
+            Child, opts = QButton(tr("Options...")), End,
           Child, help = TextObject, MUIA_Text_Contents, (ULONG)tr(method_help[sm.method < 3 ? sm.method : 0]), MUIA_Text_SetMax, FALSE, End,
         End, "Solve");
     if (!w) return;
     utf8_l1(sm.objective, t, sizeof t); set(obj, MUIA_String_Contents, (ULONG)t);
     utf8_l1(sm.vars, t, sizeof t); set(vars, MUIA_String_Contents, (ULONG)t);
-    if (sm.maxevals > 0) { sprintf(t, "%ld", sm.maxevals); set(evals, MUIA_String_Contents, (ULONG)t); }
     for (i = 0; i < sm.ncons; i++) { char u[300]; solver_cons_text(&sm.cons[i], u, sizeof u); utf8_l1(u, t, sizeof t); DoMethod(list, MUIM_List_InsertSingle, (ULONG)t, MUIV_List_Insert_Bottom); }
     if (sel >= 0 && sel < sm.ncons) set(list, MUIA_List_Active, sel);
     set(val, MUIA_Disabled, sm.goal != SG_VALUE);
-    set(multi, MUIA_Disabled, sm.method != SM_GRG);
+    press_id(opts, ID_DLG6); press_id(ls, ID_DLG7);
     press_id(add, ID_DLG1); press_id(chg, ID_DLG2); press_id(del, ID_DLG3); press_id(reset, ID_DLG4);
     notify_id(goal, MUIA_Cycle_Active, ID_DLG5); notify_id(meth, MUIA_Cycle_Active, ID_DLG5);
     DoMethod(list, MUIM_Notify, MUIA_Listview_DoubleClick, TRUE, (ULONG)app, 2, MUIM_Application_ReturnID, ID_DLG2);
@@ -386,12 +457,12 @@ static void dlg_solver(void)
       sm.value = numof(val, 0);
       sm.nonneg = (u8)checked(nonneg);
       sm.method = (u8)xget(meth, MUIA_Cycle_Active);
-      sm.multistart = (u8)checked(multi);
-      sm.maxevals = (long)numof(evals, 0);
     }
     MUI_DisposeObject(w);
     sel = (int)a;
     if (id == ID_DLG5) continue;
+    if (id == ID_DLG6) { solver_options(); continue; }
+    if (id == ID_DLG7) { solver_load_save(); continue; }
     if (id == ID_DLG1) { SolverCons c; memset(&c, 0, sizeof c); c.rel = SR_LE; if (constraint_dialog(&c, 0)) { solver_add(&sm, c.lhs, c.rel, c.rhs); sel = sm.ncons - 1; } continue; }
     if (id == ID_DLG2) { if (a >= 0 && a < sm.ncons) { SolverCons c = sm.cons[a]; if (constraint_dialog(&c, 1)) sm.cons[a] = c; } continue; }
     if (id == ID_DLG3) { if (a >= 0) solver_remove(&sm, (int)a); continue; }
