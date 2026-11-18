@@ -307,6 +307,9 @@ int book_series(Book *b, int sheet, Rect a, int across, double step, double stop
       if (!i) continue;
       v = val_num(x + step * i);
       if (stop == stop && (step >= 0 ? v.n > stop + 1e-9 : v.n < stop - 1e-9)) continue;
+      /* the last value is the stop itself, not stop plus the steps' float drift (0.1 * 3 is
+         0.30000000000000004; GridCraft's fix): */
+      if (stop == stop && fabs(v.n - stop) <= 1e-9 * (fabs(stop) > 1 ? fabs(stop) : 1)) v.n = stop;
       book_set_value(b, sheet, r, c, &v);
       if (across ? r == a.r1 : c == a.c1) {}
     }

@@ -262,8 +262,19 @@ static void sync_typed_numbers(void)
   book_free(b);
 }
 
+/* Fill Series: the stop value itself at the end, without the steps' drift */
+static void sync_series(void)
+{
+  Book *b = book_new();
+  put(b, "A1", "0");
+  book_series(b, 0, rc4(0, 0, 9, 0), 0, 0.1, 0.3);
+  ok("Fill Series ends on its stop", num_at(b, "A4") == 0.3 && cell_value(b, 0, 4, 0)->t == V_EMPTY && near(num_at(b, "A3"), 0.2));
+  book_free(b);
+}
+
 static void sync_tests(void)
 {
+  sync_series();
   sync_typed_numbers();
   sync_precision();
   sync_hidden_totals();
