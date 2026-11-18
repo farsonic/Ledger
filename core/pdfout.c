@@ -630,7 +630,7 @@ int pdf_save_book(Book *b, FontSet *fs, const PdfOptions *o, const char *path)
   u8 *data = pdf_book(b, fs, o, &n);
   int ok;
   if (!data) return 0;
-  ok = file_write(path, data, n);
+  ok = file_write_safe(path, data, n);
   free(data);
   return ok;
 }

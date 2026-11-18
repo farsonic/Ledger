@@ -59,6 +59,7 @@ i32    icos(int tenths);
 int    iatan2(i32 y, i32 x);
 /* whole files: read (malloc'd, 0-terminated; NULL if unreadable) and written (0 on failure) */
 u8    *file_read(const char *path, size_t *len);
+int    file_write_safe(const char *path, const void *data, size_t len);   /* through a temporary file */
 int    file_write(const char *path, const void *data, size_t len);
 
 

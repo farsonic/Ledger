@@ -83,8 +83,36 @@ static void sync_getpivotdata(void)
   book_free(b);
 }
 
+/* a saved workbook replaces the old file only once it is written in full (#3178) */
+static void sync_safe_save(void)
+{
+  const char *path = "ledger_safe_save_test.xlsx";
+  Book *b = book_new(), *c;
+  u8 *x, *rd;
+  size_t n, rn;
+  FILE *fp;
+  put(b, "A1", "42");
+  x = xlsx_save(b, &n);
+  ok("safe save: a new file", x && file_write_safe(path, x, n));
+  put(b, "A1", "43");
+  free(x);
+  x = xlsx_save(b, &n);
+  ok("safe save: the old one replaced", x && file_write_safe(path, x, n));
+  rd = file_read(path, &rn);
+  c = rd ? xlsx_load(rd, rn, NULL, 0) : NULL;
+  ok("safe save: the new contents", rd && rn == n && c && num_at(c, "A1") == 43);
+  ok("safe save: no temporary file left", !(fp = fopen("Ledger.tmp", "rb")));
+  if (fp) fclose(fp);
+  ok("safe save: a drawer that isn't there fails", !file_write_safe("no_such_drawer_here/x.xlsx", x, n));
+  remove(path);
+  free(rd); free(x);
+  if (c) book_free(c);
+  book_free(b);
+}
+
 static void sync_tests(void)
 {
+  sync_safe_save();
   sync_functions();
   sync_getpivotdata();
 }

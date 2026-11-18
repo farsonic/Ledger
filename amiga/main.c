@@ -767,7 +767,7 @@ static int save_to(const char *path)
   set(win, MUIA_Window_Sleep, TRUE);
   if (csv) {
     char *t = csv_save(book, cur_index(), ',');
-    ok = t && file_write(path, t, strlen(t));
+    ok = t && file_write_safe(path, t, strlen(t));
     free(t);
   } else {
     size_t len;
@@ -775,7 +775,7 @@ static int save_to(const char *path)
     if (username[0] && !book->author[0]) latin1_utf8(username, book->author, sizeof book->author);
     strncpy(xd_book_name, (const char *)FilePart((STRPTR)path), sizeof xd_book_name - 1);   /* (a PivotChart's link names the file) */
     data = xlsx_save(book, &len);
-    ok = data && file_write(path, data, len);
+    ok = data && file_write_safe(path, data, len);
     free(data);
   }
   set(win, MUIA_Window_Sleep, FALSE);

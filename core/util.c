@@ -272,6 +272,26 @@ int file_write(const char *path, const void *data, size_t len)
   return ok;
 }
 
+/* a whole file replaced safely (GridCraft #3178): written and closed (flushed) under a temporary name
+   in the same drawer first, and only then put in the old one's place, so a full disk or a failed
+   write leaves the old file as it was. The temporary name is short (Ledger.tmp): Amiga file names
+   may have only 30 characters. AmigaOS's Rename won't replace a file, so the old one goes first. */
+int file_write_safe(const char *path, const void *data, size_t len)
+{
+  char tmp[600];
+  size_t n = strlen(path), d = n;
+  while (d > 0 && path[d - 1] != '/' && path[d - 1] != ':' && path[d - 1] != '\\') d--;
+  if (d + 12 >= sizeof tmp) return file_write(path, data, len);
+  memcpy(tmp, path, d);
+  strcpy(tmp + d, "Ledger.tmp");
+  if (!strcmp(tmp, path)) return file_write(path, data, len);
+  if (!file_write(tmp, data, len)) { remove(tmp); return 0; }
+  if (rename(tmp, path) == 0) return 1;
+  remove(path);
+  if (rename(tmp, path) == 0) return 1;
+  return 0;                       /* (the new file is left as Ledger.tmp) */
+}
+
 double dmod(double a, double b) { return a - b * floor(a / b); }
 double ipow(double b, int n)
 {
