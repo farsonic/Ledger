@@ -47,6 +47,9 @@ typedef struct {
   u16 fsize;                       /* text size, tenths of a point (0: 11pt) */
   u8 bold, italic, halign, valign; /* text: halign 0 left 1 centre 2 right; valign 0 top 1 middle 2 bottom */
   u32 tcolor;                      /* text colour, FILL_ON | rgb (0: automatic) */
+  u8 wordart;                      /* SK_TEXTBOX: WordArt (Insert > WordArt): large decorative text, no box of its own */
+  u32 toutline, tshadow;           /* text outline and shadow colours, FILL_ON | rgb (0 none) */
+  u16 toutw;                       /* the text outline's width, hundredths of a point */
   Blob *pic; u8 pictype;           /* OB_PICTURE: the file (PNG or JPEG) */
   Chart *chart;                    /* OB_CHART */
   struct Slicer *slicer;           /* OB_SLICER (slicer.h) */
@@ -65,6 +68,19 @@ typedef struct { u32 id, parent; char name[48]; } DGroup;
 extern const char *const drw_icon_names[DRW_NICONS];
 const char *drw_icon_desc(int k);         /* NULL if k isn't one */
 int   drw_icon_by_name(const char *name);  /* -1 if none */
+
+/* ------------------------------------------------------------------ WordArt (Insert > WordArt) */
+/* GridCraft's ten WordArt styles (its own palette): text colour, outline (and its width, hundredths
+   of a point), shadow (FILL_ON | rgb, 0 none), bold, italic and size (tenths of a point) */
+typedef struct { const char *name; u32 fill, outline; u16 outw; u32 shadow; u8 bold, italic; u16 size; } WordArtStyle;
+#define DRW_NWORDART 10
+extern const WordArtStyle drw_wordart_styles[DRW_NWORDART];
+#define DRW_WORDART_TEXT "Your text here"
+/* a style's look given to a WordArt (its text and place kept) */
+void  drw_wordart_style(DObj *o, int style);
+/* a WordArt of style with text (NULL: "Your text here") at sheet pixel x, y, sized to its text; its
+   index, or -1 when the sheet is protected without Edit objects allowed (an undo step) */
+int   book_wordart_add(Book *b, int sheet, int style, const char *text, i32 x, i32 y);
 
 /* ------------------------------------------------------------------ charts */
 enum {

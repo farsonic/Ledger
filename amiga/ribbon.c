@@ -309,6 +309,7 @@ static const Item i_text[] = {
 #include "chartrib.h"            /* charts, pictures, shapes, ink, sparklines (charttab.c does their commands) */
 static const Item i_textx[] = {
   { K_BUTTON, S_LARGE, IC_TEXTBOX, 0, "Text Box", ID_X_TEXTBOX, 0, 0, 0, 0, "A box of text over the cells: drag on the sheet to draw it" },
+  { K_DROP, S_LARGE, ICX_WORDART, LX_WORDART, "WordArt", ID_X_WORDARTDD, 0, 0, 0, 0, "Large decorative text over the cells, in one of ten styles" },
   { K_BUTTON, S_LARGE, IC_HEADER, 0, "Header & Footer", ID_LX_HEADERFOOTER, 0, 0, 0, 0, "Headers and footers for the pages: Page Layout view and its Page Setup" },
 };
 static const Group insert[] = { { "Tables", G_COLS, i_tables, N(i_tables) }, { "Sheets & Cells", G_COLS, i_sheets, N(i_sheets) }, { "Illustrations", G_COLS, ix_illus, N(ix_illus) },

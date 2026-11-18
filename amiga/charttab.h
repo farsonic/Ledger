@@ -29,6 +29,9 @@ ULONG chart_ribbon_state(void);
   XP("Shape"), XS("Rectangle", ID_X_SHAPE0), XS("Rounded Rectangle", ID_X_SHAPE0 + 1), XS("Oval", ID_X_SHAPE0 + 2), XS("Triangle", ID_X_SHAPE0 + 3), \
     XS("Line", ID_X_SHAPE0 + 4), XS("Arrow", ID_X_SHAPE0 + 5), XS("Text Box", ID_X_SHAPE0 + 6), \
   XI("Text Box", ID_X_TEXTBOX), \
+  XP("WordArt"), XS("Classic", ID_X_WORDART0), XS("Midnight", ID_X_WORDART0 + 1), XS("Sunrise", ID_X_WORDART0 + 2), XS("Lagoon", ID_X_WORDART0 + 3), \
+    XS("Ember", ID_X_WORDART0 + 4), XS("Mint Outline", ID_X_WORDART0 + 5), XS("Ink Stamp", ID_X_WORDART0 + 6), XS("Orchid", ID_X_WORDART0 + 7), \
+    XS("Graphite", ID_X_WORDART0 + 8), XS("Lime Pop", ID_X_WORDART0 + 9), \
   XBAR, \
   XI("Recommended Charts...", ID_X_RECCHART), XI("All Charts...", ID_X_ALLCHARTS), XP("Insert Chart"), XKINDS(ID_X_KIND0), \
   XP("Sparklines"), XS("Line...", ID_X_SPARKLINE), XS("Column...", ID_X_SPARKCOL), XS("Win/Loss...", ID_X_SPARKWIN), \

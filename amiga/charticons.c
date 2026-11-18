@@ -59,6 +59,7 @@ static const char *const icx[ICX_N - ICX_BASE] = {
   /* MARKCOLOR: markers and a colour bar */ "ci P 3 2 9 7 4 13 8 cr E 2 9 1 E 7 4 1 E 13 8 1 ca F 1 13 14 15",
   /* EDITSPARK: a sparkline and a pencil */ "ci R 1 6 9 12 ca P 3 2 10 5 8 8 10 co P 4 9 6 14 1 15 2 10 7",
   /* DELCHART: a chart and a red cross */ "ci L 1 15 10 15 ca F 2 9 4 14 F 6 6 8 14 cr L 10 1 15 6 L 15 1 10 6",
+  /* WORDART: a large A with its shadow and a swash */ "cs P 3 4 14 8 3 12 14 L 6 10 10 10 ca P 3 2 12 7 1 11 12 L 4 8 10 8 L 3 12 3 11 L 11 12 11 11 co P 4 1 15 6 13 10 15 15 13",
 };
 const char *chart_icon_desc(int icon)
 {

@@ -340,6 +340,17 @@ static void insert_icon(int k)
   end();
 }
 static const u8 shape_of[7] = { SK_RECT, SK_ROUNDRECT, SK_ELLIPSE, SK_TRIANGLE, SK_LINE, SK_ARROW, SK_TEXTBOX };
+/* Insert > WordArt: a style's WordArt at the active cell, then its text asked for */
+static void edit_text(void);
+static void insert_wordart(int style)
+{
+  Sheet *s = cur_sheet();
+  int i = book_wordart_add(book, cur_index(), style, NULL, sheet_col_px(s, s->cur_c), sheet_row_px(s, s->cur_r));
+  if (i < 0) { ask("OK", "%s", tr("The sheet is protected: unprotect it to insert WordArt.")); return; }
+  ov_select(OV(), i);
+  refresh_all();
+  edit_text();
+}
 static void place_shape(int k)
 {
   ov_tool(OV(), TOOL_PLACE, 0, 0, shape_of[k % 7]);
@@ -685,7 +696,7 @@ static void edit_text(void)
   char t[400], u[800];
   if (!o || o->kind != OB_SHAPE || o->shape == SK_LINE || o->shape == SK_ARROW || o->shape == SK_INK || o->shape == SK_ICON) return;
   utf8_latin(o->text ? o->text : "", t, sizeof t);
-  if (!ask_string(o->shape == SK_TEXTBOX ? "Text Box" : "Shape Text", "Text:", t, sizeof t)) return;
+  if (!ask_string(o->wordart ? "WordArt" : o->shape == SK_TEXTBOX ? "Text Box" : "Shape Text", "Text:", t, sizeof t)) return;
   latin1_utf8(t, u, sizeof u);
   begin();
   free(o->text); o->text = u[0] ? str_dup(u) : NULL;
@@ -993,6 +1004,7 @@ void chart_command(ULONG id)
   if (id >= ID_X_SHAPE0 && id <= ID_X_SHAPE6) { place_shape((int)(id - ID_X_SHAPE0)); return; }
   if (id >= ID_X_KIND0 && id <= ID_X_KINDN) { insert_chart((int)(id - ID_X_KIND0)); return; }
   if (id >= ID_X_TYPE0 && id <= ID_X_TYPEN) { change_type((int)(id - ID_X_TYPE0)); return; }
+  if (id >= ID_X_WORDART0 && id <= ID_X_WORDART9) { insert_wordart((int)(id - ID_X_WORDART0)); return; }
   if (id >= ID_X_LAYOUT1 && id <= ID_X_LAYOUT6) { if (c) { begin(); chart_quick_layout(c, (int)(id - ID_X_LAYOUT1 + 1)); end(); } return; }
   if (id >= ID_X_COLOR0 && id <= ID_X_COLOR7) { if (c) { begin(); chart_colors(c, (int)(id - ID_X_COLOR0)); end(); } return; }
   if (id >= ID_X_ALIGN0 && id <= ID_X_ALIGN5) { align_objects((int)(id - ID_X_ALIGN0)); return; }
@@ -1003,6 +1015,7 @@ void chart_command(ULONG id)
   case ID_X_SHAPEDD: place_shape((int)v); break;
   case ID_X_ICONDD: insert_icon((int)v); break;
   case ID_X_TEXTBOX: place_shape(6); break;
+  case ID_X_WORDARTDD: insert_wordart((int)v); break;
   case ID_X_RECCHART: dlg_insert_chart(1); break;
   case ID_X_ALLCHARTS: dlg_insert_chart(0); break;
   case ID_X_COLBARDD: insert_chart(CK_COL + (int)v); break;

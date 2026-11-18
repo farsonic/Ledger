@@ -457,14 +457,21 @@ static void txbody(Buf *o, const DObj *ob)
   const char *p = ob->text ? ob->text : "";
   static const char *const al[3] = { "l", "ctr", "r" };
   static const char *const an[3] = { "t", "ctr", "b" };
-  buf_printf(o, "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\" wrap=\"square\" rtlCol=\"0\" anchor=\"%s\"/><a:lstStyle/>", an[ob->valign % 3]);
+  buf_printf(o, "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\" wrap=\"square\" rtlCol=\"0\" anchor=\"%s\"", an[ob->valign % 3]);
+  /* WordArt is marked as GridCraft marks it: the plain (non-warping) text warp, textNoShape */
+  buf_adds(o, ob->wordart ? "><a:prstTxWarp prst=\"textNoShape\"><a:avLst/></a:prstTxWarp></a:bodyPr><a:lstStyle/>" : "/><a:lstStyle/>");
   do {
     const char *e = strchr(p, '\n');
     size_t n = e ? (size_t)(e - p) : strlen(p);
     buf_printf(o, "<a:p><a:pPr algn=\"%s\"/>", al[ob->halign % 3]);
     if (n) {
       buf_printf(o, "<a:r><a:rPr lang=\"en-GB\" sz=\"%d\" b=\"%d\" i=\"%d\">", ob->fsize ? ob->fsize * 10 : 1100, ob->bold, ob->italic);
+      if (ob->toutline) { buf_printf(o, "<a:ln w=\"%ld\">", (long)(ob->toutw ? ob->toutw : 75) * 127); solid(o, ob->toutline); buf_adds(o, "</a:ln>"); }
       solid(o, ob->tcolor ? ob->tcolor : (ob->shape == SK_TEXTBOX ? 0 : 0xFFFFFF));
+      if (ob->tshadow) {
+        buf_adds(o, "<a:effectLst><a:outerShdw blurRad=\"38100\" dist=\"38100\" dir=\"2700000\" algn=\"tl\" rotWithShape=\"0\">");
+        buf_printf(o, "<a:srgbClr val=\"%06lX\"/></a:outerShdw></a:effectLst>", (unsigned long)(ob->tshadow & 0xFFFFFF));
+      }
       buf_adds(o, "</a:rPr><a:t>"); xml_escape(o, p, n); buf_adds(o, "</a:t></a:r>");
     }
     buf_adds(o, "</a:p>");
@@ -1054,6 +1061,7 @@ typedef struct {
   int flipx, flipy;
   Buf text, ink;
   u16 fsize; u8 bold, italic, halign, valign; u32 tcolor;
+  int warp; u32 toutline, tshadow; u16 toutw;   /* WordArt's marker (textNoShape), the text's outline and shadow */
   int hasx; long xo, yo, xe, ye;    /* (in a group) its frame: a:off and a:ext in its group's child coordinates */
 } RObj;
 /* the groups open while reading (grpSp): each one's id, its frame (off, ext) and child frame (chOff,
@@ -1110,6 +1118,9 @@ static DObj *finish_obj(Book *b, ZipReader *z, const XRel *rels, int nrels, int 
     ob->line = o->noline ? 0 : o->line; ob->linew = o->linew;
     if (o->kind == OB_SHAPE) {
       if (o->shape == SK_LINE && o->arrow) o->shape = SK_ARROW;
+      /* WordArt (GridCraft's marker): a rectangle with the plain text warp that is a text box, or has
+         no fill and no outline of its own; on other shapes the warp changes nothing */
+      if (o->warp && o->shape == SK_RECT && (o->txbox || (o->nofill && (o->noline || !o->line)))) { ob->wordart = 1; o->txbox = 1; }
       if (o->txbox) o->shape = SK_TEXTBOX;
       if (o->custgeom && !strncmp(o->name, "Icon: ", 6) && drw_icon_by_name(o->name + 6) >= 0) {
         char t[8];
@@ -1142,6 +1153,7 @@ static DObj *finish_obj(Book *b, ZipReader *z, const XRel *rels, int nrels, int 
       ob->fill = o->nofill ? 0 : o->fill;
       if (!o->custgeom && o->text.len) ob->text = str_dup(o->text.data);
       ob->fsize = o->fsize; ob->bold = o->bold; ob->italic = o->italic; ob->halign = o->halign; ob->valign = o->valign; ob->tcolor = o->tcolor;
+      ob->toutline = o->toutline; ob->toutw = o->toutw; ob->tshadow = o->tshadow;
     }
   } else { chart_free(ch); blob_free(pic); }
   slicer_free(sl);
@@ -1252,6 +1264,10 @@ static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
         if (ii) o.italic = (u8)atoi(ii);
       }
       else if (is_clr(n) && !strcmp(up(&st, 1), "solidFill") && !strcmp(up(&st, 2), "rPr")) o.tcolor = clr(&x);
+      else if (!strcmp(n, "prstTxWarp") && within(&st, "txBody")) { const char *w = xml_attr(&x, "prst"); if (w && !strcmp(w, "textNoShape")) o.warp = 1; }
+      else if (!strcmp(n, "ln") && !strcmp(up(&st, 1), "rPr")) { const char *w = xml_attr(&x, "w"); if (w) o.toutw = (u16)(atol(w) / 127); }
+      else if (is_clr(n) && !strcmp(up(&st, 1), "solidFill") && !strcmp(up(&st, 2), "ln") && !strcmp(up(&st, 3), "rPr")) o.toutline = clr(&x);
+      else if (is_clr(n) && !strcmp(up(&st, 1), "outerShdw") && within(&st, "rPr")) o.tshadow = clr(&x);
       else if (!strcmp(n, "p") && within(&st, "txBody")) { if (para++) buf_addc(&o.text, '\n'); }
       continue;
     }

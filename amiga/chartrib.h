@@ -9,6 +9,8 @@
 #include "../core/drawing.h"
 
 /* ------------------------------------------------------------------ the lists (LX_ order) */
+/* Insert > WordArt: GridCraft's ten styles (drawing.c's drw_wordart_styles, in that order) */
+static const char *const x_wordart[] = { "Classic", "Midnight", "Sunrise", "Lagoon", "Ember", "Mint Outline", "Ink Stamp", "Orchid", "Graphite", "Lime Pop" };
 static const char *const x_shapes[] = { "Rectangle", "Rounded Rectangle", "Oval", "Triangle", "Line", "Arrow", "Text Box" };
 static const char *const x_colbar[] = { "Clustered Column", "Stacked Column", "100% Stacked Column", "Clustered Bar", "Stacked Bar", "100% Stacked Bar" };
 static const char *const x_linearea[] = { "Line", "Line with Markers", "Stacked Line", "Area", "Stacked Area", "100% Stacked Area" };
@@ -41,7 +43,7 @@ static List xlists[LX_END - LX_BASE] = {
   { x_stat, N(x_stat), PL_TEXT, NULL }, { x_more, N(x_more), PL_TEXT, NULL }, { x_addelem, N(x_addelem), PL_TEXT, NULL },
   { x_layouts, N(x_layouts), PL_TEXT, NULL }, { x_colors, N(x_colors), PL_TEXT, NULL }, { x_styles, N(x_styles), PL_TEXT, NULL },
   { x_types, CK_N, PL_TEXT, NULL }, { x_elems, 1, PL_TEXT, NULL }, { x_spaxis, N(x_spaxis), PL_TEXT, NULL }, { x_spclear, N(x_spclear), PL_TEXT, NULL },
-  { x_align, N(x_align), PL_TEXT, NULL },
+  { x_align, N(x_align), PL_TEXT, NULL }, { x_wordart, N(x_wordart), PL_TEXT, NULL },
 };
 /* ribbon.c's list_of() made to know these lists too (inside the macro, list_of is still the function) */
 #define list_of(k) ((k) >= LX_BASE && (k) < LX_END ? (const List *)&xlists[(k) - LX_BASE] : list_of(k))
@@ -85,6 +87,7 @@ static const Item ix_spark[] = {
 };
 static const Item ix_text[] = {
   { K_BUTTON, S_LARGE, IC_TEXTBOX, 0, "Text Box", ID_X_TEXTBOX, 0, 0, 0, 0, "A box of text over the cells: drag on the sheet to draw it" },
+  { K_DROP, S_LARGE, ICX_WORDART, LX_WORDART, "WordArt", ID_X_WORDARTDD, 0, 0, 0, 0, "Large decorative text over the cells, in one of ten styles" },
 };
 /* ------------------------------------------------------------------ Draw */
 static const Item dw_tools[] = {

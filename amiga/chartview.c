@@ -233,12 +233,29 @@ static void shape_text(struct RastPort *rp, const DObj *o, LONG x0, LONG y0, LON
     if (*p == ' ' || *p == '\n') p++;
   }
   ty = o->valign == 1 ? (y0 + y1 - nl * lh) / 2 : o->valign == 2 ? y1 - 4 - nl * lh : y0 + 3;
-  SetAPen(rp, pen(ctx, o->tcolor ? o->tcolor : (o->shape == SK_TEXTBOX || !o->fill ? FILL_ON : FILL_ON | 0xFFFFFF)));
-  for (i = 0; i < nl; i++) {
-    LONG w = TextLength(rp, (STRPTR)lines[i], (ULONG)strlen(lines[i])), tx = o->halign == 1 ? (x0 + x1 - w) / 2 : o->halign == 2 ? x1 - 4 - w : x0 + 4;
-    if (ty + i * lh + lh > y1 + 2 && i) break;
-    Move(rp, tx, ty + i * lh + tf->tf_Baseline);
-    Text(rp, (STRPTR)lines[i], (ULONG)strlen(lines[i]));
+  {
+    /* WordArt's shadow (down and right) and outline (the text drawn around itself) go under the text */
+    LONG sh = zoom >= 150 ? 3 : 2, ow = o->toutline ? lw_px(o->toutw, zoom) : 0, pass;
+    if (ow > 3) ow = 3;
+    for (pass = 0; pass < 3; pass++) {
+      LONG dxs[8], dys[8], nd = 0, k;
+      if (pass == 0 && !o->tshadow) continue;
+      if (pass == 1 && !o->toutline) continue;
+      if (pass == 0) { dxs[0] = sh; dys[0] = sh; nd = 1; SetAPen(rp, pen(ctx, o->tshadow)); }
+      else if (pass == 1) {
+        static const signed char ux[8] = { -1, 0, 1, -1, 1, -1, 0, 1 }, uy[8] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+        for (k = 0; k < 8; k++) { dxs[k] = ux[k] * ow; dys[k] = uy[k] * ow; }
+        nd = 8;
+        SetAPen(rp, pen(ctx, o->toutline));
+      } else { dxs[0] = dys[0] = 0; nd = 1; SetAPen(rp, pen(ctx, o->tcolor ? o->tcolor : (o->shape == SK_TEXTBOX || !o->fill ? FILL_ON : FILL_ON | 0xFFFFFF))); }
+      for (k = 0; k < nd; k++)
+        for (i = 0; i < nl; i++) {
+          LONG w = TextLength(rp, (STRPTR)lines[i], (ULONG)strlen(lines[i])), tx = o->halign == 1 ? (x0 + x1 - w) / 2 : o->halign == 2 ? x1 - 4 - w : x0 + 4;
+          if (ty + i * lh + lh > y1 + 2 && i) break;
+          Move(rp, tx + dxs[k], ty + i * lh + tf->tf_Baseline + dys[k]);
+          Text(rp, (STRPTR)lines[i], (ULONG)strlen(lines[i]));
+        }
+    }
   }
   SetSoftStyle(rp, 0, FSF_ITALIC);
 }

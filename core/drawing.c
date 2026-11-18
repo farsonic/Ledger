@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "drawing.h"
 #include "slicer.h"
+#include "data.h"
 
 /* ------------------------------------------------------------------ pictures' bytes */
 Blob *blob_new(const u8 *data, u32 len)
@@ -389,4 +390,57 @@ int prims_hit(const PrimList *l, i32 x, i32 y)
     }
   }
   return CE_NONE;
+}
+
+/* ------------------------------------------------------------------ WordArt */
+#define RGB_(v) (FILL_ON | (v))
+const WordArtStyle drw_wordart_styles[DRW_NWORDART] = {
+  { "Classic", RGB_(0x4472C4), 0, 0, 0, 1, 0, 360 },
+  { "Midnight", RGB_(0x1B2A49), 0, 0, RGB_(0x8A94A6), 1, 0, 400 },
+  { "Sunrise", RGB_(0xF2A33A), RGB_(0xB5451B), 150, 0, 1, 0, 400 },
+  { "Lagoon", RGB_(0x1F9E9A), RGB_(0x0B4F5C), 100, RGB_(0x9CC9C7), 1, 1, 360 },
+  { "Ember", RGB_(0xD64527), 0, 0, RGB_(0x5A1A0E), 1, 0, 440 },
+  { "Mint Outline", RGB_(0xFFFFFF), RGB_(0x2E9B6A), 200, 0, 1, 0, 400 },
+  { "Ink Stamp", RGB_(0x2F3A8F), RGB_(0x2F3A8F), 50, 0, 1, 0, 320 },
+  { "Orchid", RGB_(0x8E4FB5), 0, 0, RGB_(0xD9C2E8), 0, 1, 400 },
+  { "Graphite", RGB_(0x4A4F57), RGB_(0xFFFFFF), 100, RGB_(0x9AA0A8), 1, 0, 360 },
+  { "Lime Pop", RGB_(0xA6D61C), RGB_(0x3F5A00), 150, RGB_(0x6E8B2C), 1, 1, 400 },
+};
+void drw_wordart_style(DObj *o, int style)
+{
+  const WordArtStyle *w = &drw_wordart_styles[style >= 0 && style < DRW_NWORDART ? style : 0];
+  o->wordart = 1;
+  o->tcolor = w->fill; o->toutline = w->outline; o->toutw = w->outw; o->tshadow = w->shadow;
+  o->bold = w->bold; o->italic = w->italic; o->fsize = w->size;
+  o->fill = 0; o->line = 0;
+  o->halign = 1; o->valign = 1;
+}
+int book_wordart_add(Book *b, int sheet, int style, const char *text, i32 x, i32 y)
+{
+  Sheet *s;
+  DObj *o;
+  long chars = 0, w, h;
+  const char *p;
+  int idx = -1;
+  if (sheet < 0 || sheet >= b->nsh) return -1;
+  s = b->sh[sheet];
+  if (s->protect && !(s->protallow & PA_OBJECTS)) return -1;   /* (as GridCraft: not on a protected sheet) */
+  if (!text || !*text) text = DRW_WORDART_TEXT;
+  for (p = text; *p; p++) if ((*p & 0xC0) != 0x80) chars++;
+  if (chars > 1000) chars = 1000;
+  drw_begin(b, sheet);
+  if ((o = drw_new(s, OB_SHAPE))) {
+    o->shape = SK_TEXTBOX;
+    drw_wordart_style(o, style);
+    o->text = str_dup(text);
+    snprintf(o->name, sizeof o->name, "WordArt %lu", (unsigned long)o->id);
+    /* about 0.6 of the size across per character, one and a half times it high (pixels at 96 dpi) */
+    w = chars * o->fsize * 96 * 6 / (720 * 10) + 24;
+    h = (long)o->fsize * 96 * 15 / (720 * 10) + 12;
+    if (w > 4000) w = 4000;
+    dobj_place(s, o, x, y, x + (i32)w, y + (i32)h);
+    idx = drw_count(s) - 1;
+  }
+  drw_end(b);
+  return idx;
 }

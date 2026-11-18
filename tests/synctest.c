@@ -156,8 +156,69 @@ static void sync_chart_types(void)
   ok("chart type: stacked and 100% stacked forms", bad == 0);
 }
 
+/* Insert > WordArt (GridCraft #784): a styled text shape, saved with GridCraft's textNoShape marker */
+static void sync_wordart(void)
+{
+  Book *b = book_new(), *d;
+  int i, j;
+  DObj *o;
+  u8 *x;
+  size_t len;
+  char err[100];
+  i = book_wordart_add(b, 0, 2, NULL, 64, 40);          /* Sunrise: orange, a brown outline */
+  o = drw_obj(b->sh[0], i);
+  ok("WordArt: made", i == 0 && o && o->kind == OB_SHAPE && o->shape == SK_TEXTBOX && o->wordart && !strcmp(o->text, "Your text here") &&
+     o->tcolor == (FILL_ON | 0xF2A33A) && o->toutline == (FILL_ON | 0xB5451B) && o->toutw == 150 && o->fsize == 400 && o->bold && !o->fill && !o->line);
+  j = book_wordart_add(b, 0, 9, "Lime", 64, 200);       /* Lime Pop: outline and shadow, italic */
+  ok("WordArt: a second with its text", j == 1 && drw_obj(b->sh[0], 1)->tshadow == (FILL_ON | 0x6E8B2C) && drw_obj(b->sh[0], 1)->italic);
+  o = drw_new(b->sh[0], OB_SHAPE);                      /* an ordinary rectangle stays one */
+  o->shape = SK_RECT; o->fill = FILL_ON | 0x4472C4; o->text = str_dup("box");
+  x = xlsx_save(b, &len);
+  ok("WordArt: the marker saved", x && part_has(x, len, "xl/drawings/drawing1.xml", "prstTxWarp prst=\"textNoShape\"") && part_has(x, len, "xl/drawings/drawing1.xml", "outerShdw"));
+  d = x ? xlsx_load(x, len, err, sizeof err) : NULL;
+  ok("WordArt: back from the file", d && drw_count(d->sh[0]) == 3 && drw_obj(d->sh[0], 0)->wordart && drw_obj(d->sh[0], 0)->toutline == (FILL_ON | 0xB5451B) &&
+     drw_obj(d->sh[0], 0)->toutw == 150 && drw_obj(d->sh[0], 1)->tshadow == (FILL_ON | 0x6E8B2C) && !strcmp(drw_obj(d->sh[0], 1)->text, "Lime") &&
+     drw_obj(d->sh[0], 1)->fsize == 400 && !drw_obj(d->sh[0], 2)->wordart && drw_obj(d->sh[0], 2)->shape == SK_RECT);
+  if (d) book_free(d);
+  free(x);
+  ok("WordArt: undone", book_undo(b, NULL, NULL) && drw_count(b->sh[0]) == 1);   /* (the second one; the rectangle came without an undo step) */
+  book_protect_sheet(b, 0, "", PA_DEFAULT);
+  ok("WordArt: not on a protected sheet", book_wordart_add(b, 0, 0, "x", 0, 0) < 0 && drw_count(b->sh[0]) == 1);
+  book_protect_sheet(b, 0, "", PA_DEFAULT | PA_OBJECTS);
+  ok("WordArt: unless objects may be edited", book_wordart_add(b, 0, 0, "x", 0, 0) == 1);
+  book_free(b);
+}
+
+/* a hidden Total Row keeps its calculations through a file (GridCraft #4383) */
+static void sync_hidden_totals(void)
+{
+  Book *b = book_new(), *d;
+  int ti;
+  u8 *x;
+  size_t len;
+  char err[100];
+  sales_data(b);
+  ti = book_table_add(b, 0, rc4(0, 0, 6, 3), 1, "");
+  book_table_option(b, 0, ti, TO_TOTALS, 1);
+  book_table_total(b, 0, ti, 2, TF_AVERAGE);
+  book_table_option(b, 0, ti, TO_TOTALS, 0);
+  x = xlsx_save(b, &len);
+  d = x ? xlsx_load(x, len, err, sizeof err) : NULL;
+  ok("hidden Total Row: its functions kept", d && d->sh[0]->ntables == 1 && !d->sh[0]->tables[0].totals && d->sh[0]->tables[0].cols[3].totfn == TF_SUM &&
+     d->sh[0]->tables[0].cols[2].totfn == TF_AVERAGE && d->sh[0]->tables[0].cols[0].totlabel && !strcmp(d->sh[0]->tables[0].cols[0].totlabel, "Total"));
+  if (d) {
+    book_table_option(d, 0, 0, TO_TOTALS, 1);
+    ok("hidden Total Row: shown again with them", num_at(d, "D8") == 57 && num_at(d, "C8") == 625.0 / 6 && text_at(d, "A8", "Total"));
+    book_free(d);
+  }
+  free(x);
+  book_free(b);
+}
+
 static void sync_tests(void)
 {
+  sync_hidden_totals();
+  sync_wordart();
   sync_chart_types();
   sync_safe_save();
   sync_functions();
