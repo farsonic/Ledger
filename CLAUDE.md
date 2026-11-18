@@ -2,9 +2,9 @@
 
 Ledger is a spreadsheet for AmigaOS 3.x (68040/68060 with FPU, MUI 3.8, AROS or MorphOS), written in C
 and laid out the way GridCraft (an Excel-like program) is: ribbon, formula bar, grid, sheet tabs. It
-reads and writes Excel .xlsx (and opens .xls and .ods, writes .csv, PDF and web pages), has 542
-worksheet functions with dynamic arrays, LET/LAMBDA, charts, sparklines, pictures and shapes, tables,
-pivot tables and slicers, data validation, the Data tab's tools (Solver, Analysis ToolPak, Goal Seek,
+reads and writes Excel .xlsx (and opens .xls, .ods, SYLK and web pages' tables, writes .csv, SYLK, PDF
+and web pages), has 516 worksheet functions (every one of GridCraft's) with dynamic arrays, LET/LAMBDA,
+charts, sparklines, pictures, shapes, equations and form controls, tables, pivot tables and slicers, data validation, the Data tab's tools (Solver, Analysis ToolPak, Goal Seek,
 scenarios, Forecast Sheet), protection, page layout and PDF export, in five interface languages.
 GPL-2.0-only (see `LICENSE`). This file is for anyone, person or agent, picking the work up. Read it
 first, then `README.md` (what Ledger does) and `FEATURES.md` / `docs/gridcraft-gap.md` (what's missing).
@@ -16,11 +16,11 @@ first, then `README.md` (what Ledger does) and `FEATURES.md` / `docs/gridcraft-g
 | `core/` | Portable C99, no AmigaOS calls: the workbook (`book.c`), formula parser and evaluator (`formula.c`, `calc.c`), functions (`func*.c`, with `funcdesc.c` describing each), number formats, `.xlsx`/`.xls`/`.ods` readers and writers, charts, tables, pivots, slicers, drawings, validation, outline, protection, Flash Fill, data tools, what-if, Solver, the Analysis ToolPak, forecasting, page setup, PDF and HTML output, spelling, fonts and the TrueType rasteriser. |
 | `amiga/` | The MUI front end: the window, ribbon, grid, formula bar, panes and dialogs; `lang.c`/`lang_table.h` (generated) for interface strings. |
 | `lang/` | `strings.txt`: every interface string with its German, French, Spanish and Italian translations. `tools/mklang.py` makes `amiga/lang_table.h`; `tools/langcheck.py` checks every string is translated and used. |
-| `tests/` | `coretest.c` (it includes `analysistest.c`, `drawtest.c`, `layouttest.c`, `uitest.c`), `xlsxtool.c`, `fixtures/` (made by `mkfixtures.py`). |
+| `tests/` | `coretest.c` (it includes `analysistest.c`, `drawtest.c`, `layouttest.c`, `uitest.c`, `synctest.c` and `gc2test.c`, the two rounds of the GridCraft 4c388df sync), `xlsxtool.c`, `fixtures/` (made by `mkfixtures.py`). |
 | `tools/` | `test.sh` (native tests, what CI runs), `functest/` (makes and checks `FunctionTests.xlsx`, compares with LibreOffice), `Install-Ledger` (Installer script), `mkicons.py`, `vbcc-aos68k-fpu` (the vbcc config for the 68040+FPU build). |
 | `docs/` | `gridcraft-gap.md` (every GridCraft ribbon command and Ledger's status), `functions-*.txt`, and `gridcraft/` (copies of GridCraft's own reference documents, MIT, see its README). |
 | `FEATURES.md` | GridCraft's big features, one row each, with Ledger's status. |
-| `FunctionTests.xlsx` | 3,503 tests of every function, with PASS/FAIL cells; shipped as an example workbook. |
+| `FunctionTests.xlsx` | 3,615 tests of every function, with PASS/FAIL cells; shipped as an example workbook. |
 
 ## Build and test
 
@@ -28,7 +28,7 @@ Native tests (need a C compiler and Python 3; CI runs them and they must stay gr
 
     sh tools/test.sh            # TMP=<dir> to build somewhere other than /tmp
 
-Expected: `893 tests, 0 failed` (or more), `amiga/lang_table.h is up to date` and langcheck reporting 0
+Expected: `1027 tests, 0 failed` (or more), `amiga/lang_table.h is up to date` and langcheck reporting 0
 missing strings. When you add or change interface strings, edit `lang/strings.txt` (all five languages),
 then `python3 tools/mklang.py` and `python3 tools/langcheck.py`.
 

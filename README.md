@@ -129,6 +129,12 @@ Brought up to date with GridCraft's changes to 18 November 2026 (docs/gridcraft-
 - **Excel's answers at the edges** for HARMEAN, T.DIST, T.INV, GAMMA.DIST, WEIBULL.DIST, BETA.DIST, BINOM.DIST, POISSON.DIST (accurate far out), PERCENTRANK, F.DIST, MOD, YEARFRAC, LINEST (a predictor next to a large offset), FIXED and DOLLAR (length limits; 15 significant digits and then zeros, everywhere numbers are formatted), LOWER/UPPER/PROPER (Latin Extended-A letters), UNICHAR, IMSQRT, BITLSHIFT and DEC2BIN; FIXED(1E191,0) no longer overruns a buffer. FunctionTests.xlsx has 3,615 tests.
 - **Files:** a hidden table Total Row keeps its calculations; Google Sheets' DUMMYFUNCTION wrappers open as the formulas.
 - **Typed numbers** are read exactly as a formula's are (0.3 typed in a cell was a hair off, so MATCH couldn't find it).
+- **Insert > Equation:** type an equation in LaTeX (`\frac`, `^`, `_`, `\sqrt`, Greek letters...); Ledger draws it as a formula and saves it as Office Math, as Excel does, and opens the equations in Excel's files.
+- **Spin buttons and scroll bars** (Insert > Functions, or Insert > Form Controls): form controls that set a number in their linked cell; Format Control sets the limits and the link; Ctrl-click one to move or size it. Saved as Excel saves them.
+- **Python cells** in Excel's files keep their code and their last results (Ledger doesn't run Python): they show what Excel worked out and are saved back as they were.
+- **Solver:** Load/Save Model (the model written on the sheet as formulas), Options (integer optimality, evaluations, population, seed, Multistart) and the Sensitivity report (shadow prices, reduced costs and their ranges).
+- **Files:** SYLK (.slk) files open and save (Project > Save Sheet as SYLK); a web page saved to disk (.htm, .html, or the HTML table web applications name .xls) opens its first table as a sheet; CSV import reads each column's dates the way its values show (31/05/2026 day first, 12/31/2026 month first) and says when a column could be either; a sheet's right-to-left view is kept.
+- **Find and Replace** keep to the selection when more than one cell is selected, as in Excel. **Sort** can order by the days of the week or the months (Excel's custom lists).
 
 ## What's new in 0.3
 

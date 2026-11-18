@@ -38,7 +38,13 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 32 | WordArt (Insert > WordArt, GridCraft's ten styles, saved with its textNoShape marker) | yes (4c388df) | ✅ |
 | 33 | Set precision as displayed | yes (4c388df) | ✅ |
 | 34 | Safe saving (the new file written in full before it replaces the old one) | yes (4c388df) | ✅ |
-| 35 | Equations (Insert > Equation, LaTeX, Office Math in .xlsx) | yes (4c388df) | ⬜ |
-| 36 | Python in cells (stored with cached results, no code run) | yes (4c388df) | ⬜ (running code ➖) |
-| 37 | Form controls (spin button, scroll bar, button) | yes (4c388df) | ⬜ spin button and scroll bar; buttons ➖ (they run macros) |
-| 38 | SYLK (.slk) files | yes (4c388df) | ⬜ |
+| 35 | Equations (Insert > Equation, LaTeX, Office Math in .xlsx) | yes (4c388df) | ✅ LaTeX subset, drawn by Ledger, Office Math kept and written |
+| 36 | Python in cells (stored with cached results, no code run) | yes (4c388df) | ✅ kept with their results (running code ➖) |
+| 37 | Form controls (spin button, scroll bar, button) | yes (4c388df) | ✅ spin button and scroll bar; buttons ➖ (they run macros) |
+| 38 | SYLK (.slk) files | yes (4c388df) | ✅ opened and saved |
+| 39 | A web page's table opened as a sheet (a file on disk; no network) | yes (4c388df) | ✅ |
+| 40 | Solver Load/Save Model, Options, Sensitivity report | yes (4c388df) | ✅ |
+| 41 | CSV import with each column's date order | yes (4c388df) | ✅ |
+| 42 | Right-to-left sheets (mirrored grid, Arabic text) | yes (4c388df) | ⬜ the sheet's right-to-left view kept in files; the grid not mirrored, no Arabic fonts |
+
+Rows 35-41 (round 2 of the 4c388df sync, 2026-11-18) are tested natively and build for the Amiga; their check in the emulator is still to do.

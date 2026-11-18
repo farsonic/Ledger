@@ -10,7 +10,7 @@ GridCraft 4c388df has 516 worksheet functions (511 in its registry and evaluator
 
 - ✅ ECMA.CEILING (Compatibility): CEILING by its ECMA-376 name, `_xlfn.` in files; not on Microsoft's list, as USDOLLAR.
 - ✅ GETPIVOTDATA (Lookup): the value a pivot table shows for a data field where the named Rows and Columns items meet, from the pivot's definition and source (volatile); `#REF!` for anything the report doesn't show. (GridCraft's "Generate GetPivotData", typing it by clicking a report cell, is not in Ledger either.)
-- ⬜ PY: GridCraft keeps Python cells (Excel's `_xlfn._xlws.PY`) with their cached results without running the code; Ledger opens such a cell as a formula of an unknown function showing its cached value.
+- ✅ PY (2026-11-18, round 2): Python cells are kept with their results and never run, as GridCraft keeps them: the cell is `PY("code",type)` (the code in string literals, as GridCraft shows it), its result the one the file gave (an array result spills); one typed in Ledger shows #GETTING_DATA. In .xlsx the code goes to the workbook's Python part (xl/python.xml, pythonScript) and the cell's formula names it, `_xlfn._xlws.PY(index,type)`, with `%Px%` arguments put back into the code on reading. PY is a special form, not one of the 516 functions (core/pycell.c; tests gc2_python).
 
 GridCraft's function fixes in this period, each checked in Ledger first and made where Ledger differed (with FunctionTests rows, LibreOffice's differing answers noted in tools/functest/excel.txt): HARMEAN with no numbers `#N/A`; T.DIST with 0 degrees `#DIV/0!` (density), T.INV(0) `#DIV/0!`; GAMMA.DIST, WEIBULL.DIST and BETA.DIST densities at 0 and at the ends; BINOM.DIST's 2,147,483,646-trial limit; BINOM.DIST and POISSON.DIST masses by Loader's saddle point (1E-8 relative error at 1E7 trials before); the t density at huge degrees; PERCENTRANK's significance 309 and 15-digit rounding; F.DIST/F.INV at 1E10 degrees; MOD's 1.1259E12 quotient limit; YEARFRAC basis 0 from February's end; LINEST keeping a predictor that varies little next to a large offset (Ledger centres the variables; it already solved by orthogonalisation, not the normal equations); FIXED and DOLLAR's 255/254-character limits and digits past the fifteenth (Ledger now shows 15 significant digits and then zeros everywhere, as Excel); single-character case changes (LOWER of the dotted capital I is i, Latin Extended-A letters); UNICHAR's noncharacters; IMSQRT by Excel's polar route; BITLSHIFT/BITRSHIFT of 0; TRUE as DEC2BIN's places. Already as Excel in Ledger: GCD/LCM with negative fractions, BIN2*/HEX2*/OCT2* with spaces, UPPER keeping ß, DOLLAR of a negative amount rounding to 0, HYPERLINK without a friendly name, AutoSum stopping at a blank.
 
@@ -131,7 +131,7 @@ GridCraft 4c388df implements 282 of the 296 Excel ribbon commands in its catalog
 
 New Cell Style keeps the active cell's look under a name in Home > My Styles while Ledger runs (not saved in the file). Format as Table, Flash Fill and Protect Sheet are the table and data work's. Lock Cell (in the Format list and the Format menu) locks the selected cells, or unlocks them when the active cell is locked; a protected sheet refuses it unless Format cells is allowed. Orientation sets and saves the angle; PDF export draws the text at its angle, the screen shows it upright. Draw Border (in the Borders list) draws on the next cells dragged over, one stroke at a time. Add-ins: Ledger has none.
 
-### Insert (10 of 17 by name)
+### Insert (11 of 17 by name)
 
 - ✅ PivotTable (Tables) `insert.pivotTable`
 - ✅ Recommended PivotTables (Tables) `insert.recommendedPivotTables`
@@ -149,11 +149,13 @@ New Cell Style keeps the active cell's look under a name in Home > My Styles whi
 - ✅ Text Box (Text) `insert.textBox`
 - ✅ WordArt (Text) `insert.wordArt` (new in GridCraft, there "Decorative Text"; 2026-11-18)
 - ✅ Header & Footer (Text) `pageLayout.headerFooter`
-- ⬜ Equation (Symbols) `insert.equation` (new in GridCraft: a LaTeX editor, Office Math in .xlsx; Ledger shows an equation's fallback text only)
+- ✅ Equation (Symbols) `insert.equation` (new in GridCraft: a LaTeX editor, Office Math in .xlsx; Ledger 2026-11-18: LaTeX typed in, drawn as a formula, Office Math in .xlsx)
 - ✅ Symbol (Symbols) `insert.symbol`
 - ✅ Checkbox (Cell Controls) `insert.checkbox`
 
 WordArt (Insert > Text > WordArt, and the Insert menu) puts large decorative text at the active cell in one of GridCraft's ten styles (its own palette: text colour, outline, shadow, bold or italic, size); its text is then typed in and edited as a text box's. It is not inserted on a protected sheet unless objects may be edited. It is saved as GridCraft saves it, a text box whose text body has the plain text warp textNoShape, with the run's outline (a:ln) and shadow (outerShdw), and read back as WordArt. GridCraft's Format Chart Area pane got the stacked and 100% stacked chart types (#2605); Ledger's Format Chart dialog now has a Chart type list with every kind, the chart's own shown.
+
+Equation (Insert > Text > Equation, and Insert > Equation...) asks for the equation in LaTeX and puts it at the active cell; double-click edits it. Ledger reads a working subset of LaTeX (groups, `^` and `_`, `\frac`, `\sqrt[n]`, `\left( ... \right)`, `\hat` `\bar` `\vec` `\dot` `\tilde` and `\overline`, Greek letters, operators and relations by name, upright function names, `\sum` `\prod` `\int` with limits; Quill's equation editor knows more) and lays it out itself: fraction bars, radicals, raised and lowered scripts. It is saved as Excel and GridCraft save equations: an mc:AlternateContent whose a14 choice is a text box holding the a14:m Office Math, the fallback the same box with the LaTeX as text. Office Math from a file is turned into LaTeX (fractions, scripts, radicals, delimiters, n-ary operators, functions, accents, bars, limits; matrices, equation arrays and boxes by their contents), kept and written back unchanged while the source isn't edited; GridCraft's `gridcraft:latex:` description is taken first. (core/equation.c; tests gc2_equation).
 
 Checkbox makes the selected cells checkboxes, as GridCraft and Excel do: the cell holds TRUE or FALSE and shows a box (empty cells start FALSE; a formula's TRUE/FALSE shows too); a click on the cell or Space ticks it. It is kept as the cell format "checkbox" (GridCraft's way) and saved in .xlsx as Excel saves it: General plus the xf's feature property bag extension (featurePropertyBag.xml, [MS-XLSX] 2.1.22), read back from Excel's files.
 
@@ -299,14 +301,14 @@ Split makes two or four panes that scroll on their own, at the active cell (or t
 - ➖ Record Actions (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.recordActions`
 - ➖ Trust Scripts (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.trustScripts`
 
-### Developer (0 of 4; new in GridCraft)
+### Developer (3 of 4; new in GridCraft; Ledger has them on the Insert tab, Functions group, and the Insert menu's Form Controls)
 
 - ➖ Button (Form Control) (Controls) `insert.button` (it runs a macro or command: scripting is left out)
-- ⬜ Spin Button (Form Control) (Controls) `insert.spinButton`
-- ⬜ Scroll Bar (Form Control) (Controls) `insert.slider`
-- ⬜ Properties (Controls) `control.format`
+- ✅ Spin Button (Form Control) (Controls) `insert.spinButton`
+- ✅ Scroll Bar (Form Control) (Controls) `insert.slider`
+- ✅ Properties (Controls) `control.format` (Format Control...)
 
-GridCraft's form controls are floating objects linked to a cell (a spin button or scroll bar sets its number); Ledger's checkbox cells are the cell form of the same idea. The spin button and scroll bar could come without scripting.
+GridCraft's form controls are floating objects linked to a cell: a spin button counts its number up and down by the incremental change, a scroll bar sets it between a minimum and a maximum (its track by the page change), 0 to 30000 as in Excel; the control shows the linked cell's value while that is a number in range. A click works the control; a Ctrl-click selects it to move, size or format, as in Excel; Format Control sets the value, limits and cell link, which follows rows and columns inserted or deleted. Saved as Excel writes them: a ctrlProp part (formControlPr), the sheet's `<controls>` (x14, with the anchor) and a VML shape beside the notes'; read back from the ctrlProp part, Excel's own mirror of the control in the drawing (a14:compatExt) passed over. Not on a protected sheet unless objects may be edited (core/formctl.c; tests gc2_controls).
 
 ### Table Design (2 of 13 by name)
 
@@ -379,5 +381,14 @@ Recommended PivotTables offers GridCraft's suggestions (a category by a number, 
 - ✅ Fill Series keeps its stop value despite float drift.
 - ✅ (found while checking the above) a typed number is the nearest double, as a formula's literal: 0.3 typed in a cell was an ulp off, so MATCH(0.3,A1,0) failed.
 - Already as GridCraft now has it: Page Setup's first page number (#4382), R1C1 reference style kept (#2809), AutoSum stopping at a blank (#3291), Subtotal's outline with every row under the grand total (#3945), HYPERLINK without a friendly name.
-- ⬜ Not yet: Equations (Insert > Equation, #471), Python cells kept with their results (#2637, no code runs), form controls (#481; buttons are scripting), SYLK (.slk) files (#1481), a web page's table opened as a sheet (#3166), Find and Replace within the selection (#3224), CSV date order detected per column (#2765), custom-list sort (Ledger has no custom lists), Arabic right-to-left cells (#947), Solver's Load/Save Model, Options and Sensitivity report (#3086, #3087, #501).
+- ✅ (round 2, 2026-11-18) Find and Replace within the selection (#3224): with more than one cell selected the dialogs search it only (a Within the selection box, ticked), as Excel; also a one-sheet search's wrap-round looked at the next sheet's first cells (fixed).
+- ✅ CSV date order detected per column (#2765): a date that reads only day first (31/05/2026) makes its column day first, one only month first (12/31/2026) month first; a column of dates that read either way follows Ledger's date order, one with both kinds keeps those dates as text, each with a note (File > Open and Data > From Text/CSV).
+- ✅ SYLK (.slk) files (#1481): opened (values, R1C1 formulas turned into A1 as Excel does, shared formulas, number formats, column widths; UTF-8 or Latin-1; damaged records counted) and, beyond GridCraft, saved (Project > Save Sheet as SYLK, or a .slk name in Save As).
+- ✅ Solver's Load/Save Model, Options and Sensitivity report (#3086, #3087, #501): Save Model writes the model down a column as GridCraft does (=MAX(objective), =COUNT(variables), one =AND(...) per constraint showing whether it holds, the options as a spilling array constant), refusing the model's own cells and asking before replacing data; Load Model reads it back. Solver Options: integer optimality, evaluations, population, random seed, Multistart. The Sensitivity report: for Simplex LP each variable's reduced cost and its objective coefficient's allowable increase and decrease, each constraint's shadow price and its right side's range (from the vertex's active set); for GRG Nonlinear reduced gradients and Lagrange multipliers (least squares over the binding constraints, wrong-sign ones dropped); not for integer models, Evolutionary or Value Of.
+- ✅ Form controls (#481): spin button and scroll bar (see Developer); buttons stay out, as scripting.
+- ✅ Python cells kept with their results (#2637; see Functions): no code runs.
+- ✅ Insert > Equation (#471; see Insert).
+- ✅ A web page's table opened as a sheet (#3166): File > Open of a page saved to disk (.htm, .html, or an HTML table named .xls) reads its first table: cells as typed, colspan and rowspan merged, header cells bold and centred, line breaks, entities and non-breaking spaces; the sheet named by the page's x:Name or the file. No network, as Ledger has none.
+- ✅ Custom-list sort (#3949): Sort's Order offers Excel's built-in lists (days, months; short or long names); values not in the list come after the listed ones A to Z.
+- 🟨 Right-to-left sheets (#947, #955): a sheet's rightToLeft view is kept in .xlsx (Ledger dropped it) and a web page export writes its table right to left; the grid itself isn't drawn mirrored yet, and Arabic text in cells isn't laid out right to left (the Amiga's fonts have no Arabic).
 - ➖ Not for Ledger: the installers, Windows/Linux/macOS/Flatpak packaging and window decorations, the web host and page API, update checks, telemetry, the MCP/control server, Python code running, macros and Record Macro, the command palette and its shortcuts, egui interface work, Rust lint and CI work, performance work on GridCraft's own engine (Ledger's calculation is its own), the shared Craft libraries' cutovers.
