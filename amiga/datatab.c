@@ -1164,7 +1164,9 @@ static void get_data(void)
     gd_preview();
     if (run_modal(w, ends, gd_each) == ID_DLGOK) {
       int newsheet = xget(gd.where, MUIA_Cycle_Active) == 0;
-      Book *b = csv_load(gd.text, gd.len, gd_delim());
+      int either, both;
+      Book *b = csv_load_report(gd.text, gd.len, gd_delim(), &either, &both);
+      if (b) csv_dates_note(either, both);
       if (newsheet && book->lockstruct) { datatab_refused(ID_IMPORTCSV, 0); }
       else if (b) {
         int at = cur_index();

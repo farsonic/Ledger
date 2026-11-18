@@ -179,6 +179,23 @@ int ask(const char *gadgets, const char *fmt, const char *arg)
 {
   return (int)MUI_Request(app, win, 0, (STRPTR)"Ledger", (STRPTR)tr(gadgets), (STRPTR)tr(fmt), arg);
 }
+void csv_dates_note(int either_col, int both_col)
+{
+  static char msg[400];
+  char a[8], c[8];
+  if (either_col < 0 && both_col < 0) return;
+  msg[0] = 0;
+  col_name(either_col, a); col_name(both_col, c);
+  if (both_col >= 0) snprintf(msg, sizeof msg, tr("Column %s has dates that read only day first and others only month first: they were kept as text."), c);
+  if (either_col >= 0) {
+    size_t n = strlen(msg);
+    snprintf(msg + n, sizeof msg - n, "%s", n ? "\n\n" : "");
+    n = strlen(msg);
+    snprintf(msg + n, sizeof msg - n, tr(ledger_date_order ? "The dates in column %s could be day first or month first: they were read month first, Ledger's date order." :
+                                                             "The dates in column %s could be day first or month first: they were read day first, Ledger's date order."), a);
+  }
+  ask("OK", "%s", msg);
+}
 static void latin1_utf8(const char *s, char *u, size_t cap)
 {
   size_t o = 0;
@@ -716,13 +733,15 @@ static Book *load_file(const char *path)
   u8 *data = file_read(path, &len);
   Book *b = NULL;
   char err[200] = "";
+  int either = -1, both = -1;
   if (!data) { ask("OK", "Ledger couldn't read\n%s", path); return NULL; }
   set(win, MUIA_Window_Sleep, TRUE);
   if (len >= 4 && data[0] == 'P' && data[1] == 'K') b = ods_is(data, len) ? ods_load(data, len, err, sizeof err) : xlsx_load(data, len, err, sizeof err);
   else if (len >= 8 && data[0] == 0xD0 && data[1] == 0xCF) b = xls_load(data, len, err, sizeof err);   /* (datatab: old Excel) */
-  else b = csv_load((const char *)data, len, 0);
+  else b = csv_load_report((const char *)data, len, 0, &either, &both);
   set(win, MUIA_Window_Sleep, FALSE);
   free(data);
+  if (b) csv_dates_note(either, both);
   if (!b) {
     static char msg[400];
     snprintf(msg, sizeof msg, "%s\n\n%s", tr("Ledger couldn't open this file:"), err[0] ? err : tr("it isn't a workbook Ledger can read."));

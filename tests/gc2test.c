@@ -23,7 +23,22 @@ static void gc2_find(void)
   book_free(b);
 }
 
+extern int ledger_date_order;
+static void gc2_csv_dates(void)
+{
+  const char *t = "When,US,Either,Mixed,ISO\n31/05/2026,12/31/2026,03/04/2026,31/05/2026,2026-05-31\n03/04/2026,03/04/2026 10:30,12/01/2026,12/31/2026,x\n";
+  int either, both;
+  Book *b = csv_load_report(t, strlen(t), 0, &either, &both);
+  ok("csv dates: a day-first column", b && num_at(b, "A2") == date_serial(2026, 5, 31) && num_at(b, "A3") == date_serial(2026, 4, 3));
+  ok("csv dates: a month-first column", b && num_at(b, "B2") == date_serial(2026, 12, 31) && near(num_at(b, "B3"), date_serial(2026, 3, 4) + 10.5 / 24));
+  ok("csv dates: either way follows Ledger's order", b && num_at(b, "C2") == date_serial(2026, ledger_date_order ? 3 : 4, ledger_date_order ? 4 : 3) && either == 2);
+  ok("csv dates: both kinds stay text", b && text_at(b, "D2", "31/05/2026") && text_at(b, "D3", "12/31/2026") && both == 3);
+  ok("csv dates: ISO dates as ever", b && num_at(b, "E2") == date_serial(2026, 5, 31));
+  if (b) book_free(b);
+}
+
 static void gc2_tests(void)
 {
   gc2_find();
+  gc2_csv_dates();
 }

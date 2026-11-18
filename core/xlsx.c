@@ -1770,13 +1770,67 @@ u8 *xlsx_save(Book *b, size_t *len)
 }
 
 /* ------------------------------------------------------------------ CSV */
-Book *csv_load(const char *data, size_t len, char delim)
+/* one CSV field from *i into f (quoted: it was in quotes); *end_line 1 at a line's end, 2 at the data's */
+static void csv_field(const char *data, size_t len, size_t *pi, char delim, Buf *f, int *quoted, int *end_line)
+{
+  size_t i = *pi;
+  *quoted = 0; *end_line = 0;
+  f->len = 0;
+  if (f->data) f->data[0] = 0;
+  if (i < len && data[i] == '"') {
+    *quoted = 1;
+    i++;
+    while (i < len) {
+      if (data[i] == '"') { if (i + 1 < len && data[i + 1] == '"') { buf_addc(f, '"'); i += 2; continue; } i++; break; }
+      buf_addc(f, data[i++]);
+    }
+  }
+  while (i < len && data[i] != delim && data[i] != '\n' && data[i] != '\r') buf_addc(f, data[i++]);
+  if (i >= len) *end_line = 2;
+  else if (data[i] == delim) i++;
+  else { if (data[i] == '\r' && i + 1 < len && data[i + 1] == '\n') i++; i++; *end_line = 1; }
+  buf_addc(f, 0); f->len--;
+  *pi = i;
+}
+/* a date of three numbers split by / or - (not ISO year first, not a three-digit year), a time after
+   it allowed: the dates whose day and month could go either way */
+static int numeric_date(const char *t)
+{
+  int k, n, sep = 0;
+  while (*t == ' ') t++;
+  for (k = 0; k < 3; k++) {
+    for (n = 0; isdigit((u8)t[n]); n++) ;
+    if (!n || (k == 0 && n > 2) || (k == 2 && n == 3)) return 0;
+    t += n;
+    if (k < 2) { if ((*t != '/' && *t != '-') || (sep && *t != sep)) return 0; sep = *t++; }
+  }
+  return !*t || *t == ' ';
+}
+extern int ledger_date_order;
+/* how a column's numeric dates read (GridCraft #2765): from what its values allow */
+enum { CD_NONE, CD_DAY, CD_MONTH, CD_EITHER, CD_BOTH };
+static int csv_parse_as(const char *t, int order)
+{
+  int saved = ledger_date_order, ok, isd;
+  double d;
+  ledger_date_order = order;
+  ok = parse_number(t, &d, &isd) && isd;
+  ledger_date_order = saved;
+  return ok;
+}
+#define CSV_DATE_COLS 256
+#define CSV_DATE_ROWS 200
+Book *csv_load(const char *data, size_t len, char delim) { return csv_load_report(data, len, delim, NULL, NULL); }
+Book *csv_load_report(const char *data, size_t len, char delim, int *either_col, int *both_col)
 {
   Book *b = book_new();
-  size_t i = 0;
+  size_t i = 0, i0;
   i32 r = 0, c = 0;
   Buf f;
-  int saved_manual;
+  int saved_manual, quoted, end_line, saved_order = ledger_date_order;
+  u8 rule[CSV_DATE_COLS];
+  if (either_col) *either_col = -1;
+  if (both_col) *both_col = -1;
   if (!b) return NULL;
   if (len >= 3 && (u8)data[0] == 0xEF && (u8)data[1] == 0xBB && (u8)data[2] == 0xBF) i = 3;      /* UTF-8 mark */
   if (!delim) {
@@ -1789,34 +1843,46 @@ Book *csv_load(const char *data, size_t len, char delim)
     }
     delim = counts[1] > counts[0] && counts[1] >= counts[2] ? ';' : counts[2] > counts[0] ? '\t' : ',';
   }
+  buf_init(&f);
+  /* each column's date order from its first rows: a date that reads only day first (31/05/2026) makes
+     the column day first, one only month first (12/31/2026) month first; dates that read either way
+     only follow Ledger's order (reported); a column with both kinds keeps those dates as text */
+  memset(rule, CD_NONE, sizeof rule);
+  i0 = i;
+  while (i <= len && r < CSV_DATE_ROWS) {
+    csv_field(data, len, &i, delim, &f, &quoted, &end_line);
+    if (c < CSV_DATE_COLS && f.len && numeric_date(f.data)) {
+      int dm = csv_parse_as(f.data, 0), md = csv_parse_as(f.data, 1), k = dm && md ? CD_EITHER : dm ? CD_DAY : md ? CD_MONTH : CD_NONE;
+      u8 *u = &rule[c];
+      if (k == CD_DAY || k == CD_MONTH) *u = *u == CD_NONE || *u == CD_EITHER || *u == k ? (u8)k : CD_BOTH;
+      else if (k == CD_EITHER && *u == CD_NONE) *u = CD_EITHER;
+    }
+    c++;
+    if (end_line) { r++; c = 0; }
+    if (end_line == 2) break;
+  }
+  for (c = 0; c < CSV_DATE_COLS; c++) {
+    if (rule[c] == CD_EITHER && either_col && *either_col < 0) *either_col = c;
+    if (rule[c] == CD_BOTH && both_col && *both_col < 0) *both_col = c;
+  }
+  i = i0; r = 0; c = 0;
   saved_manual = b->manualcalc;
   b->manualcalc = 1;
-  buf_init(&f);
   while (i <= len) {
-    int quoted = 0, end_line = 0;
-    f.len = 0;
-    if (f.data) f.data[0] = 0;
-    if (i < len && data[i] == '"') {
-      quoted = 1;
-      i++;
-      while (i < len) {
-        if (data[i] == '"') { if (i + 1 < len && data[i + 1] == '"') { buf_addc(&f, '"'); i += 2; continue; } i++; break; }
-        buf_addc(&f, data[i++]);
-      }
-    }
-    while (i < len && data[i] != delim && data[i] != '\n' && data[i] != '\r') buf_addc(&f, data[i++]);
-    if (i >= len) end_line = 2;
-    else if (data[i] == delim) i++;
-    else { if (data[i] == '\r' && i + 1 < len && data[i + 1] == '\n') i++; i++; end_line = 1; }
+    csv_field(data, len, &i, delim, &f, &quoted, &end_line);
     if (f.len || quoted) {
       const char *t = f.data ? f.data : "";
-      if (quoted) {
+      int cr = c < CSV_DATE_COLS ? rule[c] : CD_NONE;
+      ledger_date_order = cr == CD_DAY ? 0 : cr == CD_MONTH ? 1 : saved_order;
+      if (cr == CD_BOTH && numeric_date(t)) { Value v = val_str(t); book_set_value(b, 0, r, c, &v); val_free(&v); }
+      else if (quoted) {
         /* quoted fields are text unless they read as numbers */
         double d;
         int k;
         if (parse_number(t, &d, &k)) book_input(b, 0, r, c, t, NULL);
         else { Value v = val_str(t); book_set_value(b, 0, r, c, &v); val_free(&v); }
-      } else book_input(b, 0, r, c, t[0] == '=' ? t : t, NULL);
+      } else book_input(b, 0, r, c, t, NULL);
+      ledger_date_order = saved_order;
     }
     c++;
     if (end_line) { r++; c = 0; if (r >= MAXROW) break; }

@@ -28,6 +28,9 @@ void   update_controls(void);
 
 /* a requester (gadgets "OK|Cancel"; returns the button, 1 the first, 0 the last) */
 int    ask(const char *gadgets, const char *fmt, const char *arg);
+/* after a CSV import (csv_load_report): a note about a column whose dates read either way, or
+   that has both kinds (kept as text); nothing if both are -1 */
+void   csv_dates_note(int either_col, int both_col);
 /* a modal dialog: the window opened over the workbook's (which sleeps meanwhile) until one of the
    ids in ends (0-terminated) or its close gadget (ID_DLGCANCEL); each other id goes to each(), if
    given. Returns the id that ended it. The window is added to the application and removed again;

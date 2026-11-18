@@ -12,6 +12,11 @@ Book *xlsx_load(const u8 *data, size_t len, char *err, size_t errcap);
 u8   *xlsx_save(Book *b, size_t *len);
 /* CSV: delim 0 guesses (comma, semicolon or tab). Fields are read as if typed (numbers, dates) */
 Book *csv_load(const char *data, size_t len, char delim);
+/* the same, each column's dates read in the order its values show (31/05/2026: day first, 12/31/2026:
+   month first, as GridCraft and Excel's import): *either_col the first column whose dates all read
+   either way (they follow Ledger's date order), *both_col the first with both kinds (its dates kept as
+   text); -1 for none. Either pointer may be NULL */
+Book *csv_load_report(const char *data, size_t len, char delim, int *either_col, int *both_col);
 /* one sheet as CSV text (malloc'd): numbers in full, dates as shown, text quoted when needed */
 char *csv_save(Book *b, int sheet, char delim);
 
