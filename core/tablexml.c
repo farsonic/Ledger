@@ -318,12 +318,13 @@ static void write_table(Book *b, int si, LTable *t, int id, FileFormulaFn ff, Bu
     buf_printf(o, "<tableColumn id=\"%d\" name=\"", k + 1);
     esc(o, c->name ? c->name : "");
     buf_adds(o, "\"");
-    if (t->totals) {
+    /* (also with the Total Row hidden, as Excel: its calculations come back when it is shown again) */
+    {
       if (c->totfn != TF_NONE) buf_printf(o, " totalsRowFunction=\"%s\"", totnames[c->totfn]);
       else if (c->totlabel) { buf_adds(o, " totalsRowLabel=\""); esc(o, c->totlabel); buf_adds(o, "\""); }
     }
     for (pos = 0; pos < 2; pos++) {
-      const char *txt = pos ? (t->totals && c->totfn == TF_CUSTOM ? c->totformula : NULL) : c->calcformula;
+      const char *txt = pos ? (c->totfn == TF_CUSTOM ? c->totformula : NULL) : c->calcformula;
       Formula *f;
       int e;
       if (!txt || !(f = formula_parse(b, si, txt, &e))) continue;
