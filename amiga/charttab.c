@@ -578,18 +578,20 @@ static void num_read(Object *s, u8 *set, double *v)
   if (!*t) { *set = 0; return; }
   *set = 1; *v = atof(t);
 }
+static void set_kind(Chart *c, int k);
 static void dlg_format(void)
 {
   static const ULONG ends[] = { ID_DLGOK, 0 };
-  static const char *cols[20], *legs[6], *aligns[4], *valigns[4];
+  static const char *cols[20], *legs[6], *aligns[4], *valigns[4], *kinds[CK_N + 1];
   static const char *const leg_en[] = { "None", "Bottom", "Top", "Left", "Right", NULL }, *al_en[] = { "Left", "Centre", "Right", NULL }, *va_en[] = { "Top", "Middle", "Bottom", NULL };
   DObj *o = sel_obj();
   Chart *c = sel_chart();
   Object *w, *o_el = NULL, *o_fill = NULL, *o_line, *o_title = NULL, *o_show = NULL, *o_xt = NULL, *o_yt = NULL, *o_min = NULL, *o_max = NULL, *o_maj = NULL;
-  Object *o_leg = NULL, *o_lab = NULL, *o_grid = NULL, *o_text = NULL, *o_size = NULL, *o_bold = NULL, *o_ital = NULL, *o_al = NULL, *o_va = NULL, *o_lw = NULL, *o_alt = NULL, *o_w, *o_h;
+  Object *o_kind = NULL, *o_leg = NULL, *o_lab = NULL, *o_grid = NULL, *o_text = NULL, *o_size = NULL, *o_bold = NULL, *o_ital = NULL, *o_al = NULL, *o_va = NULL, *o_lw = NULL, *o_alt = NULL, *o_w, *o_h;
   char t1[200], t2[100], t3[100], mn[32], mx[32], mj[32], sz[16], lw[16], wt[16], ht[16], alt[200];
   i32 x0, y0, x1, y1;
   if (!o) return;
+  { int k; for (k = 0; k < CK_N; k++) kinds[k] = tr(chart_kind_name(k)); kinds[CK_N] = NULL; }
   trn(fcol_names, cols); trn(leg_en, legs); trn(al_en, aligns); trn(va_en, valigns);
   dobj_box(cur_sheet(), o, &x0, &y0, &x1, &y1);
   sprintf(wt, "%ld", (long)(x1 - x0)); sprintf(ht, "%ld", (long)(y1 - y0));
@@ -604,6 +606,8 @@ static void dlg_format(void)
             Child, Label1(tr("Fill:")), Child, o_fill = cycle_obj(cols, 0), Child, Label1(tr("Outline:")), Child, o_line = cycle_obj(cols, 0),
           End,
           Child, ColGroup(2),
+            /* (as GridCraft's Format Chart Area: every type with its stacked and 100% stacked forms, the current one shown) */
+            Child, Label1(tr("Chart type:")), Child, o_kind = cycle_obj(kinds, c->kind < CK_N ? c->kind : 0),
             Child, Label1(tr("Title:")), Child, HGroup, Child, o_show = check_obj(c->has_title), Child, o_title = str_obj(t1, 190), End,
             Child, Label1(tr("Horizontal axis title:")), Child, o_xt = str_obj(t2, 90),
             Child, Label1(tr("Vertical axis title:")), Child, o_yt = str_obj(t3, 90),
@@ -657,6 +661,7 @@ static void dlg_format(void)
       c->legend = (u8)xget(o_leg, MUIA_Cycle_Active);
       c->labels = (u8)(xget(o_lab, MUIA_Selected) != 0);
       c->hgrid = (u8)(xget(o_grid, MUIA_Selected) != 0);
+      if ((int)xget(o_kind, MUIA_Cycle_Active) != c->kind) set_kind(c, (int)xget(o_kind, MUIA_Cycle_Active));
     } else {
       if (o_fill && xget(o_fill, MUIA_Cycle_Active)) apply_colour(NULL, o, 0, fcol_get(o_fill, o->fill), 0);
       if (xget(o_line, MUIA_Cycle_Active)) apply_colour(NULL, o, 0, fcol_get(o_line, o->line), 1);
@@ -722,14 +727,19 @@ static void add_element(int v)
   }
   end();
 }
+static void set_kind(Chart *c, int k)
+{
+  if (k < 0 || k >= CK_N) return;
+  c->kind = (u8)k;
+  /* a pie's legend names the slices; bubbles need sizes (each value its own) */
+  if (chart_is_pielike(k)) { c->hgrid = 0; if (c->legend == LG_NONE && k != CK_FUNNEL) c->legend = LG_BOTTOM; }
+}
 static void change_type(int k)
 {
   Chart *c = sel_chart();
   if (!c || k < 0 || k >= CK_N) return;
   begin();
-  c->kind = (u8)k;
-  /* a pie's legend names the slices; bubbles need sizes (each value its own) */
-  if (chart_is_pielike(k)) { c->hgrid = 0; if (c->legend == LG_NONE && k != CK_FUNNEL) c->legend = LG_BOTTOM; }
+  set_kind(c, k);
   end();
 }
 

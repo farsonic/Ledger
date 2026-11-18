@@ -110,8 +110,55 @@ static void sync_safe_save(void)
   book_free(b);
 }
 
+/* a package part holds a text */
+static int part_has(const u8 *x, size_t len, const char *part, const char *text)
+{
+  ZipReader z;
+  int i, r = 0;
+  size_t n;
+  u8 *d;
+  if (!zip_open(&z, x, len)) return 0;
+  if ((i = zip_find(&z, part)) >= 0 && (d = zip_read(&z, i, &n))) {
+    size_t k, tl = strlen(text);
+    for (k = 0; k + tl <= n && !r; k++) if (!memcmp(d + k, text, tl)) r = 1;
+    free(d);
+  }
+  zip_close(&z);
+  return r;
+}
+/* Format Chart's Chart type (GridCraft #2605): a column chart switched to the stacked and 100%
+   stacked forms of column, bar and area, and stacked line, keeps its series, draws, and is saved
+   with Excel's grouping */
+static void sync_chart_types(void)
+{
+  static const int kinds[] = { CK_COLSTACK, CK_COL100, CK_BARSTACK, CK_BAR100, CK_LINESTACK, CK_AREASTACK, CK_AREA100 };
+  static const char *const grouping[] = { "\"stacked\"", "\"percentStacked\"", "\"stacked\"", "\"percentStacked\"", "\"stacked\"", "\"stacked\"", "\"percentStacked\"" };
+  int i, bad = 0;
+  for (i = 0; i < 7; i++) {
+    Book *e = sales_book(), *d = NULL;
+    DObj *eo = add_chart(e, 0, CK_COL, R4(0, 0, 6, 3)), *o;
+    PrimList pl;
+    u8 *x = NULL; size_t len = 0; char err[100];
+    if (!eo) { bad++; book_free(e); continue; }
+    eo->chart->kind = (u8)kinds[i];
+    prims_init(&pl);
+    if (!chart_render(e, 0, eo->chart, 400, 240, 100, NULL, NULL, &pl) || count_series_prims(&pl, 0) < 1) bad++;
+    prims_free(&pl);
+    x = xlsx_save(e, &len);
+    if (!x || !part_has(x, len, "xl/charts/chart1.xml", grouping[i])) bad++;
+    d = x ? xlsx_load(x, len, err, sizeof err) : NULL;
+    o = d ? drw_obj(d->sh[0], 0) : NULL;
+    if (!o || !o->chart || o->chart->kind != kinds[i] || o->chart->ns != eo->chart->ns) { bad++; printf("   %s\n", chart_kind_name(kinds[i])); }
+    if (d) book_free(d);
+    free(x);
+    book_free(e);
+  }
+  ok("chart type: stacked and 100% stacked forms", bad == 0);
+}
+
 static void sync_tests(void)
 {
+  sync_chart_types();
   sync_safe_save();
   sync_functions();
   sync_getpivotdata();
