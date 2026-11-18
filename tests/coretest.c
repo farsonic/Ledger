@@ -1813,6 +1813,7 @@ static void stat_functions(void)
 }
 
 #include "analysistest.c"
+#include "synctest.c"
 int main(void)
 {
   values_dates();
@@ -1845,6 +1846,7 @@ int main(void)
   dynarrays();
   ui_tests();
   analysis_tests();
+  sync_tests();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }

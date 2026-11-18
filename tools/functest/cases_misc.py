@@ -65,3 +65,13 @@ C += [
  ('EUROCONVERT', ['1', '"FRF"', '"DEM"', 'TRUE']), ('EUROCONVERT', ['100', '"EUR"', '"BEF"']), ('EUROCONVERT', ['100', '"EUR"', '"PTE"']), ('EUROCONVERT', ['1', '"XYZ"', '"EUR"']),
  ('EUROCONVERT', ['1', '"DEM"', '"FRF"', 'FALSE', '2']), ('EUROCONVERT', ['5', '"eur"', '"eur"']), ('EUROCONVERT', ['100', '"ITL"', '"EUR"']),
 ]
+# GridCraft 4c388df's fixes (Excel's answers): FIXED and DOLLAR digits and length limits, single-character
+# casing, UNICHAR's noncharacters, MOD's quotient limit, YEARFRAC's 30/360 end-of-February
+C += [
+ ('FIXED', ['1.005', '20']), ('FIXED', ['1.1', '16']), ('LEN(FIXED(@))', ['1E191', '0']), ('FIXED', ['1E192', '0']),
+ ('LEN(DOLLAR(@))', ['1E189', '0']), ('DOLLAR', ['1E190', '0']), ('DOLLAR', ['-0.0001', '0']), ('FIXED', ['123456789012345678', '0']),
+ ('LOWER', ['"İ"']), ('PROPER', ['"İSTANBUL"']), ('UPPER', ['"Straße"']), ('UPPER', ['"łódź"']), ('LOWER', ['"ŁÓDŹ"']),
+ ('UNICHAR', ['65534']), ('UNICHAR', ['64976']), ('UNICHAR', ['131071']),
+ ('MOD', ['1125900000000', '1']), ('MOD', ['1125800000000', '7']),
+ ('YEARFRAC', ['DATE(2021,2,28)', 'DATE(2021,3,31)', '0']), ('YEARFRAC', ['DATE(2021,3,31)', 'DATE(2021,2,28)']),
+]

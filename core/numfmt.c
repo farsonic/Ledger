@@ -334,6 +334,33 @@ static void int_digits(double v, char *buf)
   if (v < 1e15) sprintf(buf, "%.0f", floor(v + 0.5));
   else sprintf(buf, "%.0f", v);
 }
+/* more digits than a double holds (v rounded to decdig decimals is 1E15 or more): as Excel, 15
+   significant digits and then zeros (1.005 with twenty decimals is 1.00500000000000000000, not the
+   binary value's 1.00499999999999983616; 123456789012345678 is 123456789012345000). ib gets the
+   integer digits ("0" for none), db decdig decimals; both hold up to 380 characters. */
+static void sig_digits(double v, int decdig, char *ib, char *db)
+{
+  char t[48], fm[16], dg[20];
+  int k = 15, x, nd = 0, i;
+  const char *e;
+  sprintf(t, "%.14e", v);
+  x = atoi(strchr(t, 'e') + 1);
+  if (x + 1 + decdig < k) {           /* fewer digits shown than 15: round there */
+    k = x + 1 + decdig;
+    if (k < 1) k = 1;
+    sprintf(fm, "%%.%de", k - 1);    /* (built, not %.*e: vbcc takes a precision of 0 there as none) */
+    sprintf(t, fm, v);
+    x = atoi(strchr(t, 'e') + 1);
+  }
+  for (e = t; *e && *e != 'e'; e++) if (*e >= '0' && *e <= '9' && nd < 19) dg[nd++] = *e;
+  if (x > 370) x = 370;
+  if (x >= 0) {
+    for (i = 0; i <= x; i++) ib[i] = i < nd ? dg[i] : '0';
+    ib[x + 1] = 0;
+  } else strcpy(ib, "0");
+  for (i = 0; i < decdig; i++) { int p = x + 1 + i; db[i] = p >= 0 && p < nd ? dg[p] : '0'; }
+  db[decdig] = 0;
+}
 /* the best fraction for x with a denominator of at most dmax (or exactly dfix) */
 static void best_frac(double x, int dmax, int dfix, long *num, long *den)
 {
@@ -354,7 +381,7 @@ static void fmt_number(Book *b, const Sect *s, double v, int neg_sign, Out *o)
 {
   Shape sh;
   const char *p = s->s, *end = s->s + s->n;
-  char ib[64], db[64], eb[16];
+  char ib[400], db[400], eb[16];
   int ilen, di = 0, ei = 0, q = 0, exp10 = 0, intleft, afterdot = 0, afterexp = 0, insect_frac = 0;
   long fnum = 0, fden = 1;
   double whole;
@@ -408,10 +435,12 @@ static void fmt_number(Book *b, const Sect *s, double v, int neg_sign, Out *o)
   /* round to the decimals shown and split into integer and decimal digits */
   {
     double r = floor(v * pow(10.0, sh.decdig) + 0.5 + 1e-9);
-    double ip = floor(r / pow(10.0, sh.decdig));
-    double dp = r - ip * pow(10.0, sh.decdig);
-    int_digits(ip, ib);
-    if (sh.decdig) { sprintf(db, "%0*.0f", sh.decdig, dp); } else db[0] = 0;
+    if (r < 1e15 || !(v == v) || sh.decdig > 380) {
+      double ip = floor(r / pow(10.0, sh.decdig));
+      double dp = r - ip * pow(10.0, sh.decdig);
+      int_digits(ip, ib);
+      if (sh.decdig && sh.decdig <= 380) { sprintf(db, "%0*.0f", sh.decdig, dp); } else db[0] = 0;
+    } else sig_digits(v, sh.decdig, ib, db);
   }
   if (!strcmp(ib, "0") && sh.intzero == 0) ib[0] = 0;   /* "#.00" shows .50 */
   if (insect_frac && !strcmp(ib, "0") && fnum) ib[0] = 0;

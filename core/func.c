@@ -205,6 +205,7 @@ static Value f_mod(Ctx *cx, Value *a, int n)
   (void)n;
   if ((e = arg_num(cx, &a[0], &x)) || (e = arg_num(cx, &a[1], &y))) return val_err(e);
   if (y == 0) return val_err(E_DIV0);
+  if (fabs(x / y) >= 1.1259e12) return val_err(E_NUM);   /* (Excel 16's limit on the quotient) */
   r = x - y * floor(x / y);                 /* the sign of the divisor, as Excel */
   return val_num(r);
 }
@@ -805,11 +806,24 @@ static void case_map(char *s, int mode)
     } else if (*p == 0xC3 && p[1]) {
       u32 cp = 0xC0 + (p[1] & 0x3F) + 0x40 * 0;
       cp = ((u32)(p[0] & 0x1F) << 6) | (p[1] & 0x3F);
-      if (cp >= 0xC0 && cp <= 0xFE && cp != 0xD7 && cp != 0xF7 && cp != 0xDF) {
+      if (cp == 0xFF && up) { p[0] = 0xC5; p[1] = 0xB8; }   /* ÿ: Ÿ */
+      else if (cp >= 0xC0 && cp <= 0xFE && cp != 0xD7 && cp != 0xF7 && cp != 0xDF) {
         if (up && cp >= 0xE0) cp -= 32;
         else if (!up && cp < 0xE0) cp += 32;
         p[1] = (unsigned char)(0x80 | (cp & 0x3F));
       }
+      start = 0;
+      p += 2;
+    } else if ((*p == 0xC4 || *p == 0xC5) && (p[1] & 0xC0) == 0x80) {
+      /* Latin Extended-A (U+0100-017F), one character to one, as Excel: LOWER("İ") is "i" and the
+         dotless ı is I in capitals (so PROPER("İSTANBUL") is Istanbul); ĸ and ŉ stay as they are */
+      u32 cp = ((u32)(p[0] & 0x1F) << 6) | (p[1] & 0x3F), to = cp;
+      if (cp == 0x130) { if (!up) { *p = 'i'; memmove(p + 1, p + 2, strlen((char *)p + 2) + 1); p++; start = 0; continue; } }
+      else if (cp == 0x131) { if (up) { *p = 'I'; memmove(p + 1, p + 2, strlen((char *)p + 2) + 1); p++; start = 0; continue; } }
+      else if (cp == 0x178 && !up) to = 0xFF;   /* Ÿ: ÿ */
+      else if ((cp < 0x138) || (cp >= 0x14A && cp < 0x178)) to = up ? (cp & ~1u) : (cp | 1u);
+      else if ((cp >= 0x139 && cp < 0x149) || (cp >= 0x179 && cp < 0x17F)) to = up ? (cp & 1u ? cp : cp - 1) : (cp & 1u ? cp + 1 : cp);
+      if (to != cp) { p[0] = (unsigned char)(0xC0 | (to >> 6));   /* (two bytes either way) */ p[1] = (unsigned char)(0x80 | (to & 0x3F)); }
       start = 0;
       p += 2;
     } else { start = 0; p++; while ((*p & 0xC0) == 0x80) p++; }
@@ -1106,7 +1120,7 @@ static Value fixed_impl(Ctx *cx, Value *a, int n, int dollar)
 {
   double x, d = 2;
   int e, nocomma = 0;
-  char code[128], out[256];                       /* (room for DOLLAR's two parts with thirty decimals) */
+  char code[128], out[400];                       /* (room for DOLLAR's two parts with thirty decimals) */
   Value v;
   u32 col;
   if ((e = arg_num(cx, &a[0], &x))) return val_err(e);
@@ -1121,6 +1135,8 @@ static Value fixed_impl(Ctx *cx, Value *a, int n, int dollar)
   if (dollar) { char neg[132]; sprintf(neg, ";(%.60s)", code); strcat(code, neg); }   /* (code is at most 39 characters here) */
   v = val_num(x);
   fmt_value(cx->b, code, &v, out, sizeof out, &col, 255);
+  /* Excel: FIXED's text is at most 255 characters, DOLLAR's 254 */
+  if (strlen(out) > (dollar ? 254u : 255u) || !(x - x == 0)) return val_err(E_VALUE);
   return val_str(out);
 }
 static Value f_fixed(Ctx *cx, Value *a, int n) { return fixed_impl(cx, a, n, 0); }
@@ -1144,6 +1160,8 @@ static Value f_unichar(Ctx *cx, Value *a, int n)
   (void)n;
   if ((e = arg_num(cx, &a[0], &x))) return val_err(e);
   if (x < 1 || x > 0x10FFFF) return val_err(E_VALUE);
+  { u32 cp = (u32)x;   /* (Excel: surrogates and the noncharacters U+FDD0-FDEF, U+xFFFE/xFFFF are #N/A) */
+    if ((cp >= 0xD800 && cp <= 0xDFFF) || (cp >= 0xFDD0 && cp <= 0xFDEF) || (cp & 0xFFFE) == 0xFFFE) return val_err(E_NA); }
   out[utf8_put(out, (u32)x)] = 0;
   return val_str(out);
 }

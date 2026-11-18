@@ -70,17 +70,19 @@ static int days_in(int y, int m)
   static const unsigned char md[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
   return m == 2 && is_leap(y) ? 29 : md[m - 1];
 }
-/* 30/360 days from s1 to s2: US (NASD, as Excel's financial functions count it) or European */
+/* 30/360 days from s1 to s2: US (NASD, as Excel's financial functions count it) or European; us 2
+   is YEARFRAC's US count, which tests the end-31 rule against the start's own day (before a February
+   end becomes the 30th: YEARFRAC(28 Feb 2021, 31 Mar 2021) is 31/360 in Excel) */
 static double days360(double s1, double s2, int us)
 {
   int y1, m1, d1, y2, m2, d2;
   serial_ymd(s1, &y1, &m1, &d1);
   serial_ymd(s2, &y2, &m2, &d2);
   if (us) {
-    int feb1 = m1 == 2 && d1 == days_in(y1, 2), feb2 = m2 == 2 && d2 == days_in(y2, 2);
+    int feb1 = m1 == 2 && d1 == days_in(y1, 2), feb2 = m2 == 2 && d2 == days_in(y2, 2), start30 = d1 >= 30;
     if (feb1 && feb2) d2 = 30;
     if (feb1) d1 = 30;
-    if (d2 == 31 && d1 >= 30) d2 = 30;
+    if (d2 == 31 && (us == 2 ? start30 : d1 >= 30)) d2 = 30;
     if (d1 == 31) d1 = 30;
   } else {
     if (d1 == 31) d1 = 30;
@@ -534,6 +536,7 @@ static Value f_yearfrac(Ctx *cx, Value *a, int n)
   double s1, s2;
   int e, basis = 0;
   if ((e = get_date(cx, a, n, 0, &s1)) || (e = get_date(cx, a, n, 1, &s2)) || (e = get_basis(cx, a, n, 2, &basis))) return val_err(e);
+  if (basis == 0) return num_or_err((s1 <= s2 ? days360(s1, s2, 2) : days360(s2, s1, 2)) / 360);
   return num_or_err(year_frac(s1, s2, basis));
 }
 static Value f_disc(Ctx *cx, Value *a, int n) { double x[2], yf; int e = sec_args(cx, a, n, x, &yf); return e ? val_err(e) : num_or_err((1 - x[0] / x[1]) / yf); }

@@ -178,6 +178,12 @@ static double t_upper(double t, double df)
 static double t_cdf(double t, double df) { return t < 0 ? t_upper(-t, df) : 1.0 - t_upper(t, df); }
 static double t_pdf(double t, double df)
 {
+  if (df >= 100) {
+    /* many degrees: ln(G(z + 1/2) / G(z)) - ln(z)/2 by its asymptotic series (z = df/2), so the
+       two log-gammas don't cancel (T.DIST(0.5,1E10,FALSE) was right to only 6 digits) */
+    double z = df / 2, z2 = z * z, c = -1 / (8 * z) + 1 / (192 * z * z2) - 1 / (640 * z * z2 * z2) + 17 / (14336 * z * z2 * z2 * z2);
+    return exp(c - (df + 1) / 2 * lg1p(t * t / df)) / sqrt(2 * M_PI);
+  }
   return exp(lgam((df + 1) / 2) - lgam(df / 2) - (df + 1) / 2 * lg1p(t * t / df)) / sqrt(df * M_PI);
 }
 /* chi-squared */
@@ -200,11 +206,58 @@ static double f_pdf(double x, double d1, double d2)
   return exp(0.5 * (d1 * log(d1 * x) + d2 * log(d2) - (d1 + d2) * log(d1 * x + d2)) - (lgam(d1 / 2) + lgam(d2 / 2) - lgam((d1 + d2) / 2))) / x;
 }
 static double lchoose(double n, double k) { return lgam(n + 1) - lgam(k + 1) - lgam(n - k + 1); }
+/* Catherine Loader's saddle-point forms (as R's dbinom and dpois, and GridCraft's): ln(n!) less
+   Stirling's approximation, and x ln(x/np) + np - x without its cancellation; the binomial and
+   Poisson masses to about 1E-15 where exp(lchoose(...)) lost digits as n grew (1E-8 at 1E7 trials) */
+static double stirlerr(double n)
+{
+  static const double whole[16] = { 0, 0.08106146679532725821967026, 0.04134069595540929409382208,
+    0.02767792568499833914878929, 0.02079067210376509311152277, 0.01664469118982119216319487,
+    0.01387612882307074799874573, 0.01189670994589177009505572, 0.01041126526197209649747857,
+    0.009255462182712732917728637, 0.008330563433362871256469319, 0.007573675487951840794972024,
+    0.006942840107209529865664153, 0.006408994188004207068439631, 0.005951370112758847735624416,
+    0.00555473355196280137103869 };
+  double nn = n * n;
+  if (n <= 15) {
+    if (n == floor(n) && n >= 1) return whole[(int)n];
+    return lgam(n + 1) - (n + 0.5) * log(n) + n - LN_SQRT2PI;
+  }
+  if (n > 500) return (1.0 / 12 - 1.0 / 360 / nn) / n;
+  if (n > 80) return (1.0 / 12 - (1.0 / 360 - 1.0 / 1260 / nn) / nn) / n;
+  if (n > 35) return (1.0 / 12 - (1.0 / 360 - (1.0 / 1260 - 1.0 / 1680 / nn) / nn) / nn) / n;
+  return (1.0 / 12 - (1.0 / 360 - (1.0 / 1260 - (1.0 / 1680 - 1.0 / 1188 / nn) / nn) / nn) / nn) / n;
+}
+static double bd0(double x, double np)
+{
+  if (fabs(x - np) < 0.1 * (x + np)) {
+    double v = (x - np) / (x + np), s = (x - np) * v, ej = 2 * x * v, s1;
+    int j;
+    v = v * v;
+    for (j = 1; j < 1000; j++) {
+      ej *= v;
+      s1 = s + ej / (2 * j + 1);
+      if (s1 == s) return s1;
+      s = s1;
+    }
+  }
+  return x * log(x / np) + np - x;
+}
 static double binom_pmf(double k, double n, double p)
 {
+  double q = 1 - p, lc;
   if (p == 0) return k == 0;
   if (p == 1) return k == n;
-  return exp(lchoose(n, k) + k * log(p) + (n - k) * lg1p(-p));
+  if (k < 0 || k > n) return 0;
+  if (k == 0) return exp(p < 0.1 ? -bd0(n, n * q) - n * p : n * lg1p(-p));
+  if (k == n) return exp(q < 0.1 ? -bd0(n, n * p) - n * q : n * log(p));
+  lc = stirlerr(n) - stirlerr(k) - stirlerr(n - k) - bd0(k, n * p) - bd0(n - k, n * q);
+  return exp(lc - 0.5 * (log(2 * M_PI) + log(k) + lg1p(-k / n)));
+}
+static double pois_pmf(double k, double m)
+{
+  if (m == 0) return k == 0;
+  if (k == 0) return exp(-m);
+  return exp(-stirlerr(k) - bd0(k, m)) / sqrt(2 * M_PI * k);
 }
 static double binom_cdf(double k, double n, double p)       /* P(X <= k) */
 {
@@ -465,6 +518,8 @@ static Value t_dist_impl(Ctx *cx, Value *a, int n, int kind)
     kind = x[2] == 1 ? 1 : 2;
     if (x[0] < 0) return val_err(E_NUM);
   }
+  /* T.DIST's density with degrees that truncate to 0 is #DIV/0! in Excel (the cumulative form #NUM!) */
+  if (kind == 0 && !cum && x[1] == 0) return val_err(E_DIV0);
   if (x[1] < 1 || x[1] > 1e10) return val_err(E_NUM);
   if (kind == 2 && x[0] < 0) return val_err(E_NUM);
   if (kind == 0) return num_or_err(cum ? t_cdf(x[0], x[1]) : t_pdf(x[0], x[1]));
@@ -480,6 +535,7 @@ static Value f_t_inv(Ctx *cx, Value *a, int n)
   double x[2];
   NUMS(0, 2, x);
   x[1] = trunc_(x[1]);
+  if (x[0] == 0 && x[1] >= 1 && x[1] <= 1e10) return val_err(E_DIV0);   /* (Excel: T.INV(0, df) is #DIV/0!) */
   if (x[0] <= 0 || x[0] >= 1 || x[1] < 1 || x[1] > 1e10) return val_err(E_NUM);
   if (x[0] == 0.5) return val_num(0);
   return num_or_err(x[0] < 0.5 ? -t_inv_upper(x[0], x[1]) : t_inv_upper(1 - x[0], x[1]));
@@ -525,7 +581,7 @@ static Value f_dist_impl(Ctx *cx, Value *a, int n, int kind)
   NUMS(0, 3, x);
   if (kind == 0) BOOLARG(3, cum);
   x[1] = trunc_(x[1]); x[2] = trunc_(x[2]);
-  if (x[0] < 0 || x[1] < 1 || x[2] < 1 || x[1] >= 1e10 || x[2] >= 1e10) return val_err(E_NUM);
+  if (x[0] < 0 || x[1] < 1 || x[2] < 1 || x[1] > 1e10 || x[2] > 1e10) return val_err(E_NUM);
   if (kind == 1) return num_or_err(f_tail(x[0], x[1], x[2], 1));
   return num_or_err(cum ? f_tail(x[0], x[1], x[2], 0) : f_pdf(x[0], x[1], x[2]));
 }
@@ -536,7 +592,7 @@ static Value f_inv_impl(Ctx *cx, Value *a, int n, int upper)
   double x[3];
   NUMS(0, 3, x);
   x[1] = trunc_(x[1]); x[2] = trunc_(x[2]);
-  if (x[0] < 0 || x[0] > 1 || x[1] < 1 || x[2] < 1 || x[1] >= 1e10 || x[2] >= 1e10) return val_err(E_NUM);
+  if (x[0] < 0 || x[0] > 1 || x[1] < 1 || x[2] < 1 || x[1] > 1e10 || x[2] > 1e10) return val_err(E_NUM);
   if (x[0] == (upper ? 1 : 0)) return val_num(0);
   if (x[0] == (upper ? 0 : 1)) return val_err(E_NUM);
   return num_or_err(upper ? solve(cdf_f_upper, &x[1], x[0], 0, 1, 0, 1) : solve(cdf_f, &x[1], x[0], 0, 1, 0, 0));
@@ -564,6 +620,7 @@ static Value f_gamma_dist(Ctx *cx, Value *a, int n)
   double x[3]; int cum = 0;
   NUMS(0, 3, x); BOOLARG(3, cum);
   if (x[0] < 0 || x[1] <= 0 || x[2] <= 0) return val_err(E_NUM);
+  if (!cum && x[0] == 0) return x[1] <= 1 ? val_err(E_NUM) : val_num(0);   /* (Excel: the density at 0 with shape 1 too) */
   return num_or_err(cum ? gam_p(x[1], x[0] / x[2]) : gamma_pdf(x[0], x[1], x[2]));
 }
 static Value f_gamma_inv(Ctx *cx, Value *a, int n)
@@ -585,7 +642,8 @@ static Value f_beta_dist(Ctx *cx, Value *a, int n)
   {
     double w = ab[1] - ab[0], u = (x[0] - ab[0]) / w, v = (ab[1] - x[0]) / w;
     if (cum) return num_or_err(ibeta(u, v, x[1], x[2], 0));
-    if ((u == 0 && x[1] < 1) || (v == 0 && x[2] < 1)) return val_err(E_NUM);
+    /* Excel: the density at an end is #NUM! when that end's shape is 1 or less */
+    if ((u == 0 && x[1] <= 1) || (v == 0 && x[2] <= 1)) return val_err(E_NUM);
     if (u == 0) return val_num(x[1] == 1 ? x[2] / w : 0);
     if (v == 0) return val_num(x[2] == 1 ? x[1] / w : 0);
     return num_or_err(exp((x[1] - 1) * log(u) + (x[2] - 1) * log(v) - (lgam(x[1]) + lgam(x[2]) - lgam(x[1] + x[2]))) / w);
@@ -624,20 +682,23 @@ static Value f_weibull_dist(Ctx *cx, Value *a, int n)
   NUMS(0, 3, x); BOOLARG(3, cum);
   if (x[0] < 0 || x[1] <= 0 || x[2] <= 0) return val_err(E_NUM);
   {
-    double t = pow(x[0] / x[2], x[1]);
+    double t;
+    if (x[0] == 0) return val_num(0);
+    t = pow(x[0] / x[2], x[1]);
     if (cum) return num_or_err(-em1(-t));
-    if (x[0] == 0) return x[1] < 1 ? val_err(E_NUM) : val_num(x[1] == 1 ? 1 / x[2] : 0);
+    if (x[0] == 0) return val_num(0);   /* (Excel: 0 at 0, whatever the shape) */
     return num_or_err(x[1] / x[2] * pow(x[0] / x[2], x[1] - 1) * exp(-t));
   }
 }
 
 /* ------------------------------------------------------------------ discrete distributions */
+#define MAX_BINOM_TRIALS 2147483646.0   /* (Excel: more trials, after truncation, are #NUM!) */
 static Value f_binom_dist(Ctx *cx, Value *a, int n)
 {
   double x[3]; int cum = 0;
   NUMS(0, 3, x); BOOLARG(3, cum);
   x[0] = trunc_(x[0]); x[1] = trunc_(x[1]);
-  if (x[0] < 0 || x[0] > x[1] || x[2] < 0 || x[2] > 1) return val_err(E_NUM);
+  if (x[0] < 0 || x[0] > x[1] || x[1] > MAX_BINOM_TRIALS || x[2] < 0 || x[2] > 1) return val_err(E_NUM);
   return num_or_err(cum ? binom_cdf(x[0], x[1], x[2]) : binom_pmf(x[0], x[1], x[2]));
 }
 static Value f_binom_dist_range(Ctx *cx, Value *a, int n)
@@ -648,7 +709,7 @@ static Value f_binom_dist_range(Ctx *cx, Value *a, int n)
   x[3] = x[2];
   NUMS(3, 1, &x[3]);
   x[3] = trunc_(x[3]);
-  if (x[0] < 0 || x[1] < 0 || x[1] > 1 || x[2] < 0 || x[2] > x[0] || x[3] < x[2] || x[3] > x[0]) return val_err(E_NUM);
+  if (x[0] < 0 || x[0] > MAX_BINOM_TRIALS || x[1] < 0 || x[1] > 1 || x[2] < 0 || x[2] > x[0] || x[3] < x[2] || x[3] > x[0]) return val_err(E_NUM);
   if (x[3] == x[2]) return num_or_err(binom_pmf(x[2], x[0], x[1]));
   {
     double s = 0, k;
@@ -691,7 +752,7 @@ static Value f_poisson_dist(Ctx *cx, Value *a, int n)
   if (x[0] < 0 || x[1] < 0) return val_err(E_NUM);
   if (x[1] == 0) return val_num(cum || x[0] == 0 ? 1 : 0);
   if (cum) return num_or_err(gam_q(x[0] + 1, x[1]));
-  return num_or_err(exp(-x[1] + x[0] * log(x[1]) - lgam(x[0] + 1)));
+  return num_or_err(pois_pmf(x[0], x[1]));
 }
 static double hyp_pmf(double s, double ns, double ps, double np)
 {
@@ -774,7 +835,7 @@ static Value f_harmean(Ctx *cx, Value *a, int n)
 {
   Nums ns; double s = 0; long i;
   if (gather(cx, a, n, &ns, 0)) { free(ns.v); return val_err(ns.err); }
-  if (!ns.n) { free(ns.v); return val_err(E_NUM); }
+  if (!ns.n) { free(ns.v); return val_err(E_NA); }   /* (Excel: no numbers at all is #N/A) */
   for (i = 0; i < ns.n; i++) { if (ns.v[i] <= 0) { free(ns.v); return val_err(E_NUM); } s += 1 / ns.v[i]; }
   s = ns.n / s;
   free(ns.v);
@@ -816,6 +877,7 @@ static Value pctrank_impl(Ctx *cx, Value *a, int n, int excl)
   if (sig < 1) return val_err(E_NUM);
   if (!(v = numbers(cx, &a[0], &cnt, 0, 1, &e))) return val_err(e);
   if (!cnt) { free(v); return val_err(E_NUM); }
+  if (sig >= 309) { free(v); return val_err(E_DIV0); }   /* (Excel: 10^significance overflows from 309) */
   if (x < v[0] || x > v[cnt - 1]) { free(v); return val_err(E_NA); }
   for (i = 0; i < cnt && v[i] < x; i++) ;
   /* v[i] is the first value >= x */
@@ -825,6 +887,11 @@ static Value pctrank_impl(Ctx *cx, Value *a, int n, int excl)
     r = excl ? (i + fr) / (cnt + 1) : (i - 1 + fr) / (cnt - 1);
   }
   free(v);
+  if (sig >= 15) {   /* from 15 Excel gives 15 significant digits, rounded */
+    char t[40];
+    sprintf(t, "%.14e", r);
+    return val_num(strtod(t, NULL));
+  }
   m = pow(10, sig);
   return val_num(floor(r * m + 1e-9) / m);
 }
@@ -1084,13 +1151,16 @@ bad:
 }
 /* the fit: coefficients b[0..k] (b[0] the constant, b[j] for variable j), and what LINEST's
    statistics need. Modified Gram-Schmidt (twice) on the columns; a column that depends on the ones
-   before it is dropped (its coefficient 0), as Excel does */
+   before it is dropped (its coefficient 0), as Excel does. With a constant the variables are
+   centred first (GridCraft's QR does the same), so a predictor that varies by little next to a
+   large offset ({1E13;1E13+1;1E13+2}) is kept; a column is collinear when what is left of it is
+   under 1E-6 of its centred length, and constant only when its values are all the same */
 typedef struct { double *b, *se; int *drop; double ssreg, ssres, r2, sey, F, df; int kept; } Fit;
 static void fit_free(Fit *f) { free(f->b); free(f->se); free(f->drop); }
 static int reg_fit(const Reg *g, int cnst, Fit *f)
 {
   long n = g->n, p = g->k + 1, i, j, l, pass;
-  double *q, *R, *qy, ym = 0, sst = 0;
+  double *q, *R, *qy, *xm, ym = 0, sst = 0;
   memset(f, 0, sizeof *f);
   q = (double *)calloc((size_t)(n * p) + 1, sizeof(double));
   R = (double *)calloc((size_t)(p * p) + 1, sizeof(double));
@@ -1098,11 +1168,23 @@ static int reg_fit(const Reg *g, int cnst, Fit *f)
   f->b = (double *)calloc((size_t)p + 1, sizeof(double));
   f->se = (double *)calloc((size_t)p + 1, sizeof(double));
   f->drop = (int *)calloc((size_t)p + 1, sizeof(int));
-  if (!q || !R || !qy || !f->b || !f->se || !f->drop) { free(q); free(R); free(qy); fit_free(f); return E_NUM; }
-  /* column 0 the constant (or dropped), then the variables */
+  xm = (double *)calloc((size_t)p + 1, sizeof(double));
+  if (!q || !R || !qy || !f->b || !f->se || !f->drop || !xm) { free(q); free(R); free(qy); free(xm); fit_free(f); return E_NUM; }
+  /* the variables' means (with a constant), and the columns that are constant */
+  if (cnst)
+    for (j = 1; j < p; j++) {
+      int same = 1;
+      for (i = 0; i < n; i++) {
+        xm[j] += g->x[i * g->k + j - 1];
+        if (g->x[i * g->k + j - 1] != g->x[j - 1]) same = 0;
+      }
+      xm[j] /= n;
+      if (same) f->drop[j] = 1;
+    }
+  /* column 0 the constant (or dropped), then the variables (centred with a constant) */
   for (i = 0; i < n; i++) {
     q[i * p] = cnst ? 1 : 0;
-    for (j = 1; j < p; j++) q[i * p + j] = g->x[i * g->k + j - 1];
+    for (j = 1; j < p; j++) q[i * p + j] = g->x[i * g->k + j - 1] - xm[j];
   }
   if (!cnst) f->drop[0] = 1;
   for (j = 0; j < p; j++) {
@@ -1120,7 +1202,7 @@ static int reg_fit(const Reg *g, int cnst, Fit *f)
       }
     for (i = 0; i < n; i++) nrm += q[i * p + j] * q[i * p + j];
     nrm = sqrt(nrm);
-    if (norm0 == 0 || nrm <= 1e-11 * norm0) { f->drop[j] = 1; continue; }
+    if (norm0 == 0 || nrm <= 1e-6 * norm0) { f->drop[j] = 1; continue; }
     R[j * p + j] = nrm;
     for (i = 0; i < n; i++) q[i * p + j] /= nrm;
   }
@@ -1136,6 +1218,8 @@ static int reg_fit(const Reg *g, int cnst, Fit *f)
     for (l = j + 1; l < p; l++) if (!f->drop[l]) s -= R[j * p + l] * f->b[l];
     f->b[j] = s / R[j * p + j];
   }
+  /* back from the centred variables: the constant less the slopes times the means */
+  if (cnst) { for (j = 1; j < p; j++) if (!f->drop[j]) f->b[0] -= f->b[j] * xm[j]; }
   /* the sums of squares */
   for (i = 0; i < n; i++) ym += g->y[i];
   ym /= n;
@@ -1157,7 +1241,7 @@ static int reg_fit(const Reg *g, int cnst, Fit *f)
   /* standard errors: sigma^2 times the diagonal of (R'R)^-1, the row sums of squares of R^-1 */
   if (f->df > 0) {
     double *ri = (double *)calloc((size_t)(p * p) + 1, sizeof(double)), s2 = f->ssres / f->df;
-    if (!ri) { free(q); free(R); free(qy); fit_free(f); return E_NUM; }
+    if (!ri) { free(q); free(R); free(qy); free(xm); fit_free(f); return E_NUM; }
     for (j = 0; j < p; j++) {
       if (f->drop[j]) continue;
       ri[j * p + j] = 1 / R[j * p + j];
@@ -1174,9 +1258,25 @@ static int reg_fit(const Reg *g, int cnst, Fit *f)
       for (j = l; j < p; j++) if (!f->drop[j]) s += ri[l * p + j] * ri[l * p + j];
       f->se[l] = sqrt(s * s2);
     }
+    /* the constant's error from the centred fit's: var(b0) = var(b0c) - 2 xm'cov(b0c, b) + xm'cov(b) xm,
+       the covariances being s2 (R'R)^-1 = s2 Ri Ri' */
+    if (cnst) {
+      double v = 0; long m;
+      for (j = 0; j < p; j++) {
+        double wj = j == 0 ? 1 : -xm[j];
+        if (f->drop[j]) continue;
+        for (l = 0; l < p; l++) {
+          double wl = l == 0 ? 1 : -xm[l], c = 0;
+          if (f->drop[l]) continue;
+          for (m = (j > l ? j : l); m < p; m++) if (!f->drop[m]) c += ri[j * p + m] * ri[l * p + m];
+          v += wj * wl * c;
+        }
+      }
+      f->se[0] = sqrt((v > 0 ? v : 0) * s2);
+    }
     free(ri);
   }
-  free(q); free(R); free(qy);
+  free(q); free(R); free(qy); free(xm);
   return 0;
 }
 static Value linest_impl(Ctx *cx, Value *a, int n, int lg)
@@ -1590,6 +1690,15 @@ static Value f_usdollar(Ctx *cx, Value *a, int n)
   return func_table[id].fn(cx, a, n);
 }
 
+/* ------------------------------------------------------------------ ECMA.CEILING: CEILING by its ECMA-376 name
+   (a legacy name Excel still evaluates, stored as _xlfn.ECMA.CEILING; GridCraft has it as CEILING too) */
+static Value f_ecma_ceiling(Ctx *cx, Value *a, int n)
+{
+  int id = func_lookup("CEILING");
+  if (id < 0) return val_err(E_NAME);
+  return func_table[id].fn(cx, a, n);
+}
+
 /* ================================================================== the table, in name order */
 #define X FF_XLFN
 const FuncDef func_stat_defs[] = {
@@ -1617,6 +1726,7 @@ const FuncDef func_stat_defs[] = {
   { "COVARIANCE.S", 2, 2, X, f_covariance_s },
   { "CRITBINOM", 3, 3, 0, f_binom_inv },
   { "DEVSQ", 1, 255, 0, f_devsq },
+  { "ECMA.CEILING", 2, 2, X, f_ecma_ceiling },
   { "EXPON.DIST", 3, 3, X, f_expon_dist },
   { "EXPONDIST", 3, 3, 0, f_expon_dist },
   { "F.DIST", 4, 4, X, f_f_dist },

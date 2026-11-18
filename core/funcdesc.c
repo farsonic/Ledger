@@ -152,6 +152,7 @@ const FuncDesc func_descs[] = {
   { "DURATION", "settlement, maturity, coupon, yld, frequency, [basis]", "The Macaulay duration of a bond, in years.", FC_FIN },
   { "DVAR", "database, field, criteria", "The sample variance of a field over the matching records.", FC_DB },
   { "DVARP", "database, field, criteria", "The population variance of a field over the matching records.", FC_DB },
+  { "ECMA.CEILING", "number, significance", "Rounds up to a multiple of significance (CEILING by its ECMA-376 name).", FC_COMPAT },
   { "EDATE", "start, months", "The date months before or after.", FC_DATE },
   { "EFFECT", "nominal_rate, npery", "The effective annual interest rate.", FC_FIN },
   { "ENCODEURL", "text", "Text with the characters a URL can't hold percent-encoded.", FC_WEB },

@@ -66,6 +66,7 @@ static int base_places(Ctx *cx, Value *a, int n, int i, int *places)
   int e;
   *places = 0;
   if (!HAS(i)) return 0;
+  if (a[i].t == V_BOOL) return E_VALUE;   /* (Excel: TRUE or FALSE as places is #VALUE!) */
   if ((e = arg_num(cx, &a[i], &p))) return e;
   p = floor(p);
   if (p < 1 || p > 10) return E_NUM;
@@ -193,6 +194,7 @@ static Value bitshift(Ctx *cx, Value *a, int left)
   int e;
   if ((e = bit_arg(cx, &a[0], &x)) || (e = arg_num(cx, &a[1], &s))) return val_err(e);
   s = s < 0 ? ceil(s) : floor(s);
+  if (x == 0) return val_num(0);   /* (Excel: 0 shifted any distance stays 0) */
   if (fabs(s) > 53) return val_err(E_NUM);
   if (!left) s = -s;
   r = s >= 0 ? x * ipow(2.0, (int)s) : floor(x / ipow(2.0, (int)-s));
@@ -654,7 +656,16 @@ static Value cplx1(Ctx *cx, Value *a, int op)
   if ((e = cplx_arg(cx, &a[0], &z, &sf))) return val_err(e);
   one.re = 1; one.im = 0;
   switch (op) {
-  case CF_SQRT: { double m = sqrt(cx_abs(z)), t = atan2(z.im, z.re) / 2; r.re = m * cos(t); r.im = m * sin(t); break; }
+  case CF_SQRT: {
+    /* Excel's polar route, as GridCraft has it: IMSQRT("-4") is 1.22514845490862E-16+2i. Excel's cosine
+       reduces with a 64-bit pi, PI/2 + 2.508E-20, which shows as the stray real part; a -0 imaginary
+       part counts as +0, so the angle stays +pi */
+    double im = z.im == 0 ? 0.0 : z.im, th, m = sqrt(cx_abs(z)), h;
+    if (z.re == 0) th = im == 0 ? 0 : im < 0 ? -1.5707963267948966 : 1.5707963267948966;
+    else if (z.re > 0) th = atan(im / z.re);
+    else th = atan(im / z.re) + (im < 0 ? -3.141592653589793 : 3.141592653589793);
+    h = th / 2;
+    r.re = m * (cos(h) + 2.50827880633e-20 * fabs(sin(h))); r.im = m * sin(h); break; }
   case CF_EXP: r = cx_exp(z); break;
   case CF_LN: case CF_LOG10: case CF_LOG2: {
     double d = op == CF_LN ? 1 : op == CF_LOG10 ? log(10.0) : log(2.0);

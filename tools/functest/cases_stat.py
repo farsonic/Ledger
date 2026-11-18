@@ -17,7 +17,7 @@ T16 = [[i] for i in range(1, 17)]
 # functions new since Excel 2007: files write them with _xlfn.
 XLFN = {'BETA.DIST', 'BETA.INV', 'BINOM.DIST', 'BINOM.DIST.RANGE', 'BINOM.INV', 'CHISQ.DIST', 'CHISQ.DIST.RT', 'CHISQ.INV',
         'CHISQ.INV.RT', 'CHISQ.TEST', 'CONFIDENCE.NORM', 'CONFIDENCE.T', 'COVARIANCE.P', 'COVARIANCE.S', 'EXPON.DIST',
-        'F.DIST', 'F.DIST.RT', 'F.INV', 'F.INV.RT', 'F.TEST', 'FORECAST.ETS', 'FORECAST.ETS.CONFINT',
+        'ECMA.CEILING', 'F.DIST', 'F.DIST.RT', 'F.INV', 'F.INV.RT', 'F.TEST', 'FORECAST.ETS', 'FORECAST.ETS.CONFINT',
         'FORECAST.ETS.SEASONALITY', 'FORECAST.ETS.STAT', 'FORECAST.LINEAR', 'GAMMA', 'GAMMA.DIST', 'GAMMA.INV',
         'GAMMALN.PRECISE', 'GAUSS', 'HYPGEOM.DIST', 'LOGNORM.DIST', 'LOGNORM.INV', 'MODE.MULT', 'NEGBINOM.DIST',
         'NORM.DIST', 'NORM.INV', 'NORM.S.DIST', 'NORM.S.INV', 'PERCENTRANK.EXC', 'PERCENTRANK.INC', 'PERMUTATIONA', 'PHI',
@@ -155,4 +155,21 @@ C = [
  ('FORECAST.ETS.STAT', [LIN12, T12, '8']), ('FORECAST.ETS.STAT', [LIN12, [[2 * i] for i in range(12)], '8']), ('FORECAST.ETS.STAT', [LIN12, T12, '9']),
  ('FORECAST.ETS.CONFINT', ['13', LIN12, T12, '1']),
  ('USDOLLAR', ['1234.567']), ('USDOLLAR', ['1234.567', '-2']),
+]
+# GridCraft 4c388df's fixes (Excel's answers): ECMA.CEILING; endpoints and zero degrees; trial limit;
+# Loader's masses far out; t density at huge degrees; PERCENTRANK's significance; F at 1E10 degrees;
+# LINEST keeping a predictor that varies little next to a large offset
+C += [
+ ('ECMA.CEILING', ['2.3', '1']), ('ECMA.CEILING', ['-2.3', '-1']), ('ECMA.CEILING', ['7', '5']), ('ECMA.CEILING', ['2.31', '0.05']),
+ ('HARMEAN', [[['"a"'], ['"b"']]]),
+ ('T.DIST', ['1', '0.5', 'FALSE']), ('T.DIST', ['1', '0.5', 'TRUE']), ('T.INV', ['0', '5']), ('T.DIST', ['0.5', '10000000000', 'FALSE']),
+ ('T.DIST', ['0.5', '100000000', 'FALSE']),
+ ('GAMMA.DIST', ['0', '1', '2', 'FALSE']), ('GAMMA.DIST', ['0', '2', '2', 'FALSE']), ('WEIBULL.DIST', ['0', '0.5', '1', 'FALSE']),
+ ('WEIBULL.DIST', ['0', '1', '2', 'FALSE']), ('BETA.DIST', ['0', '1', '2', 'FALSE']), ('BETA.DIST', ['1', '2', '1', 'FALSE']),
+ ('BINOM.DIST', ['1', '2147483647', '0.5', 'FALSE']), ('BINOM.DIST', ['5000000', '10000000', '0.5', 'FALSE']),
+ ('BINOM.DIST', ['500', '1000', '0.5', 'FALSE']), ('POISSON.DIST', ['1000', '1000', 'FALSE']), ('POISSON.DIST', ['3', '2.5', 'FALSE']),
+ ('PERCENTRANK', [[[1], [2], [3]], '2.5', '309']), ('PERCENTRANK', [[[1], [2], [3], [7]], '2.5', '20']),
+ ('F.DIST', ['1', '10000000000', '10000000000', 'TRUE']),
+ ('INDEX(LINEST(@),1)', [[[1], [3], [4.5]], [[10000000000000], [10000000000001], [10000000000002]]]),
+ ('INDEX(LINEST(@,TRUE,TRUE),2,2)', [[[1], [3], [4.5]], [[1], [2], [4]]]),
 ]

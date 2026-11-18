@@ -102,3 +102,10 @@ C += [
  ('N', ['INDEX(_xlfn.MUNIT(3),2,2)']), ('N', ['INDEX(_xlfn.MUNIT(3),3,1)']), ('N', ['ROWS(_xlfn.MUNIT(4))']), ('N', ['_xlfn.MUNIT(0)']),
  ('N', ['SUMPRODUCT(MMULT({1,2;3,4},{5,6;7,8}))']), ('N', ['SUMPRODUCT(MINVERSE({2,0;0,4}))']),
 ]
+# GridCraft 4c388df's fixes (Excel's answers): IMSQRT by Excel's polar route, 0 shifted any distance,
+# TRUE as places
+C += [
+ ('IMSQRT', ['"-4"']), ('IMSQRT', ['"i"']), ('IMSQRT', ['"-5+12i"']), ('IMSQRT', ['"-1+1E-10i"']),
+ (x('BITLSHIFT'), ['0', '60']), (x('BITRSHIFT'), ['0', '-60']), (x('BITLSHIFT'), ['1', '60']),
+ ('DEC2BIN', ['1', 'TRUE']), ('DEC2HEX', ['-1', 'TRUE']),
+]

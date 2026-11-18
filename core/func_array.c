@@ -1527,7 +1527,7 @@ const int func_array_count = (int)(sizeof func_array_defs / sizeof func_array_de
 const char *const func_lift_spec[] = {
   /* maths and trigonometry */
   "ABS s", "ACOS s", "ACOSH s", "ACOT s", "ACOTH s", "ARABIC s", "ASIN s", "ASINH s", "ATAN s", "ATAN2 s", "ATANH s", "BASE s",
-  "CEILING s", "CEILING.MATH s", "CEILING.PRECISE s", "COMBIN s", "COMBINA s", "COS s", "COSH s", "COT s", "COTH s", "CSC s", "CSCH s",
+  "CEILING s", "ECMA.CEILING s", "CEILING.MATH s", "CEILING.PRECISE s", "COMBIN s", "COMBINA s", "COS s", "COSH s", "COT s", "COTH s", "CSC s", "CSCH s",
   "DECIMAL s", "DEGREES s", "EVEN s", "EXP s", "FACT s", "FACTDOUBLE s", "FLOOR s", "FLOOR.MATH s", "FLOOR.PRECISE s", "INT s",
   "ISO.CEILING s", "LN s", "LOG s", "LOG10 s", "MOD s", "MROUND s", "ODD s", "PERMUT s", "PERMUTATIONA s", "POWER s", "QUOTIENT s",
   "RADIANS s", "ROMAN s", "ROUND s", "ROUNDDOWN s", "ROUNDUP s", "SEC s", "SECH s", "SIGN s", "SIN s", "SINH s", "SQRT s", "SQRTPI s",

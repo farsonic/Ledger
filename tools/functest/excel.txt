@@ -391,3 +391,37 @@ FORECAST.ETS.CONFINT#1	the same, from cells
 DGET#1	Excel documents #NUM! for more than one matching record; LibreOffice #VALUE!
 DSTDEV#2	Excel: #DIV/0! for a single matching record, as STDEV; LibreOffice #NUM!
 DSUM#11	Excel documents that text in criteria matches entries beginning with it ("App" finds Apple); LibreOffice matches whole cells
+=_xlfn.GAMMA.DIST(0,1,2,FALSE)	Excel: the density at 0 is #NUM! for a shape of 1 or less (GridCraft G713); LibreOffice gives 1/scale
+=_xlfn.WEIBULL.DIST(0,1,2,FALSE)	Excel: the density at 0 is 0 whatever the shape (GridCraft G714); LibreOffice gives 1/scale for shape 1
+=_xlfn.WEIBULL.DIST(0,0.5,1,FALSE)	Excel: the density at 0 is 0 whatever the shape (GridCraft G714); LibreOffice #NUM!
+=_xlfn.ECMA.CEILING(2.3,1)	Excel still works out ECMA.CEILING, as CEILING; LibreOffice doesn't know the name
+=_xlfn.ECMA.CEILING(-2.3,-1)	the same
+=_xlfn.ECMA.CEILING(7,5)	the same
+=_xlfn.ECMA.CEILING(2.31,0.05)	the same
+=HARMEAN({"a";"b"})	Excel: no numbers at all is #N/A (GridCraft G719); LibreOffice #NUM!
+=_xlfn.T.DIST(1,0.5,FALSE)	Excel: degrees that truncate to 0 are #DIV/0! for the density (#NUM! cumulative, G710); LibreOffice #VALUE!
+=_xlfn.T.DIST(1,0.5,TRUE)	Excel: degrees that truncate to 0 are #NUM! cumulative; LibreOffice #VALUE!
+=_xlfn.T.INV(0,5)	Excel: a probability of 0 is #DIV/0! (G712); LibreOffice #VALUE!
+=_xlfn.T.DIST(0.5,10000000000,FALSE)	the exact density is 0.3520653267516471 (Excel agrees, GridCraft checked it at 1E10 degrees); LibreOffice loses digits
+=_xlfn.BETA.DIST(0,1,2,FALSE)	Excel: the density at an end is #NUM! when that end's shape is 1 or less (G718); LibreOffice gives the limit
+=_xlfn.BETA.DIST(1,2,1,FALSE)	the same at the upper end
+=_xlfn.BINOM.DIST(1,2147483647,0.5,FALSE)	Excel: more than 2,147,483,646 trials is #NUM! (G717); LibreOffice works it out
+=PERCENTRANK({1;2;3},2.5,309)	Excel: 10^significance overflows from 309, #DIV/0!; LibreOffice #NUM!
+=_xlfn.F.DIST(1,10000000000,10000000000,TRUE)	Excel takes degrees up to 1E10 (G709); LibreOffice #VALUE! from 1E10
+=IMSQRT("i")	Excel's polar route (a 64-bit pi in its cosine) gives ...547i in the last digit (GridCraft checked 79 inputs in Excel 16)
+=IMSQRT("-1+1E-10i")	Excel's polar route keeps the small real part; LibreOffice rounds it away
+=_xlfn.BITLSHIFT(1,60)	Excel: #NUM! when the result passes 2^48-1 or the shift passes 53; LibreOffice shifts anyway
+=DEC2BIN(1,TRUE)	Excel: TRUE or FALSE as places is #VALUE!; LibreOffice takes TRUE as 1
+=DEC2HEX(-1,TRUE)	the same
+=FIXED(1.005,20)	Excel shows 15 significant digits and then zeros; LibreOffice refuses more than 15 decimals
+=FIXED(1.1,16)	the same
+=FIXED(1E192,0)	Excel: FIXED's text is at most 255 characters (GridCraft G707); LibreOffice writes it all
+=DOLLAR(1E190,0)	Excel: DOLLAR's text is at most 254 characters (G707); LibreOffice writes it all
+=DOLLAR(-0.0001,0)	Excel keeps the sign of a negative amount that rounds to 0 at 0 or more places (G708): ($0)
+=LOWER("İ")	Excel maps one character to one (Windows Excel 16, LCID 1033): İ is i
+=PROPER("İSTANBUL")	the same: Istanbul
+=UPPER("Straße")	Excel keeps ß (one character to one); LibreOffice gives the capital ẞ
+=_xlfn.UNICHAR(65534)	Excel: the noncharacters U+FDD0-FDEF and U+xFFFE/xFFFF are #N/A; LibreOffice writes them
+=_xlfn.UNICHAR(64976)	the same (U+FDD0)
+=_xlfn.UNICHAR(131071)	the same (U+1FFFF)
+=MOD(1125900000000,1)	Excel 16: #NUM! when number/divisor is 1.1259E12 or more; LibreOffice works it out
