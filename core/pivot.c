@@ -1477,6 +1477,79 @@ int book_pivot_refresh(Book *b, int sheet, int pi, const char **why)
   release(b, m);
   return ok;
 }
+/* GETPIVOTDATA (see pivot.h): the report worked out again (not read from its cells, which may be
+   stale while the sheet recalculates), then walked down by the field and item pairs */
+static int pair_field(const LPivot *p, int area, const char *name)
+{
+  int i, n = area == PA_ROWS ? p->nrows : p->ncols;
+  char cap[256];
+  for (i = 0; i < n; i++) {
+    pivot_field_caption(p, area, i, cap, sizeof cap);
+    if (str_ieq(cap, name)) return i;
+  }
+  for (i = 0; i < n; i++) if (str_ieq((area == PA_ROWS ? p->rows : p->cols)[i].name, name)) return i;
+  return -1;
+}
+static int item_matches(const Item *it, const PivotItemArg *a)
+{
+  if (!it) return 0;
+  if (a->isnum && it->v.t == V_NUM && it->v.n == a->num) return 1;
+  return str_ieq(it->label, a->text);
+}
+Value pivot_get_data(Book *b, int sheet, i32 r, i32 c, const char *datafield, const PivotItemArg *pairs, int npairs)
+{
+  LPivot *p = pivot_at(b, sheet, r, c);
+  Work w;
+  const char *why = "";
+  int v = -1, i, k, rn = 0, cn = 0, kr = 0, kc = 0;
+  int ri[64], ci[64];             /* the pair given for each row and column field, -1 none */
+  char cap[300];
+  Value res = val_err(E_REF);
+  if (!p || npairs > 126) return val_err(E_REF);
+  for (i = 0; i < p->nvals && v < 0; i++) {
+    pivot_caption(&p->vals[i], cap, sizeof cap);
+    if (str_ieq(cap, datafield)) v = i;
+  }
+  for (i = 0; i < p->nvals && v < 0; i++) if (str_ieq(p->vals[i].name, datafield)) v = i;
+  if (v < 0 || p->nrows > 64 || p->ncols > 64) return val_err(E_REF);
+  for (i = 0; i < 64; i++) ri[i] = ci[i] = -1;
+  for (k = 0; k < npairs; k++) {
+    int f = pair_field(p, PA_ROWS, pairs[k].field);
+    if (f >= 0) { ri[f] = k; continue; }
+    if ((f = pair_field(p, PA_COLS, pairs[k].field)) >= 0) { ci[f] = k; continue; }
+    return val_err(E_REF);       /* (a field the report doesn't show) */
+  }
+  /* only what the report shows: the fields named from the outermost in, without gaps */
+  while (kr < p->nrows && ri[kr] >= 0) kr++;
+  while (kc < p->ncols && ci[kc] >= 0) kc++;
+  for (i = kr; i < p->nrows; i++) if (ri[i] >= 0) return val_err(E_REF);
+  for (i = kc; i < p->ncols; i++) if (ci[i] >= 0) return val_err(E_REF);
+  if ((kr == 0 && p->nrows && !p->grandcols) || (kc == 0 && p->ncols && !p->grandrows)) return val_err(E_REF);
+  if ((kr > 0 && kr < p->nrows && !p->subtotals) || (kc > 0 && kc < p->ncols && (!p->subtotals || p->ncols < 2))) return val_err(E_REF);
+  memset(&w, 0, sizeof w);
+  w.b = b; w.p = p;
+  if (work_out(&w, &why)) {
+    int ok = 1;
+    for (i = 0; i < kr && ok; i++) {
+      int ch;
+      for (ch = first_child(&w.rt, rn); ch >= 0; ch = w.rnext[ch]) if (item_matches(node_item(&w, &w.rt, w.rf, ch), &pairs[ri[i]])) break;
+      if (ch < 0) ok = 0; else rn = ch;
+    }
+    for (i = 0; i < kc && ok; i++) {
+      int ch;
+      for (ch = first_child(&w.ct, cn); ch >= 0; ch = next_sibling(&w.ct, ch)) if (item_matches(node_item(&w, &w.ct, w.cf, ch), &pairs[ci[i]])) break;
+      if (ch < 0) ok = 0; else cn = ch;
+    }
+    if (ok) {
+      ColE ce;
+      ce.node = cn; ce.v = v; ce.kind = (u8)(kc == p->ncols ? 0 : kc ? 1 : 2);
+      res = cell_of(&w, rn, &ce);
+      if (res.t == V_EMPTY) res = val_err(E_REF);
+    }
+  }
+  work_free(&w);
+  return res;
+}
 void book_pivots_refresh_all(Book *b)
 {
   int s, i;

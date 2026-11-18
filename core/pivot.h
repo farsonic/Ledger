@@ -145,6 +145,15 @@ LPivot *pivot_by_link(Book *b, const char *link, int *sheet);
    the pivot has no values and rows or columns. An undo step */
 int     book_pivot_chart_add(Book *b, int sheet, int pi, int kind, const char **why);
 
+/* ------------------------------------------------------------------ GETPIVOTDATA */
+/* an item named in GETPIVOTDATA: its text, and its number when given as one (a date's serial) */
+typedef struct { const char *field, *text; double num; int isnum; } PivotItemArg;
+/* the value data field (its caption, "Sum of Sales", or its source field, "Sales") of the pivot
+   table holding cell r, c shows where the given row and column fields' items meet: the grand total
+   with no pairs, a subtotal when only the outer fields are named. #REF! for anything the report
+   doesn't show (a field not in Rows or Columns, an item it hasn't, a subtotal that's turned off) */
+Value   pivot_get_data(Book *b, int sheet, i32 r, i32 c, const char *datafield, const PivotItemArg *pairs, int npairs);
+
 /* ------------------------------------------------------------------ editing (each an undo step) */
 /* a new, empty pivot table of source with its report at sheet r, c; its index in the sheet's
    pivots[], -1 if the source doesn't resolve */

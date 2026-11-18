@@ -75,3 +75,5 @@ C += [
  ('MOD', ['1125900000000', '1']), ('MOD', ['1125800000000', '7']),
  ('YEARFRAC', ['DATE(2021,2,28)', 'DATE(2021,3,31)', '0']), ('YEARFRAC', ['DATE(2021,3,31)', 'DATE(2021,2,28)']),
 ]
+# GETPIVOTDATA (GridCraft #284): outside a pivot table it is #REF! (tests/synctest.c checks it on one)
+C += [('GETPIVOTDATA', ['"Sales"', 'A1'])]

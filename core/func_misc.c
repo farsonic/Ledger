@@ -8,6 +8,7 @@
  */
 #include "calc.h"
 #include "xml.h"
+#include "pivot.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -1473,6 +1474,38 @@ static Value f_euroconvert(Ctx *cx, Value *a, int n)
 
 /* ------------------------------------------------------------------ the table (name order) */
 #define X FF_XLFN
+/* ------------------------------------------------------------------ GETPIVOTDATA(data_field, pivot_table, [field1, item1], ...) */
+/* (volatile: the report is worked out from its source, which the formula doesn't name) */
+static Value f_getpivotdata(Ctx *cx, Value *a, int n)
+{
+  PivotItemArg pr[126];
+  char *df = NULL, *txt[252];
+  int e, k, np = 0, nt = 0;
+  Value r;
+  if (a[1].t == V_ERR) return val_err(a[1].e);
+  if (a[1].t != V_REF || (n - 2) % 2) return val_err(E_REF);
+  if ((e = arg_str(cx, &a[0], &df))) return val_err(e);
+  for (k = 2; k + 1 < n && np < 126; k += 2) {
+    const Value *it = &a[k + 1];
+    char *f, *t;
+    if (it->t == V_REF) it = ref_cell(cx, it->sheet, it->r1, it->c1);
+    if ((e = arg_str(cx, &a[k], &f))) goto fail;
+    txt[nt++] = f;
+    if ((e = arg_str(cx, it, &t))) goto fail;
+    txt[nt++] = t;
+    pr[np].field = f; pr[np].text = t; pr[np].isnum = it->t == V_NUM; pr[np].num = it->t == V_NUM ? it->n : 0;
+    np++;
+  }
+  r = pivot_get_data(cx->b, a[1].sheet, a[1].r1, a[1].c1, df, pr, np);
+  for (k = 0; k < nt; k++) free(txt[k]);
+  free(df);
+  return r;
+fail:
+  for (k = 0; k < nt; k++) free(txt[k]);
+  free(df);
+  return val_err(e);
+}
+
 #define V FF_VOLATILE
 const FuncDef func_misc_defs[] = {
   { "ARRAYTOTEXT", 1, 2, X, f_arraytotext }, { "ASC", 1, 1, 0, f_asc }, { "BAHTTEXT", 1, 1, X, f_bahttext },
@@ -1480,7 +1513,7 @@ const FuncDef func_misc_defs[] = {
   { "CUBERANKEDMEMBER", 3, 4, 0, f_cube }, { "CUBESET", 2, 5, 0, f_cube }, { "CUBESETCOUNT", 1, 1, 0, f_cube },
   { "CUBEVALUE", 1, 255, 0, f_cube }, { "DAYS360", 2, 3, 0, f_days360 }, { "DBCS", 1, 1, X, f_dbcs },
   { "ENCODEURL", 1, 1, X, f_encodeurl }, { "EUROCONVERT", 3, 5, 0, f_euroconvert }, { "FILTERXML", 2, 2, X, f_filterxml },
-  { "FINDB", 2, 3, 0, f_findb }, { "INFO", 1, 1, V, f_info }, { "ISOWEEKNUM", 1, 1, X, f_isoweeknum },
+  { "FINDB", 2, 3, 0, f_findb }, { "GETPIVOTDATA", 2, 254, V, f_getpivotdata }, { "INFO", 1, 1, V, f_info }, { "ISOWEEKNUM", 1, 1, X, f_isoweeknum },
   { "JIS", 1, 1, 0, f_dbcs }, { "LEFTB", 1, 2, 0, f_leftb }, { "LENB", 1, 1, 0, f_lenb }, { "MIDB", 3, 3, 0, f_midb },
   { "NETWORKDAYS.INTL", 2, 4, X, f_networkdaysintl }, { "PHONETIC", 1, 1, 0, f_phonetic },
   { "REGEXEXTRACT", 2, 4, X, f_regexextract }, { "REGEXREPLACE", 3, 5, X, f_regexreplace }, { "REGEXTEST", 2, 3, X, f_regextest },

@@ -211,6 +211,7 @@ const FuncDesc func_descs[] = {
   { "GCD", "number1, ...", "The greatest common divisor.", FC_MATH },
   { "GEOMEAN", "number1, ...", "The geometric mean.", FC_STAT },
   { "GESTEP", "number, [step]", "1 if a number is at least the step, else 0.", FC_ENG },
+  { "GETPIVOTDATA", "data_field, pivot_table, [field1, item1], ...", "The value a PivotTable shows for a data field where the given fields' items meet.", FC_LOOKUP },
   { "GROUPBY", "row_fields, values, function, [field_headers], [total_depth], [sort_order], [filter_array]", "Groups rows by their fields and aggregates each group's values, with a total.", FC_LOOKUP },
   { "GROWTH", "known_y's, [known_x's], [new_x's], [const]", "Values on the exponential curve fitted to known points (an array).", FC_STAT },
   { "HARMEAN", "number1, ...", "The harmonic mean.", FC_STAT },

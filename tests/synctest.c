@@ -53,7 +53,38 @@ static void sync_functions(void)
   book_free(b);
 }
 
+/* GETPIVOTDATA on the sales data's pivot table: Region in Rows, Product in Columns, Sum of Sales */
+static void sync_getpivotdata(void)
+{
+  Book *b = book_new();
+  LPivot np;
+  int sh;
+  sales_data(b);
+  sh = book_add_sheet(b, "Pivot", -1);
+  book_pivot_add(b, sh, "Sheet1!$A$1:$D$7", 2, 0);
+  pivot_copy1(&np, &b->sh[sh]->pivots[0]);
+  pivot_def_add(&np, PA_ROWS, "Region", 0);
+  pivot_def_add(&np, PA_COLS, "Product", 0);
+  pivot_def_add(&np, PA_VALUES, "Sales", PF_SUM);
+  book_pivot_set(b, sh, 0, &np);
+  pivot_free1(&np);
+  ok("GETPIVOTDATA grand total", evn(b, "GETPIVOTDATA(\"Sales\",Pivot!A3)") == 625 && evn(b, "GETPIVOTDATA(\"Sum of Sales\",Pivot!C5)") == 625);
+  ok("GETPIVOTDATA one item", evn(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"Region\",\"East\")") == 180 && evn(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"product\",\"Apples\")") == 325);
+  ok("GETPIVOTDATA where two meet", evn(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"Region\",\"West\",\"Product\",\"Pears\")") == 250 &&
+     evn(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"Product\",\"Apples\",\"Region\",\"East\")") == 130);
+  ok("GETPIVOTDATA #REF!", ev_err(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"Region\",\"South\")", E_REF) && ev_err(b, "GETPIVOTDATA(\"Units\",Pivot!A3)", E_REF) &&
+     ev_err(b, "GETPIVOTDATA(\"Sales\",Sheet1!A1)", E_REF) && ev_err(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"Units\",\"3\")", E_REF) &&
+     ev_err(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"North\",\"Pears\")", E_REF));
+  ok("GETPIVOTDATA an item missing where two meet", ev_err(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"Region\",\"North\",\"Product\",\"Pears\")", E_REF));
+  /* follows a change in the source (volatile) */
+  put(b, "Sheet1!C2", "200");
+  book_recalc(b);
+  ok("GETPIVOTDATA follows the source", evn(b, "GETPIVOTDATA(\"Sales\",Pivot!A3,\"Region\",\"East\")") == 280);
+  book_free(b);
+}
+
 static void sync_tests(void)
 {
   sync_functions();
+  sync_getpivotdata();
 }
