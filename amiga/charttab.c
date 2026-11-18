@@ -351,6 +351,18 @@ static void insert_wordart(int style)
   refresh_all();
   edit_text();
 }
+/* Insert > Equation: its LaTeX asked for, then the equation at the active cell (equation.c) */
+static void insert_equation(void)
+{
+  Sheet *s = cur_sheet();
+  char t[400] = "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}", u[800];
+  int i;
+  if (!ask_string("Equation", "LaTeX:", t, sizeof t)) return;
+  latin1_utf8(t, u, sizeof u);
+  if ((i = book_equation_add(book, cur_index(), u, sheet_col_px(s, s->cur_c), sheet_row_px(s, s->cur_r))) < 0) { ask("OK", "%s", tr("The sheet is protected: unprotect it to insert an equation.")); return; }
+  ov_select(OV(), i);
+  refresh_all();
+}
 /* ------------------------------------------------------------------ form controls (formctl.c) */
 /* Format Control: the value, its limits and the linked cell */
 static void dlg_control(void)
@@ -742,7 +754,8 @@ static void edit_text(void)
   char t[400], u[800];
   if (!o || o->kind != OB_SHAPE || o->shape == SK_LINE || o->shape == SK_ARROW || o->shape == SK_INK || o->shape == SK_ICON) return;
   utf8_latin(o->text ? o->text : "", t, sizeof t);
-  if (!ask_string(o->wordart ? "WordArt" : o->shape == SK_TEXTBOX ? "Text Box" : "Shape Text", "Text:", t, sizeof t)) return;
+  if (o->eq) { if (!ask_string("Equation", "LaTeX:", t, sizeof t)) return; }
+  else if (!ask_string(o->wordart ? "WordArt" : o->shape == SK_TEXTBOX ? "Text Box" : "Shape Text", "Text:", t, sizeof t)) return;
   latin1_utf8(t, u, sizeof u);
   begin();
   free(o->text); o->text = u[0] ? str_dup(u) : NULL;
@@ -1112,6 +1125,7 @@ void chart_command(ULONG id)
   case ID_X_ELEMDD: ov_set_elem(ov, elem_of((int)v)); refresh_all(); break;
   case ID_X_FORMATSEL: if (o && o->kind == OB_CONTROL) dlg_control(); else dlg_format(); break;
   case ID_X_SPIN: insert_control(CT_SPIN); break;
+  case ID_X_EQUATION: insert_equation(); break;
   case ID_X_SCROLLBAR: insert_control(CT_SCROLL); break;
   case ID_X_CTLFORMAT: dlg_control(); break;
   case ID_X_FILLDD: case ID_X_OUTLINEDD: {

@@ -58,6 +58,10 @@ typedef struct {
   u8 ctl;                          /* CT_ */
   i32 cval, cmin, cmax, cinc, cpage;
   Formula *link;                   /* the cell it sets (a reference), or NULL */
+  /* SK_TEXTBOX with eq (equation.c): an equation, its text the LaTeX source; omml the Office Math a
+     file gave (kept while the source still reads the same), NULL none */
+  u8 eq;
+  char *omml;
 } DObj;
 
 /* a group of objects (Page Layout > Arrange > Group; a grpSp in the file): its members are the
@@ -246,6 +250,19 @@ typedef i32 (*TextWidthFn)(void *ctx, const char *utf8, int px, int bold);
 
 /* a form control (formctl.c) drawn in w x h pixels */
 int    control_render(Book *b, int sheet, const DObj *o, i32 w, i32 h, PrimList *out);
+
+/* ------------------------------------------------------------------ equations (equation.c) */
+/* Insert > Equation: an equation of LaTeX (NULL: the quadratic formula) at sheet pixel x, y; its
+   index or -1 (a protected sheet), an undo step */
+int    book_equation_add(Book *b, int sheet, const char *latex, i32 x, i32 y);
+/* drawn centred in w x h at px pixels to the em in color (FILL_ON | rgb) */
+int    eq_render(const char *latex, i32 w, i32 h, int px, u32 color, TextWidthFn tw, void *ctx, PrimList *out);
+void   eq_size(const char *latex, int px, TextWidthFn tw, void *ctx, i32 *w, i32 *h);
+/* Office Math (an m:oMathPara or m:oMath element) as LaTeX, and LaTeX as an m:oMathPara (malloc'd);
+   eq_latex_normal: LaTeX as Ledger writes it again (what its Office Math reads back as) */
+char  *eq_latex_from_omml(const char *xml, size_t len);
+char  *eq_omml_from_latex(const char *latex);
+char  *eq_latex_normal(const char *latex);
 
 /* ------------------------------------------------------------------ charts (chart.c) */
 Chart *chart_new(int kind);

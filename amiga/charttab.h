@@ -32,6 +32,7 @@ ULONG chart_ribbon_state(void);
   XP("WordArt"), XS("Classic", ID_X_WORDART0), XS("Midnight", ID_X_WORDART0 + 1), XS("Sunrise", ID_X_WORDART0 + 2), XS("Lagoon", ID_X_WORDART0 + 3), \
     XS("Ember", ID_X_WORDART0 + 4), XS("Mint Outline", ID_X_WORDART0 + 5), XS("Ink Stamp", ID_X_WORDART0 + 6), XS("Orchid", ID_X_WORDART0 + 7), \
     XS("Graphite", ID_X_WORDART0 + 8), XS("Lime Pop", ID_X_WORDART0 + 9), \
+  XI("Equation...", ID_X_EQUATION), \
   XP("Form Controls"), XS("Spin Button", ID_X_SPIN), XS("Scroll Bar", ID_X_SCROLLBAR), XS("Format Control...", ID_X_CTLFORMAT), \
   XBAR, \
   XI("Recommended Charts...", ID_X_RECCHART), XI("All Charts...", ID_X_ALLCHARTS), XP("Insert Chart"), XKINDS(ID_X_KIND0), \

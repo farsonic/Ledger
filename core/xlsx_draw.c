@@ -592,6 +592,40 @@ static void w_obj(Book *b, int si, DObj *ob, Buf *o, Buf *r, Buf *cbuf, ZipWrite
     buf_adds(o, "</xdr:spPr></xdr:pic>");
     sprintf(path, "xl/media/image%d.%s", *ni, ob->pictype == PIC_JPEG ? "jpeg" : "png");
     zip_add(w, path, ob->pic->data, ob->pic->len);
+  } else if (ob->eq) {
+    /* an equation, as Excel and GridCraft write it: the a14 choice a text box of Office Math, the
+       fallback the same box with the LaTeX as text (equation.c) */
+    char *om = NULL, *norm = eq_latex_normal(ob->text ? ob->text : "");
+    int g;
+    if (ob->omml) {
+      char *back = eq_latex_from_omml(ob->omml, strlen(ob->omml));
+      if (back && norm && !strcmp(back, norm)) om = str_dup(ob->omml);    /* unchanged: as the file had it */
+      free(back);
+    }
+    if (!om) om = eq_omml_from_latex(ob->text ? ob->text : "");
+    free(norm);
+    buf_adds(o, "<mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">"
+                "<mc:Choice xmlns:a14=\"http://schemas.microsoft.com/office/drawing/2010/main\" Requires=\"a14\">");
+    for (g = 0; g < 2; g++) {
+      if (g) buf_adds(o, "</mc:Choice><mc:Fallback>");
+      buf_adds(o, "<xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>"); cnvpr(o, ob);
+      buf_adds(o, "<xdr:cNvSpPr txBox=\"1\"/></xdr:nvSpPr><xdr:spPr>");
+      xfrm(o, "a", s, ob);
+      buf_adds(o, "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:noFill/></xdr:spPr>"
+                  "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\" wrap=\"none\" rtlCol=\"0\" anchor=\"ctr\"/><a:lstStyle/><a:p><a:pPr algn=\"ctr\"/>");
+      if (!g) {
+        buf_adds(o, "<a14:m xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\">");
+        if (om) buf_adds(o, om);
+        buf_printf(o, "</a14:m><a:endParaRPr lang=\"en-GB\" sz=\"%d\"/></a:p>", ob->fsize ? ob->fsize * 10 : 1100);
+      } else {
+        buf_printf(o, "<a:r><a:rPr lang=\"en-GB\" sz=\"%d\"/><a:t>", ob->fsize ? ob->fsize * 10 : 1100);
+        xesc(o, ob->text);
+        buf_adds(o, "</a:t></a:r></a:p>");
+      }
+      buf_adds(o, "</xdr:txBody></xdr:sp>");
+    }
+    buf_adds(o, "</mc:Fallback></mc:AlternateContent>");
+    free(om);
   } else {
     int conn = ob->shape == SK_LINE || ob->shape == SK_ARROW;
     buf_adds(o, conn ? "<xdr:cxnSp macro=\"\"><xdr:nvCxnSpPr>" : "<xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>");
@@ -1063,13 +1097,14 @@ typedef struct {
   u16 fsize; u8 bold, italic, halign, valign; u32 tcolor;
   int warp; u32 toutline, tshadow; u16 toutw;   /* WordArt's marker (textNoShape), the text's outline and shadow */
   int hasx; long xo, yo, xe, ye;    /* (in a group) its frame: a:off and a:ext in its group's child coordinates */
+  char *omml, *eqtex;               /* an equation (a14:m): its Office Math as the file has it, and as LaTeX */
 } RObj;
 /* the groups open while reading (grpSp): each one's id, its frame (off, ext) and child frame (chOff,
    chExt), and from them where its children go: pixel = p0 + (v - ch0) * k */
 typedef struct { u32 id; long off[2], ext[2], choff[2], chext[2]; double p0[2], ch0[2], k[2]; } RGrp;
 static void robj_reset(RObj *o)
 {
-  buf_free(&o->text); buf_free(&o->ink); free(o->descr);
+  buf_free(&o->text); buf_free(&o->ink); free(o->descr); free(o->omml); free(o->eqtex);
   memset(o, 0, sizeof *o);
   o->kind = -1;
   buf_init(&o->text); buf_init(&o->ink);
@@ -1152,6 +1187,15 @@ static DObj *finish_obj(Book *b, ZipReader *z, const XRel *rels, int nrels, int 
       ob->shape = (u8)o->shape;
       ob->fill = o->nofill ? 0 : o->fill;
       if (!o->custgeom && o->text.len) ob->text = str_dup(o->text.data);
+      if (o->eqtex) {
+        /* an equation: GridCraft's LaTeX when its description carries it, else the Office Math read */
+        const char *d = ob->descr;
+        free(ob->text);
+        ob->eq = 1; ob->shape = SK_TEXTBOX;
+        if (d && !strncmp(d, "gridcraft:latex:", 16) && strlen(d) > 33 && d[32] == ':') { ob->text = str_dup(d + 33); free(ob->descr); ob->descr = NULL; }
+        else ob->text = o->eqtex, o->eqtex = NULL;
+        ob->omml = o->omml; o->omml = NULL;
+      }
       ob->fsize = o->fsize; ob->bold = o->bold; ob->italic = o->italic; ob->halign = o->halign; ob->valign = o->valign; ob->tcolor = o->tcolor;
       ob->toutline = o->toutline; ob->toutw = o->toutw; ob->tshadow = o->tshadow;
     }
@@ -1228,7 +1272,20 @@ static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
         if (nm) snprintf(o.name, sizeof o.name, "%s", nm);
         if (ds && *ds) { free(o.descr); o.descr = str_dup(ds); }
       }
-      else if (!strcmp(n, "compatExt")) o.kind = -1;       /* Excel's mirror of a form control (formctl.c reads the control) */
+      else if (!strcmp(n, "compatExt")) o.kind = -1;
+      else if ((!strcmp(n, "oMathPara") || !strcmp(n, "oMath")) && o.kind == OB_SHAPE && !o.omml) {
+        /* an equation (equation.c): its Office Math kept as the file has it, and read as LaTeX */
+        size_t at = x.i;
+        while (at > 0 && x.s[at - 1] != '<') at--;
+        if (at > 0) at--;
+        xml_skip(&x);
+        if (x.i > at) {
+          o.omml = str_ndup(x.s + at, x.i - at);
+          o.eqtex = o.omml ? eq_latex_from_omml(o.omml, strlen(o.omml)) : NULL;
+        }
+        stk_pop(&st);
+        continue;
+      }       /* Excel's mirror of a form control (formctl.c reads the control) */
       else if (!strcmp(n, "cNvSpPr")) { const char *t = xml_attr(&x, "txBox"); if (t && atoi(t)) o.txbox = 1; }
       else if (!strcmp(n, "prstGeom")) {
         const char *p = xml_attr(&x, "prst");

@@ -174,8 +174,63 @@ static void gc2_python(void)
   py_scripts_free();
 }
 
+static i32 eq_tw(void *ctx, const char *s, int px, int bold) { (void)ctx; (void)bold; return (i32)strlen(s) * px / 2; }
+static void gc2_equation(void)
+{
+  Book *b = book_new(), *d;
+  char *om, *t;
+  int i;
+  u8 *x;
+  size_t len;
+  PrimList pl;
+  const char *q = "x = \\frac{-b \\pm \\sqrt{b^{2} - 4ac}}{2a}";
+  om = eq_omml_from_latex(q);
+  ok("equation: LaTeX to Office Math", om && strstr(om, "<m:f><m:num>") && strstr(om, "<m:rad><m:radPr><m:degHide m:val=\"1\"/>") && strstr(om, "<m:sSup><m:e><m:r><m:t>b</m:t>") &&
+     strstr(om, "<m:t>\xc2\xb1</m:t>"));
+  t = om ? eq_latex_from_omml(om, strlen(om)) : NULL;
+  ok("equation: and back", t && !strcmp(t, "x=\\frac{-b\\pm \\sqrt{b^{2}-4ac}}{2a}"));
+  free(t); free(om);
+  {
+    const char *xm = "<m:oMath xmlns:m=\"x\"><m:nary><m:naryPr><m:chr m:val=\"\xe2\x88\x91\"/></m:naryPr><m:sub><m:r><m:t>i=1</m:t></m:r></m:sub><m:sup><m:r><m:t>n</m:t></m:r></m:sup><m:e><m:sSub><m:e><m:r><m:t>x</m:t></m:r></m:e><m:sub><m:r><m:t>i</m:t></m:r></m:sub></m:sSub></m:e></m:nary>"
+                         "<m:d><m:e><m:r><m:t>a</m:t></m:r></m:e><m:e><m:r><m:t>b</m:t></m:r></m:e></m:d><m:func><m:fName><m:r><m:t>sin</m:t></m:r></m:fName><m:e><m:r><m:t>\xce\xb8</m:t></m:r></m:e></m:func></m:oMath>";
+    t = eq_latex_from_omml(xm, strlen(xm));
+  }
+  ok("equation: Excel's structures read", t && !strcmp(t, "\\sum _{i=1}^{n}x_{i}\\left(a|b\\right)\\sin \\theta"));
+  free(t);
+  i = book_equation_add(b, 0, q, 10, 10);
+  ok("equation: inserted", i == 0 && drw_obj(b->sh[0], 0)->eq && drw_obj(b->sh[0], 0)->shape == SK_TEXTBOX);
+  prims_init(&pl);
+  ok("equation: drawn", eq_render(q, 200, 60, 15, FILL_ON, eq_tw, NULL, &pl) && pl.n > 10);
+  {
+    int k, lines = 0;
+    for (k = 0; k < pl.n; k++) lines += pl.p[k].t == PR_LINE;
+    ok("equation: fraction bar and radical", lines >= 5);
+  }
+  prims_free(&pl);
+  x = xlsx_save(b, &len);
+  t = x ? zip_part(x, len, "xl/drawings/drawing1.xml") : NULL;
+  ok("equation: saved as Office Math with a fallback", t && strstr(t, "Requires=\"a14\"") && strstr(t, "<a14:m ") && strstr(t, "<m:oMathPara") && strstr(t, "<mc:Fallback>") && strstr(t, "\\frac{-b"));
+  free(t);
+  d = x ? xlsx_load(x, len, NULL, 0) : NULL;
+  ok("equation: read back", d && drw_count(d->sh[0]) == 1 && drw_obj(d->sh[0], 0)->eq && drw_obj(d->sh[0], 0)->omml &&
+     !strcmp(drw_obj(d->sh[0], 0)->text, "x=\\frac{-b\\pm \\sqrt{b^{2}-4ac}}{2a}"));
+  free(x);
+  if (d) {
+    /* changed: the Office Math made again */
+    DObj *o = drw_obj(d->sh[0], 0);
+    free(o->text); o->text = str_dup("E = mc^2");
+    x = xlsx_save(d, &len);
+    t = x ? zip_part(x, len, "xl/drawings/drawing1.xml") : NULL;
+    ok("equation: an edited equation's Office Math", t && strstr(t, "<m:sSup><m:e><m:r><m:t>c</m:t></m:r></m:e><m:sup><m:r><m:rPr><m:sty m:val=\"p\"/></m:rPr>") == NULL && strstr(t, "<m:t>c</m:t></m:r></m:e><m:sup><m:r><m:t>2</m:t>") && !strstr(t, "frac"));
+    free(t); free(x);
+    book_free(d);
+  }
+  book_free(b);
+}
+
 static void gc2_tests(void)
 {
+  gc2_equation();
   gc2_python();
   gc2_controls();
   gc2_sylk();

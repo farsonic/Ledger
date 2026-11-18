@@ -64,6 +64,7 @@ void dobj_clear(DObj *o)
   chart_free(o->chart);
   slicer_free(o->slicer);
   formula_free(o->link);
+  free(o->omml);
   memset(o, 0, sizeof *o);
 }
 int dobj_copy(DObj *dst, const DObj *src)
@@ -75,7 +76,8 @@ int dobj_copy(DObj *dst, const DObj *src)
   dst->chart = src->chart ? chart_copy(src->chart) : NULL;
   dst->slicer = src->slicer ? slicer_copy(src->slicer) : NULL;
   dst->link = src->link ? formula_copy(src->link) : NULL;
-  if ((src->descr && !dst->descr) || (src->text && !dst->text) || (src->chart && !dst->chart) || (src->slicer && !dst->slicer) || (src->link && !dst->link)) { dobj_clear(dst); return 0; }
+  dst->omml = src->omml ? str_dup(src->omml) : NULL;
+  if ((src->descr && !dst->descr) || (src->text && !dst->text) || (src->chart && !dst->chart) || (src->slicer && !dst->slicer) || (src->link && !dst->link) || (src->omml && !dst->omml)) { dobj_clear(dst); return 0; }
   return 1;
 }
 void drw_remove(Sheet *s, int i)

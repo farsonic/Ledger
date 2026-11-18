@@ -380,6 +380,15 @@ void ov_shape(struct RastPort *rp, const DObj *o, LONG x0, LONG y0, LONG x1, LON
       for (i = 0; i < n; i++) thick(rp, xy[2 * i], xy[2 * i + 1], xy[2 * ((i + 1) % n)], xy[2 * ((i + 1) % n) + 1], w);
     }
   }
+  if (o->eq) {
+    /* an equation: laid out from its LaTeX (equation.c) */
+    PrimList pl;
+    int px = (int)((long)(o->fsize ? o->fsize : 110) * 96 * zoom / (720L * 100));
+    prims_init(&pl);
+    if (eq_render(o->text ? o->text : "", (i32)(x1 - x0), (i32)(y1 - y0), px, o->tcolor ? o->tcolor : FILL_ON, ov_text_width, NULL, &pl)) ov_paint(rp, &pl, x0, y0, pen, ctx);
+    prims_free(&pl);
+    return;
+  }
   if (o->shape <= SK_TRIANGLE || o->shape == SK_TEXTBOX) shape_text(rp, o, x0, y0, x1, y1, zoom, pen, ctx);
 }
 
