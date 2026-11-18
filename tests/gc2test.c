@@ -228,8 +228,31 @@ static void gc2_equation(void)
   book_free(b);
 }
 
+static void gc2_html(void)
+{
+  const char *page = "<!-- exported -->\n<html xmlns:x=\"urn:schemas-microsoft-com:office:excel\"><head><style>td{color:red}</style><x:Name>Sales</x:Name></head><body>"
+                     "<p>Report</p><table border=1><tr><th>Region</th><th colspan=\"2\">Q1 &amp; Q2</th></tr>"
+                     "<tr><td>North</td><td>1,200.50</td><td>27/10/2026</td></tr><tr><td rowspan=2>South &nbsp;x</td><td>=1+1</td><td>a<br>b</td></tr>"
+                     "<tr><td>7</td><td><table><tr><td>in</td></tr></table></td></tr></table><table><tr><td>second</td></tr></table></body></html>";
+  char nm[40];
+  Book *b;
+  ok("html: a page with a table", html_is(page, strlen(page)) && !html_is("a,b\n1,2", 7) && !html_is("<html><p>no table</p></html>", 28));
+  b = html_load(page, strlen(page), nm, sizeof nm);
+  ok("html: the sheet's name", b && !strcmp(nm, "Sales"));
+  ok("html: cells read as typed", b && text_at(b, "A1", "Region") && text_at(b, "B1", "Q1 & Q2") && num_at(b, "B2") == 1200.5 && num_at(b, "C2") == date_serial(2026, 10, 27));
+  ok("html: headers bold, spans merged", b && b->fonts[b->styles[sheet_cell_style(b->sh[0], 0, 0)].font].bold && b->sh[0]->nmerges == 2);
+  ok("html: rowspan moves the next row's cells", b && num_at(b, "B4") == 7 && text_at(b, "C4", "in"));
+  ok("html: text kept as text", b && text_at(b, "B3", "=1+1") && text_at(b, "C3", "a\nb") && text_at(b, "A3", "South \xc2\xa0x") && !sheet_cell(b->sh[0], 4, 0));
+  if (b) book_free(b);
+  /* Latin-1 */
+  b = html_load("<table><tr><td>Gr\xfc\xdf" "e</td></tr></table>", 38, NULL, 0);
+  ok("html: Latin-1 page", b && text_at(b, "A1", "Gr\xc3\xbc\xc3\x9f" "e"));
+  if (b) book_free(b);
+}
+
 static void gc2_tests(void)
 {
+  gc2_html();
   gc2_equation();
   gc2_python();
   gc2_controls();

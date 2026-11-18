@@ -30,4 +30,8 @@ char *sylk_save(Book *b, int sheet);
    malloc'd, NULL out of memory */
 char *sylk_r1c1_to_a1(const char *f, long row, long col);
 char *sylk_a1_to_r1c1(const char *f, long row, long col);
+/* a web page's first table as a sheet (htmlin.c; a file on disk, no network): html_is the bytes are a
+   page with a table; html_load reads it (NULL if not), sheetname the page's <x:Name> or "" */
+int   html_is(const char *data, size_t len);
+Book *html_load(const char *data, size_t len, char *sheetname, size_t cap);
 #endif

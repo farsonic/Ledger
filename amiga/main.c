@@ -745,6 +745,21 @@ static Book *load_file(const char *path)
       snprintf(msg, sizeof msg, tr("%d records of this SYLK file couldn't be read and were left out."), bad);
       ask("OK", "%s", msg);
     }
+  } else if (html_is((const char *)data, len)) {
+    /* a web page saved to disk: its first table as a sheet (htmlin.c) */
+    char nm[40], base[64];
+    size_t n = strlen(path);
+    int htm = (n > 4 && !Stricmp((STRPTR)path + n - 4, (STRPTR)".htm")) || (n > 5 && !Stricmp((STRPTR)path + n - 5, (STRPTR)".html"));
+    if ((b = html_load((const char *)data, len, nm, sizeof nm))) {
+      if (!nm[0]) {
+        strncpy(base, (const char *)FilePart((STRPTR)path), sizeof base - 1); base[sizeof base - 1] = 0;
+        if (strrchr(base, '.')) *strrchr(base, '.') = 0;
+        base[31] = 0;
+        latin1_utf8(base, nm, sizeof nm);
+      }
+      if (nm[0]) book_rename_sheet(b, 0, nm);
+      if (!htm) ask("OK", "%s", tr("This file is a web page, not the kind its name says: Ledger opened the page's first table."));
+    }
   } else b = csv_load_report((const char *)data, len, 0, &either, &both);
   set(win, MUIA_Window_Sleep, FALSE);
   free(data);
@@ -780,7 +795,7 @@ static void open_path(const char *path)
     char p2[512], *dot;
     strncpy(p2, path, sizeof p2 - 6); p2[sizeof p2 - 6] = 0;
     dot = strrchr(p2, '.');
-    if (dot && dot > (char *)FilePart((STRPTR)p2) && (!Stricmp((STRPTR)dot, (STRPTR)".xls") || !Stricmp((STRPTR)dot, (STRPTR)".ods") || !Stricmp((STRPTR)dot, (STRPTR)".slk"))) { strcpy(dot, ".xlsx"); path = p2; }
+    if (dot && dot > (char *)FilePart((STRPTR)p2) && (!Stricmp((STRPTR)dot, (STRPTR)".xls") || !Stricmp((STRPTR)dot, (STRPTR)".ods") || !Stricmp((STRPTR)dot, (STRPTR)".slk") || !Stricmp((STRPTR)dot, (STRPTR)".htm") || !Stricmp((STRPTR)dot, (STRPTR)".html"))) { strcpy(dot, ".xlsx"); path = p2; }
     if (book_untouched()) show_book(b, path);
     else win_new(b, path);
   }
@@ -1382,7 +1397,7 @@ static void command(ULONG id)
   case ID_OPEN: {
     char path[512];
     strcpy(path, bookpath);
-    if (file_request(0, "Open Workbook", path, sizeof path, "#?.(xlsx|xls|ods|csv|txt|tsv|slk)")) open_path(path);
+    if (file_request(0, "Open Workbook", path, sizeof path, "#?.(xlsx|xls|ods|csv|txt|tsv|slk|htm|html)")) open_path(path);
     break; }
   case ID_IMPORTCSV: {
     char path[512];

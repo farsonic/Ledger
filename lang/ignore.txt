@@ -73,7 +73,7 @@ d/mm/yyyy h:mm
 #?.(png|jpg|jpeg)
 #?.(csv|txt|tsv|prn)
 #?.(html|htm)
-#?.(xlsx|xls|ods|csv|txt|tsv|slk)
+#?.(xlsx|xls|ods|csv|txt|tsv|slk|htm|html)
 #?.slk
 #?.(csv|txt|tsv)
 BAR,BAR,BAR,BAR P=\33r,
