@@ -272,8 +272,51 @@ static void sync_series(void)
   book_free(b);
 }
 
+/* Google Sheets' DUMMYFUNCTION wrapper opened as the formula (GridCraft #2871) */
+static void sync_dummyfunction(void)
+{
+  Book *b = book_new(), *d;
+  u8 *x, *y;
+  size_t len, ylen;
+  char err[100];
+  const char *a = "IFERROR(__xludf.DUMMYFUNCTION(\"SUM(A1:A2)*2\"),6)", *u = "IFERROR(__xludf.DUMMYFUNCTION(\"GOOGLEFINANCE(\"\"X\"\")\"),42)";
+  put(b, "A1", "1"); put(b, "A2", "2"); put(b, "B1", "=1"); put(b, "B2", "=1");
+  x = xlsx_save(b, &len);
+  /* the formulas swapped in the saved sheet for Google's wrapped ones */
+  {
+    ZipReader z; int i; size_t n; u8 *sx; Buf o; const char *p, *q;
+    buf_init(&o);
+    y = NULL; ylen = 0;
+    if (x && zip_open(&z, x, len) && (i = zip_find(&z, "xl/worksheets/sheet1.xml")) >= 0 && (sx = zip_read(&z, i, &n))) {
+      ZipWriter w; int k;
+      p = (const char *)sx;
+      q = strstr(p, "<f>1</f>"); if (q) { buf_add(&o, p, (size_t)(q - p)); buf_adds(&o, "<f>"); xml_escape(&o, a, strlen(a)); buf_adds(&o, "</f>"); p = q + 8; }
+      q = strstr(p, "<f>1</f>"); if (q) { buf_add(&o, p, (size_t)(q - p)); buf_adds(&o, "<f>"); xml_escape(&o, u, strlen(u)); buf_adds(&o, "</f>"); p = q + 8; }
+      buf_add(&o, p, n - (size_t)(p - (const char *)sx));
+      zip_begin(&w);
+      for (k = 0; k < z.n; k++) {
+        size_t en; u8 *e = k == i ? NULL : zip_read(&z, k, &en);
+        if (k == i) zip_add(&w, z.e[k].name, o.data, o.len); else if (e) { zip_add(&w, z.e[k].name, e, en); free(e); }
+      }
+      if (zip_finish(&w)) { ylen = w.out.len; y = (u8 *)buf_take(&w.out); }
+      zip_free(&w);
+      free(sx);
+      zip_close(&z);
+    }
+    buf_free(&o);
+  }
+  d = y ? xlsx_load(y, ylen, err, sizeof err) : NULL;
+  if (d) book_recalc(d);
+  ok("DUMMYFUNCTION: opened as the formula", d && text_at(d, "B1", "=SUM(A1:A2)*2") && num_at(d, "B1") == 6);
+  ok("DUMMYFUNCTION: kept round what Ledger can't work out", d && num_at(d, "B2") == 42);
+  if (d) book_free(d);
+  free(x); free(y);
+  book_free(b);
+}
+
 static void sync_tests(void)
 {
+  sync_dummyfunction();
   sync_series();
   sync_typed_numbers();
   sync_precision();

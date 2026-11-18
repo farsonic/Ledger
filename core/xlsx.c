@@ -30,6 +30,36 @@
 
 /* ------------------------------------------------------------------ colours */
 /* the classic 64-colour palette ("indexed" colours in files) */
+/* Google Sheets saves a formula Excel lacks as IFERROR(__xludf.DUMMYFUNCTION("the formula"), cached
+   value): opened as the formula itself when Ledger can work it out (every function in it known), as
+   GridCraft does (#2871); otherwise the wrapper stays and shows the cached value */
+static Formula *unwrap_dummy(Book *b, int sheet, const char *t)
+{
+  static const char head[] = "IFERROR(__xludf.DUMMYFUNCTION(\"";
+  Buf in;
+  const char *p;
+  Formula *f;
+  int pos, i;
+  if (str_ncasecmp(t, head, sizeof head - 1)) return NULL;
+  buf_init(&in);
+  for (p = t + sizeof head - 1; *p; p++) {
+    if (*p == '"') { if (p[1] == '"') { buf_addc(&in, '"'); p++; continue; } break; }
+    buf_addc(&in, *p);
+  }
+  if (*p != '"' || p[1] != ')' || p[2] != ',' || !in.len) { buf_free(&in); return NULL; }
+  buf_addc(&in, 0);
+  f = formula_parse(b, sheet, in.data[0] == '=' ? in.data + 1 : in.data, &pos);
+  buf_free(&in);
+  if (!f) return NULL;
+  for (i = 0; i < f->n; i++)
+    if (f->t[i].op == T_FUNC && f->t[i].a == 0xFFFF && !f->t[i].r1) {
+      int k, named = 0;
+      for (k = 0; k < b->nnames && f->t[i].s; k++) if (str_ieq(b->names[k].name, f->t[i].s)) named = 1;
+      if (!named) { formula_free(f); return NULL; }
+    }
+  return f;
+}
+
 static const u32 indexed[64] = {
   0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00,
   0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0x800000, 0x008000, 0x000080, 0x808000, 0x800080, 0x008080, 0xC0C0C0, 0x808080,
@@ -543,7 +573,8 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
         Formula *f = NULL;
         int pos;
         if (ftxt.len) {
-          f = formula_parse(rd->b, sheet, ftxt.data, &pos);
+          f = unwrap_dummy(rd->b, sheet, ftxt.data);
+          if (!f) f = formula_parse(rd->b, sheet, ftxt.data, &pos);
           if (f && shared_si >= 0 && is_master && nsh < 100000) {
             Shared *ns = (Shared *)realloc(sh, (size_t)(nsh + 1) * sizeof(Shared));
             if (ns) { sh = ns; sh[nsh].si = shared_si; sh[nsh].r = r; sh[nsh].c = c; sh[nsh].f = formula_copy(f); nsh++; }
