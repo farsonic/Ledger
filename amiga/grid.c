@@ -45,6 +45,8 @@
 #include "anatab.h"
 #include "pivot2.h"
 #include "../core/splitpane.h"
+#include "../core/gridgeo.h"
+#include "gmirror.h"         /* (last: the drawing calls mirrored for right-to-left sheets) */
 
 #ifndef MUIM_GoActive
 #define MUIM_GoActive   0x8042491aUL
@@ -66,6 +68,7 @@ struct Data {
   Book *book;
   FontSet *fs;
   Object *vprop, *hprop, *status;
+  LONG hent, hvis;               /* the horizontal bar's entries and visible ones as last set */
   int shown, handlers, formulas, brush;
   /* pens */
   int pens;
@@ -111,6 +114,7 @@ struct Data {
   struct MUI_InputHandlerNode ihn;
 };
 static struct MUI_CustomClass *cls;
+GgMirror grid_mirror;            /* (gmirror.h) on while a right-to-left sheet is drawn */
 
 static Sheet *SH(struct Data *d) { return d->book->sh[d->book->active]; }
 static int SI(struct Data *d) { return d->book->active; }
@@ -303,12 +307,28 @@ static LONG rowh(struct Data *d, i32 r)
 }
 
 /* ------------------------------------------------------------------ layout */
+static long ax_colw(void *g, i32 i) { return colw((struct Data *)g, i); }
+static long ax_rowh(void *g, i32 i) { return rowh((struct Data *)g, i); }
+static long ax_cgap(void *g, i32 i) { struct Data *d = (struct Data *)g; return lx_gap_before(d->book, SI(d), 0, i, zoom(d)); }
+static long ax_rgap(void *g, i32 i) { struct Data *d = (struct Data *)g; return lx_gap_before(d->book, SI(d), 1, i, zoom(d)); }
+/* the axis of rows (1) or columns (0) as the sheet is scrolled, frozen or split now */
+static void axis(struct Data *d, int rows, GgAxis *a)
+{
+  Sheet *s = SH(d);
+  int split = sheet_is_split(s);
+  a->head = rows ? d->hh : d->hw; a->extent = rows ? d->h : d->w;
+  a->frozen = rows ? s->freezer : s->freezec; a->first = rows ? s->top : s->left;
+  a->split = split && (rows ? s->splity : s->splitx) ? (rows ? s->splity : s->splitx) * zoom(d) / 100 : 0;
+  a->sfirst = rows ? s->stop : s->sleft;
+  a->before_active = !(s->apane & (rows ? 1 : 2));
+  a->barw = BARW; a->max = rows ? MAXROW : MAXCOL;
+  a->size = rows ? ax_rowh : ax_colw; a->gap = rows ? ax_rgap : ax_cgap; a->ctx = d;
+}
 /* the rows and columns that fit in w x h, frozen ones first, from the sheet's scroll position */
 static void layout(struct Data *d, LONG w, LONG h)
 {
   Sheet *s = SH(d);
-  LONG x, y, digits;
-  i32 r, c;
+  LONG digits;
   struct RastPort rp;
   char t[12];
   d->w = w; d->h = h;
@@ -325,129 +345,25 @@ static void layout(struct Data *d, LONG w, LONG h)
   /* (datatab) the outline's bands beside the headings */
   d->bandw = gx_band(s, 1); d->bandh = gx_band(s, 0);
   d->hw += d->bandw; d->hh += d->bandh;
-  /* rows */
-  y = d->hh; d->nvr = 0; d->nfr = 0; d->bary = d->barx = 0;
-  if (sheet_is_split(s) && s->splity) {
-    /* the top pane's rows, from its own first row down to the bar */
-    LONG by = d->hh + s->splity * zoom(d) / 100;
-    if (by > h - BARW - 2) by = h - BARW - 2;
-    if (by < d->hh + 2) by = d->hh + 2;
-    for (r = s->stop; r < MAXROW && d->nvr < MAXVR && y < by; r++) {
-      LONG rh = rowh(d, r);
-      if (!rh) continue;
-      d->vr[d->nvr] = r; d->vy[d->nvr++] = y; y += rh;
-    }
-    d->bary = by; y = by + BARW;
-  } else
-  for (r = 0; r < s->freezer && d->nvr < MAXVR; r++) {
-    LONG rh = rowh(d, r);
-    if (!rh) continue;
-    d->vr[d->nvr] = r; d->vy[d->nvr++] = y; y += rh;
-  }
-  d->nfr = d->nvr;
-  for (r = s->top; r < MAXROW && d->nvr < MAXVR && y < h; r++) {
-    LONG rh = rowh(d, r);
-    if (!rh) continue;
-    y += lx_gap_before(d->book, SI(d), 1, r, zoom(d));
-    d->vr[d->nvr] = r; d->vy[d->nvr++] = y; y += rh;
-  }
-  d->vy[d->nvr] = y;
-  /* columns */
-  x = d->hw; d->nvc = 0;
-  if (sheet_is_split(s) && s->splitx) {
-    LONG bx = d->hw + s->splitx * zoom(d) / 100;
-    if (bx > w - BARW - 2) bx = w - BARW - 2;
-    if (bx < d->hw + 2) bx = d->hw + 2;
-    for (c = s->sleft; c < MAXCOL && d->nvc < MAXVC && x < bx; c++) {
-      LONG cw = colw(d, c);
-      if (!cw) continue;
-      d->vc[d->nvc] = c; d->vx[d->nvc++] = x; x += cw;
-    }
-    d->barx = bx; x = bx + BARW;
-  } else
-  for (c = 0; c < s->freezec && d->nvc < MAXVC; c++) {
-    LONG cw = colw(d, c);
-    if (!cw) continue;
-    d->vc[d->nvc] = c; d->vx[d->nvc++] = x; x += cw;
-  }
-  d->nfcol = d->nvc;
-  for (c = s->left; c < MAXCOL && d->nvc < MAXVC && x < w; c++) {
-    LONG cw = colw(d, c);
-    if (!cw) continue;
-    x += lx_gap_before(d->book, SI(d), 0, c, zoom(d));
-    d->vc[d->nvc] = c; d->vx[d->nvc++] = x; x += cw;
-  }
-  d->vx[d->nvc] = x;
+  /* rows, then columns (core/gridgeo.c), in logical pixels: a right-to-left sheet is mirrored as it is drawn */
+  { GgAxis a; axis(d, 1, &a); d->nvr = gg_layout(&a, d->vr, d->vy, MAXVR, &d->nfr, &d->bary); }
+  { GgAxis a; axis(d, 0, &a); d->nvc = gg_layout(&a, d->vc, d->vx, MAXVC, &d->nfcol, &d->barx); }
 }
-/* the screen x of column c's left edge (from the grid's left), visible or not */
+/* the x of column c's left edge (from the grid's left, logical), and row r's top, shown or not */
 /* (split) column c is placed in the left pane: the active pane is a left one and c shows there */
-static int col_left_pane(struct Data *d, i32 c)
-{
-  Sheet *s = SH(d);
-  LONG x = d->hw;
-  i32 k;
-  if (!d->barx || (s->apane & 2) || c < s->sleft) return 0;
-  for (k = s->sleft; k < c && x <= d->barx; k++) x += colw(d, k);
-  return x <= d->barx;
-}
-static int row_top_pane(struct Data *d, i32 r)
-{
-  Sheet *s = SH(d);
-  LONG y = d->hh;
-  i32 k;
-  if (!d->bary || (s->apane & 1) || r < s->stop) return 0;
-  for (k = s->stop; k < r && y <= d->bary; k++) y += rowh(d, k);
-  return y <= d->bary;
-}
-static LONG col_x(struct Data *d, i32 c)
-{
-  Sheet *s = SH(d);
-  LONG x = d->hw;
-  i32 k;
-  if (d->barx) {
-    if (col_left_pane(d, c)) { for (k = s->sleft; k < c; k++) x += colw(d, k); return x; }
-    x = d->barx + BARW;
-    if (c >= s->left) { for (k = s->left; k < c && x < 30000; k++) x += colw(d, k); }
-    else { for (k = c; k < s->left && x > -30000; k++) x -= colw(d, k); }
-    return x;
-  }
-  if (c < s->freezec) { for (k = 0; k < c; k++) x += colw(d, k); return x; }
-  for (k = 0; k < s->freezec; k++) x += colw(d, k);
-  if (c >= s->left) { for (k = s->left; k < c; k++) x += colw(d, k); }
-  else { for (k = c; k < s->left; k++) x -= colw(d, k); }
-  return x;
-}
-static LONG row_y(struct Data *d, i32 r)
-{
-  Sheet *s = SH(d);
-  LONG y = d->hh;
-  i32 k;
-  if (d->bary) {
-    if (row_top_pane(d, r)) { for (k = s->stop; k < r; k++) y += rowh(d, k); return y; }
-    y = d->bary + BARW;
-    if (r >= s->top) { for (k = s->top; k < r && y < 30000; k++) y += rowh(d, k); }
-    else { for (k = r; k < s->top && y > -30000; k++) y -= rowh(d, k); }
-    return y;
-  }
-  if (r < s->freezer) { for (k = 0; k < r; k++) y += rowh(d, k); return y; }
-  for (k = 0; k < s->freezer; k++) y += rowh(d, k);
-  if (r >= s->top) { for (k = s->top; k < r && y < 30000; k++) y += rowh(d, k); }
-  else { for (k = r; k < s->top && y > -30000; k++) y -= rowh(d, k); }
-  return y;
-}
+static int col_left_pane(struct Data *d, i32 c) { GgAxis a; axis(d, 0, &a); return gg_in_first_pane(&a, d->barx, c); }
+static int row_top_pane(struct Data *d, i32 r) { GgAxis a; axis(d, 1, &a); return gg_in_first_pane(&a, d->bary, r); }
+static LONG col_x(struct Data *d, i32 c) { GgAxis a; axis(d, 0, &a); return gg_pos(&a, d->barx, c); }
+static LONG row_y(struct Data *d, i32 r) { GgAxis a; axis(d, 1, &a); return gg_pos(&a, d->bary, r); }
 /* index of a visible row or column (-1 if not shown) */
-static int vis_row(struct Data *d, i32 r) { int i; for (i = 0; i < d->nvr; i++) if (d->vr[i] == r) return i; return -1; }
-static int vis_col(struct Data *d, i32 c) { int i; for (i = 0; i < d->nvc; i++) if (d->vc[i] == c) return i; return -1; }
+static int vis_row(struct Data *d, i32 r) { return gg_shown(d->vr, d->nvr, r); }
+static int vis_col(struct Data *d, i32 c) { return gg_shown(d->vc, d->nvc, c); }
 /* what is at grid point x, y: 0 a cell (*r, *c), 1 a column heading (*c), 2 a row heading (*r),
    3 the corner. Beyond the last row or column shown, the next one */
 static int hit(struct Data *d, LONG x, LONG y, i32 *r, i32 *c)
 {
-  int i;
-  *r = d->nvr ? d->vr[d->nvr - 1] : 0; *c = d->nvc ? d->vc[d->nvc - 1] : 0;
-  for (i = 0; i < d->nvr; i++) if (y < d->vy[i + 1]) { *r = d->vr[i]; break; }
-  if (y < d->hh && d->nvr) *r = d->vr[d->nfr < d->nvr ? d->nfr : 0];
-  for (i = 0; i < d->nvc; i++) if (x < d->vx[i + 1]) { *c = d->vc[i]; break; }
-  if (x < d->hw && d->nvc) *c = d->vc[d->nfcol < d->nvc ? d->nfcol : 0];
+  *r = gg_hit(d->vr, d->vy, d->nvr, d->nfr, d->hh, y);
+  *c = gg_hit(d->vc, d->vx, d->nvc, d->nfcol, d->hw, x);
   if (y < d->hh && x < d->hw) return 3;
   if (y < d->hh) return 1;
   if (x < d->hw) return 2;
@@ -504,7 +420,8 @@ static void update_props(struct Data *d)
     vis = scroll_cols_fit(d);
     ent = imax(imax(sheet_last_col(s) + 1, s->cur_c + 1), l + vis) + vis - fc;
     if (ent > MAXCOL) ent = MAXCOL;
-    SetAttrs(d->hprop, MUIA_NoNotify, TRUE, MUIA_Prop_Entries, ent, MUIA_Prop_Visible, vis, MUIA_Prop_First, l - fc, TAG_DONE);
+    d->hent = ent; d->hvis = vis;
+    SetAttrs(d->hprop, MUIA_NoNotify, TRUE, MUIA_Prop_Entries, ent, MUIA_Prop_Visible, vis, MUIA_Prop_First, gg_bar_first(s->rtl, ent, vis, l - fc), TAG_DONE);
   }
 }
 
@@ -574,7 +491,7 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
   v = cell_value(b, SI(d), r, c);
   /* (anatab) a checkbox cell's box */
   if (v->t == V_BOOL && sty->numfmt >= 164 && !d->formulas &&
-      anatab_draw_check(rp, b, SI(d), r, c, cx0, y0, cx1, y1, pen_for(d, 0x606060), pen_for(d, 0x2B78D4), sty->fill ? pen_for(d, sty->fill & 0xFFFFFF) : pen_for(d, 0xFFFFFF))) return;
+      anatab_draw_check(rp, b, SI(d), r, c, GMX(grid_mirror.on ? cx1 : cx0), y0, GMX(grid_mirror.on ? cx0 : cx1), y1, pen_for(d, 0x606060), pen_for(d, 0x2B78D4), sty->fill ? pen_for(d, sty->fill & 0xFFFFFF) : pen_for(d, 0xFFFFFF))) return;
   /* conditional formatting: its colour and font styles over the cell's own */
   if (s->ncfs && cond_look(b, SI(d), r, c, &lk) && (lk.bold || lk.italic || lk.underline || lk.strike)) {
     cfnt = *fnt;
@@ -621,7 +538,7 @@ static void draw_text(struct Data *d, struct RastPort *rp, i32 r, i32 c, LONG cx
     if (tbl) { if (fc == COLOR_AUTO && tl.color != COLOR_AUTO) fc = tl.color; if (!fl) fl = tl.fill; }
     SetAPen(rp, ink(d, lk.color != COLOR_AUTO ? lk.color : col != COLOR_AUTO ? col : fc, fl));
   }
-  ha = sty->halign;
+  ha = gg_halign(s->rtl, sty->halign);
   if (ha == HA_GENERAL) ha = isnum || v->t == V_ERR ? HA_RIGHT : v->t == V_BOOL ? HA_CENTER : HA_LEFT;
   if (ha == HA_CENTERSEL || ha == HA_JUSTIFY) ha = HA_CENTER;
   lh = tf->tf_YSize;
@@ -704,7 +621,9 @@ static void draw_editor(struct Data *d, struct RastPort *rp, LONG dx, LONG dy)
   LONG x0, y0, x1, y1, tw, cx;
   struct TextFont *tf;
   Rect m;
+  GgMirror was = grid_mirror;
   if (!d->editing || vr < 0 || vc < 0) return;
+  grid_mirror.on = SH(d)->rtl; grid_mirror.w = d->w; grid_mirror.dx = dx;
   x0 = d->vx[vc]; y0 = d->vy[vr]; x1 = d->vx[vc + 1] - 1; y1 = d->vy[vr + 1] - 1;
   if (sheet_merge_at(s, s->cur_r, s->cur_c, &m)) { x1 = col_x(d, m.c2 + 1) - 1; y1 = row_y(d, m.r2 + 1) - 1; }
   st = sheet_cell_style(s, s->cur_r, s->cur_c);
@@ -735,7 +654,10 @@ static void draw_editor(struct Data *d, struct RastPort *rp, LONG dx, LONG dy)
       if (ty < y0) ty = y0;
       RefSpan sp[24];
       int ns = formula_ref_spans(d->book, d->ebuf, sp, 24), at = first, k;
-      Move(rp, x0 + dx + 3, ty + dy + tf->tf_Baseline);
+      /* (right to left) the box mirrored, its text placed at the mirrored end but read left to right */
+      LONG tx = x0 + 3;
+      if (grid_mirror.on) { tx = GMX(x0 + dx + 3 + te.te_Width - 1) - dx; grid_mirror.on = 0; }
+      Move(rp, tx + dx, ty + dy + tf->tf_Baseline);
       /* the text in pieces: each reference in its colour, the rest in the text pen */
       while (at < first + (int)n) {
         int end = first + (int)n, pen = -1;
@@ -748,10 +670,11 @@ static void draw_editor(struct Data *d, struct RastPort *rp, LONG dx, LONG dy)
         Text(rp, (STRPTR)d->ebuf + at, (ULONG)(end - at));
         at = end;
       }
-      cx = x0 + 3 + TextLength(rp, (STRPTR)d->ebuf + first, (ULONG)(d->ecaret - first));
+      cx = tx + TextLength(rp, (STRPTR)d->ebuf + first, (ULONG)(d->ecaret - first));
       if (d->caret_on) { SetAPen(rp, d->pen_text); RectFill(rp, cx + dx, ty + dy, cx + dx, ty + dy + tf->tf_YSize - 1); }
     }
   }
+  grid_mirror = was;
 }
 /* the rectangle of cells a..b on screen (clipped to the scrolling and frozen parts as they show) */
 static int rect_px(struct Data *d, const Rect *a, LONG *x0, LONG *y0, LONG *x1, LONG *y1)
@@ -829,7 +752,7 @@ static void draw_cells(struct Data *d, struct RastPort *rp)
       if (!cell || (!cell->f && cell->v.t == V_EMPTY)) continue;
       if (s->nmerges && sheet_merge_at(s, r, c, &m)) continue;      /* (drawn with the merges) */
       st = sheet_cell_style(s, r, c);
-      ha = b->styles[st].halign;
+      ha = gg_halign(s->rtl, b->styles[st].halign);
       if (cell_value(b, SI(d), r, c)->t == V_STR && !b->styles[st].wrap && !d->formulas) {
         /* text runs on over empty cells: right for left-aligned, left for right-aligned, both ways centred */
         if (ha == HA_GENERAL || ha == HA_LEFT || ha == HA_CENTER || ha == HA_FILL)
@@ -1153,6 +1076,7 @@ static void gv_fill(struct Data *d, GridView *gv, struct RastPort *rp, LONG ox, 
   gv->obj = d->obj; gv->rp = rp; gv->ox = ox; gv->oy = oy;
   gv->book = d->book; gv->sheet = SI(d); gv->zoom = zoom(d);
   gv->hw = d->hw; gv->hh = d->hh; gv->w = d->w; gv->h = d->h;
+  gv->rtl = SH(d)->rtl;
   gv->g = d; gv->colx = gv_colx; gv->rowy = gv_rowy; gv->cell_at = gv_cell; gv->pen = gv_pen; gv->notify = gv_notify; gv->redraw = gv_redraw;
 }
 /* (datatab) the geometry gridx.c draws the Data tab's extras by */
@@ -1174,6 +1098,7 @@ static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
   GridGeom lg;
   GridView gv;
   layout(d, w, h);
+  grid_mirror.on = SH(d)->rtl; grid_mirror.w = w; grid_mirror.dx = 0;
   draw_cells(d, rp);
   gv_fill(d, &gv, rp, 0, 0);
   if (d->ov) ov_sparks(d->ov, &gv);
@@ -1191,6 +1116,7 @@ static void draw_all(struct Data *d, struct RastPort *rp, LONG w, LONG h)
   if (d->ov) ov_draw(d->ov, &gv);
   draw_notes(d, rp);
   draw_editor(d, rp, 0, 0);
+  grid_mirror.on = 0;
 }
 /* the whole grid drawn afresh */
 static void redraw(struct Data *d) { if (d->shown && _win(d->obj)) MUI_Redraw(d->obj, MADF_DRAWOBJECT); }
@@ -1484,8 +1410,10 @@ static int edit_key(struct Data *d, UWORD code, UWORD q, const char *typed, int 
   case 0x42: commit(d, shift ? 4 : 2); return 1;                                   /* Tab */
   case 0x4C: case 0x4D: case 0x4E: case 0x4F: {                                    /* arrows */
     int dr = code == 0x4C ? -1 : code == 0x4D ? 1 : 0, dc = code == 0x4E ? 1 : code == 0x4F ? -1 : 0;
-    if (pointable(d)) { point_move(d, dr, dc, shift); return 1; }
-    if (d->editing == 1) { commit(d, code == 0x4C ? 3 : code == 0x4D ? 1 : code == 0x4E ? 2 : 4); return 1; }
+    /* (right to left) across the cells the arrows go the way they point on the screen; the caret along the text as it reads */
+    int sc = gg_key_dc(SH(d)->rtl, dc);
+    if (pointable(d)) { point_move(d, dr, sc, shift); return 1; }
+    if (d->editing == 1) { commit(d, code == 0x4C ? 3 : code == 0x4D ? 1 : sc > 0 ? 2 : 4); return 1; }
     if (dc < 0 && d->ecaret > 0) d->ecaret--;
     if (dc > 0 && d->ecaret < d->elen) d->ecaret++;
     if (dr < 0) d->ecaret = 0;
@@ -1548,7 +1476,7 @@ static int key(struct Data *d, Object *obj, struct IntuiMessage *im)
   if (code == 0x40 && !shift && !alt && !ctrl && cell_is_checkbox(d->book, SI(d), s->cur_r, s->cur_c)) { DoMethod(_app(obj), MUIM_Application_ReturnID, ID_AN_TOGGLE); return 1; }
   switch (code) {
   case 0x4C: case 0x4D: case 0x4E: case 0x4F: {
-    int dr = code == 0x4C ? -1 : code == 0x4D ? 1 : 0, dc = code == 0x4E ? 1 : code == 0x4F ? -1 : 0;
+    int dr = code == 0x4C ? -1 : code == 0x4D ? 1 : 0, dc = gg_key_dc(SH(d)->rtl, code == 0x4E ? 1 : code == 0x4F ? -1 : 0);
     if (ctrl || alt) data_edge(d, &r, &c, dr, dc);
     else if (dr) r = step_row(d, r, c, dr);
     else c = step_col(d, r, c, dc);
@@ -1605,19 +1533,8 @@ static void events_set(struct Data *d, Object *obj, ULONG ev)
 #define EV_IDLE (IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_INTUITICKS)
 #define EV_DRAG (IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE | IDCMP_INTUITICKS)
 /* the column whose right edge is near x in the headings (-1 none) */
-static i32 col_edge(struct Data *d, LONG x)
-{
-  int i;
-  /* (0.1.1: five pixels either side of the line, so it is easy to catch) */
-  for (i = d->nvc - 1; i >= 0; i--) if (x >= d->vx[i + 1] - 5 && x <= d->vx[i + 1] + 4) return d->vc[i];
-  return -1;
-}
-static i32 row_edge(struct Data *d, LONG y)
-{
-  int i;
-  for (i = d->nvr - 1; i >= 0; i--) if (y >= d->vy[i + 1] - 4 && y <= d->vy[i + 1] + 3) return d->vr[i];
-  return -1;
-}
+static i32 col_edge(struct Data *d, LONG x) { return gg_edge(d->vc, d->vx, d->nvc, x, 5, 4); }   /* (0.1.1: five pixels either side of the line, so it is easy to catch) */
+static i32 row_edge(struct Data *d, LONG y) { return gg_edge(d->vr, d->vy, d->nvr, y, 4, 3); }
 /* (0.1.1) the resize pointers: a bar with arrows either side, across for columns and up and down
    for rows (sprite data: two planes a line; colour 19 inside, 18 round it), copied to chip memory
    on first use as sprites must be */
@@ -1793,6 +1710,13 @@ static void drag_end(struct Data *d, Object *obj)
     redraw(d);
   }
 }
+/* the mouse's x from the grid's left on the screen as the logical x (mirrored for a right-to-left sheet) */
+static LONG in_x(struct Data *d, Object *obj, LONG x)
+{
+  GgMirror m;
+  m.on = d->book && SH(d)->rtl; m.w = _mwidth(obj); m.dx = 0;
+  return gg_mx(&m, x);
+}
 static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEvent *m)
 {
   struct Data *d = INST_DATA(cl, obj);
@@ -1809,6 +1733,7 @@ static ULONG handle_event(struct IClass *cl, Object *obj, struct MUIP_HandleEven
   }
   x = im->MouseX - _mleft(obj); y = im->MouseY - _mtop(obj);
   inside = x >= 0 && y >= 0 && x < _mwidth(obj) && y < _mheight(obj);
+  x = in_x(d, obj, x);             /* (right to left) the logical x everything below works by */
   if (d->ov && !d->editing && !d->drag && (im->Class == IDCMP_MOUSEBUTTONS || im->Class == IDCMP_MOUSEMOVE || im->Class == IDCMP_INTUITICKS)) {
     /* objects over the cells take the mouse first */
     GridView gv;
@@ -2052,7 +1977,8 @@ static void mset(struct Data *d, Object *obj, struct opSet *msg, int init)
       if (d->book) { i32 v = (i32)t->ti_Data + (d->bary ? 0 : SH(d)->freezer), *tp = vtop(d); if (v != *tp) { *tp = v; redraw(d); } }
       break;
     case MUIA_Grid_Left:
-      if (d->book) { i32 v = (i32)t->ti_Data + (d->barx ? 0 : SH(d)->freezec), *lp = vleft(d); if (v != *lp) { *lp = v; redraw(d); } }
+      /* (right to left: the bar runs the other way) */
+      if (d->book) { i32 v = (i32)gg_bar_first(SH(d)->rtl, d->hent, d->hvis, (long)t->ti_Data) + (d->barx ? 0 : SH(d)->freezec), *lp = vleft(d); if (v != *lp) { *lp = v; redraw(d); } }
       break;
     case MUIA_Grid_Copied:
       if (t->ti_Data) { d->copy = *(Rect *)t->ti_Data; d->copied = 1; } else d->copied = 0;
@@ -2108,7 +2034,13 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
       int i, j;
       for (i = 0; i < d->nvr && d->vr[i] != SH(d)->cur_r; i++) ;
       for (j = 0; j < d->nvc && d->vc[j] != SH(d)->cur_c; j++) ;
-      if (i < d->nvr && j < d->nvc) { cb[0] = _mleft(obj) + d->vx[j]; cb[1] = _mtop(obj) + d->vy[i]; cb[2] = _mleft(obj) + d->vx[j + 1] - 1; cb[3] = _mtop(obj) + d->vy[i + 1] - 1; }
+      if (i < d->nvr && j < d->nvc) {
+        GgMirror mm;
+        long a, z;
+        mm.on = SH(d)->rtl; mm.w = d->w; mm.dx = 0;
+        gg_item_span(&mm, d->vc, d->vx, d->nvc, d->vc[j], &a, &z);
+        cb[0] = _mleft(obj) + a; cb[1] = _mtop(obj) + d->vy[i]; cb[2] = _mleft(obj) + z; cb[3] = _mtop(obj) + d->vy[i + 1] - 1;
+      }
       else cb[0] = cb[1] = cb[2] = cb[3] = -1;
       *g->opg_Storage = (ULONG)cb;
       return TRUE; }
@@ -2184,7 +2116,7 @@ static ULONG dispatch(__reg("a0") struct IClass *cl, __reg("a2") Object *obj, __
     i32 r, c;
     Rect sel;
     d = INST_DATA(cl, obj);
-    if (d->book && !d->editing && hit(d, m->mx - _mleft(obj), m->my - _mtop(obj), &r, &c) == 0) {
+    if (d->book && !d->editing && hit(d, in_x(d, obj, m->mx - _mleft(obj)), m->my - _mtop(obj), &r, &c) == 0) {
       sel = sel_rect(d);
       if (!in_rect(&sel, r, c)) { SH(d)->cur_r = r; SH(d)->cur_c = c; d->end_r = r; d->end_c = c; redraw(d); moved(d); }
     }

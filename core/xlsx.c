@@ -450,7 +450,7 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
       if ((v = xml_attr(&x, "showGridLines"))) s->gridlines = strcmp(v, "0") && strcmp(v, "false");
       if ((v = xml_attr(&x, "showRowColHeaders"))) s->headings = strcmp(v, "0") && strcmp(v, "false");
       if ((v = xml_attr(&x, "showZeros"))) s->showzeros = strcmp(v, "0") && strcmp(v, "false");
-      if ((v = xml_attr(&x, "rightToLeft"))) s->rtl = strcmp(v, "0") && strcmp(v, "false");    /* (kept; the grid isn't mirrored yet) */
+      if ((v = xml_attr(&x, "rightToLeft"))) s->rtl = strcmp(v, "0") && strcmp(v, "false");    /* (the grid drawn mirrored: gridgeo.h) */
       if ((v = xml_attr(&x, "zoomScale"))) { int zz = atoi(v); if (zz >= 10 && zz <= 400) s->zoom = (u16)zz; }
       if ((v = xml_attr(&x, "tabSelected")) && atoi(v)) rd->b->active = sheet;
       if ((v = xml_attr(&x, "topLeftCell"))) { i32 r, c; if (cell_ref(v, &r, &c)) { s->stop = s->top = r; s->sleft = s->left = c; } }

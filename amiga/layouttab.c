@@ -1008,6 +1008,7 @@ void lt_command(ULONG id, LONG v)
     break;
   case ID_LX_VIEWGRID: DoMethod(app, MUIM_Application_ReturnID, ID_GRIDLINES); break;
   case ID_LX_VIEWHEAD: DoMethod(app, MUIM_Application_ReturnID, ID_HEADINGS); break;
+  case ID_LX_SHEETRTL: { Sheet *s = cur_sheet(); s->rtl = !s->rtl; book->dirty = 1; refresh_all(); } break;   /* (grid.c, gridgeo.h: drawn mirrored) */
   case ID_LX_EXPORTPDF: case ID_LX_SAVEPDF: export_pdf(); break;
   case ID_LX_EXPORTHTML: export_html(); break;
   case ID_LX_PROPS: properties(); break;
@@ -1118,6 +1119,7 @@ int lx_bit(int b)
   case LXB_LANDSCAPE: return page_of(s)->landscape;
   case LXB_VIEWGRID: return s->gridlines;
   case LXB_VIEWHEAD: return s->headings;
+  case LXB_SHEETRTL: return s->rtl;
   }
   return vt_bit(b) || ft_bit(b);
 }

@@ -10,6 +10,7 @@
 #include "../core/calc.h"
 #include "../core/ops.h"
 #include "../core/comments.h"
+#include "gmirror.h"              /* (last) drawing on a right-to-left sheet mirrored */
 
 void lt_command(ULONG id, LONG v);
 

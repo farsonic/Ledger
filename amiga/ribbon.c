@@ -350,6 +350,7 @@ static const Item p_opts[] = {
   { K_BUTTON, S_SMALL, 0, 0, "View", ID_LX_VIEWHEAD, LXB_VIEWHEAD, 0, F_CHECK, 0, "Show the row numbers and column letters" },
   { K_BUTTON, S_SMALL, 0, 0, "Print", ID_LX_PRINTHEAD, LXB_PRINTHEAD, 0, F_CHECK, 0, "Row numbers and column letters on the pages (PDF export)" },
   { K_BUTTON, S_SMALL, 0, 0, "Zero Values", ID_SHOWZEROS, RB_ZEROS, 0, F_CHECK | F_NEWCOL, 0, "Show zeros (else cells that are 0 look empty)" },
+  { K_BUTTON, S_SMALL, 0, 0, "Sheet Right-to-Left", ID_LX_SHEETRTL, LXB_SHEETRTL, 0, F_CHECK, 0, "Show the sheet right to left: column A at the right" },
 };
 static const Item p_sheet[] = {
   { K_BUTTON, S_LARGE, IC_RENAME, 0, "Rename", ID_RENAMESHEET, 0, 0, 0, 0, "Rename this sheet" },

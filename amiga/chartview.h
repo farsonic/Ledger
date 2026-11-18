@@ -23,6 +23,7 @@ typedef struct GridView {
   LONG (*pen)(void *g, ULONG rgb);
   void (*notify)(void *g, int changed);   /* the selection changed (0) or the workbook (1) */
   void (*redraw)(void *g);
+  int rtl;                       /* the sheet is right to left: x above is logical, drawn mirrored (w - 1 - x) */
 } GridView;
 
 enum { TOOL_SELECT, TOOL_LASSO, TOOL_PEN, TOOL_ERASER, TOOL_PLACE };

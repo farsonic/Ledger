@@ -1627,6 +1627,8 @@
   { { "Show the row numbers and column letters", "Zeilennummern und Spaltenbuchstaben anzeigen", "Afficher les num\351ros de ligne et les lettres de colonne", "Mostrar los n\372meros de fila y las letras de columna", "Mostra i numeri di riga e le lettere di colonna" } },
   { { "Row numbers and column letters on the pages (PDF export)", "Zeilennummern und Spaltenbuchstaben auf den Seiten (PDF-Export)", "Num\351ros de ligne et lettres de colonne sur les pages (export PDF)", "N\372meros de fila y letras de columna en las p\341ginas (exportaci\363n PDF)", "Numeri di riga e lettere di colonna nelle pagine (esportazione PDF)" } },
   { { "Zero Values", "Nullwerte", "Valeurs z\351ro", "Valores cero", "Valori zero" } },
+  { { "Sheet Right-to-Left", "Blatt von rechts nach links", "Feuille de droite \340 gauche", "Hoja de derecha a izquierda", "Foglio da destra a sinistra" } },
+  { { "Show the sheet right to left: column A at the right", "Das Blatt von rechts nach links zeigen: Spalte A rechts", "Afficher la feuille de droite \340 gauche : la colonne A \340 droite", "Mostrar la hoja de derecha a izquierda: la columna A a la derecha", "Mostra il foglio da destra a sinistra: la colonna A a destra" } },
   { { "Show zeros (else cells that are 0 look empty)", "Nullen anzeigen (sonst wirken Zellen mit 0 leer)", "Afficher les z\351ros (sinon les cellules \340 0 semblent vides)", "Mostrar ceros (si no, las celdas con 0 parecen vac\355as)", "Mostra gli zeri (altrimenti le celle con 0 sembrano vuote)" } },
   { { "Rename this sheet", "Dieses Blatt umbenennen", "Renommer cette feuille", "Cambiar el nombre de esta hoja", "Rinomina questo foglio" } },
   { { "Tab Colour", "Registerfarbe", "Couleur d'onglet", "Color de pesta\361a", "Colore scheda" } },

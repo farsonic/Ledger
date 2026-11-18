@@ -45,6 +45,6 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 39 | A web page's table opened as a sheet (a file on disk; no network) | yes (4c388df) | ✅ |
 | 40 | Solver Load/Save Model, Options, Sensitivity report | yes (4c388df) | ✅ |
 | 41 | CSV import with each column's date order | yes (4c388df) | ✅ |
-| 42 | Right-to-left sheets (mirrored grid, Arabic text) | yes (4c388df) | ⬜ the sheet's right-to-left view kept in files; the grid not mirrored, no Arabic fonts |
+| 42 | Right-to-left sheets (mirrored grid, Arabic text) | yes (4c388df) | ✅ the grid drawn mirrored as Excel draws it (column A at the right, row headings on the right, the horizontal scroll bar reversed, clicks, drags, fill handle, resizing, frozen panes and split bars mirrored, General text right and numbers left), Page Layout > Sheet Right-to-Left (and the Page menu) per sheet, kept in .xlsx; Arabic text itself isn't shaped (the Amiga's fonts have no Arabic) |
 
 Rows 35-41 (round 2 of the 4c388df sync, 2026-11-18) are tested natively and build for the Amiga; their check in the emulator is still to do.

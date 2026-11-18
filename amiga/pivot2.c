@@ -22,6 +22,7 @@
 #include "../core/table.h"
 #include "../core/pivot.h"
 #include "../core/slicer.h"
+#include "gmirror.h"              /* (last) drawing on a right-to-left sheet mirrored */
 /* (the command ranges mustn't meet) */
 typedef char p2_ids_clear_of_tables[ID_TBL_LAST <= ID_P2_FIRST ? 1 : -1];
 

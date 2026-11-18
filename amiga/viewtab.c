@@ -13,6 +13,7 @@
 #include "lxpriv.h"
 #include "uitab.h"
 #include "../core/splitpane.h"
+#include "gmirror.h"              /* (last) drawing on a right-to-left sheet mirrored */
 
 double ledger_now(void);
 
@@ -607,8 +608,8 @@ int vt_bit(int b)
 void vt_update(void)
 {
   Object *strip = win ? (Object *)lx_xget(win, MUIA_Window_Menustrip) : NULL;
-  static const ULONG ids[] = { ID_LX_NORMAL, ID_LX_PBP, ID_LX_PAGELAYOUT, ID_LX_RULER, ID_LX_SIDEBYSIDE, ID_LX_SYNCSCROLL, ID_LX_PRINTGRID, ID_LX_PRINTHEAD };
-  static const int bits[] = { LXB_NORMAL, LXB_PBP, LXB_PAGELAYOUT, LXB_RULER, LXB_SIDEBYSIDE, LXB_SYNC, LXB_PRINTGRID, LXB_PRINTHEAD };
+  static const ULONG ids[] = { ID_LX_NORMAL, ID_LX_PBP, ID_LX_PAGELAYOUT, ID_LX_RULER, ID_LX_SIDEBYSIDE, ID_LX_SYNCSCROLL, ID_LX_PRINTGRID, ID_LX_PRINTHEAD, ID_LX_SHEETRTL };
+  static const int bits[] = { LXB_NORMAL, LXB_PBP, LXB_PAGELAYOUT, LXB_RULER, LXB_SIDEBYSIDE, LXB_SYNC, LXB_PRINTGRID, LXB_PRINTHEAD, LXB_SHEETRTL };
   int i;
   vt_gen++;
   vt_switch_list();

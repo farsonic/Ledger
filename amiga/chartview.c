@@ -439,6 +439,21 @@ static void obj_box(GridView *gv, const DObj *o, LONG *x0, LONG *y0, LONG *x1, L
   if (*x1 < *x0) *x1 = *x0;
   if (*y1 < *y0) *y1 = *y0;
 }
+/* (right to left) boxes are worked out in logical pixels, as the grid's are, and drawn mirrored;
+   what is inside them (a chart, a picture, a slicer) reads as it is */
+static void scr_box(GridView *gv, LONG *x0, LONG *x1) { if (gv->rtl) { LONG a = gv->w - 1 - *x1; *x1 = gv->w - 1 - *x0; *x0 = a; } }
+static LONG scr_x(GridView *gv, LONG x) { return gv->rtl ? gv->w - 1 - x : x; }
+/* logical x inside the box x0..x1 as the box's contents see it */
+static LONG in_box(GridView *gv, LONG x, LONG x0, LONG x1) { return gv->rtl ? x0 + x1 - x : x; }
+/* the cells' part of the grid on the screen, across */
+static void cells_x(GridView *gv, LONG *a, LONG *b) { if (gv->rtl) { *a = 0; *b = gv->w - 1 - gv->hw; } else { *a = gv->hw; *b = gv->w - 1; } }
+/* a line drawn in a mirrored box runs the other way */
+static const DObj *scr_obj(GridView *gv, const DObj *o, DObj *tmp)
+{
+  if (!gv->rtl || o->kind != OB_SHAPE || (o->shape != SK_LINE && o->shape != SK_ARROW)) return o;
+  *tmp = *o; tmp->flipx = (u8)!o->flipx;
+  return tmp;
+}
 /* the selection checked against the sheet (objects come and go with undo) */
 static void sel_check(ObjView *ov, GridView *gv)
 {
@@ -544,8 +559,9 @@ static UBYTE *pic_pens(ObjView *ov, GridView *gv, const DObj *o, LONG w, LONG h)
 }
 static void draw_picture(ObjView *ov, GridView *gv, const DObj *o, LONG x0, LONG y0, LONG x1, LONG y1)
 {
-  LONG w = x1 - x0, h = y1 - y0, row, a, b;
+  LONG w = x1 - x0, h = y1 - y0, row, a, b, cx0, cx1;
   UBYTE *px = pic_pens(ov, gv, o, w, h);
+  cells_x(gv, &cx0, &cx1);
   struct RastPort *rp = gv->rp;
   if (!px) {
     /* it can't be shown: a crossed box */
@@ -557,7 +573,7 @@ static void draw_picture(ObjView *ov, GridView *gv, const DObj *o, LONG x0, LONG
   for (row = 0; row < h; row++) {
     LONG yy = y0 + row;
     if (yy < gv->hh || yy >= gv->h) continue;      /* (WriteChunkyPixels isn't clipped by a layer's region everywhere) */
-    a = x0 < gv->hw ? gv->hw : x0; b = x1 - 1 >= gv->w ? gv->w - 1 : x1 - 1;
+    a = x0 < cx0 ? cx0 : x0; b = x1 - 1 > cx1 ? cx1 : x1 - 1;
     if (b >= a) WriteChunkyPixels(rp, (ULONG)(gv->ox + a), (ULONG)(gv->oy + yy), (ULONG)(gv->ox + b), (ULONG)(gv->oy + yy), px + row * w + (a - x0), w);
   }
   if (o->line) {
@@ -571,7 +587,7 @@ void ov_background(ObjView *ov, GridView *gv)
   Drawing *dr = SH(gv)->drw;
   DObj t;
   u32 w0, h0;
-  LONG tw, th, x0, y0, x, y, row;
+  LONG tw, th, x0, y0, x, y, row, cx0, cx1;
   UBYTE *px;
   if (!dr || !dr->bg || img_info(dr->bg->data, dr->bg->len, &w0, &h0) == IMG_NONE) return;
   tw = (LONG)w0 * gv->zoom / 100; th = (LONG)h0 * gv->zoom / 100;
@@ -580,13 +596,15 @@ void ov_background(ObjView *ov, GridView *gv)
   t.pic = dr->bg;
   if (!(px = pic_pens(ov, gv, &t, tw, th))) return;
   /* tiles from A1's corner, wherever the sheet is scrolled to */
+  cells_x(gv, &cx0, &cx1);
   x0 = gv->colx(gv->g, 0); y0 = gv->rowy(gv->g, 0);
-  while (x0 + tw <= gv->hw) x0 += tw;
+  if (gv->rtl) { x0 = scr_x(gv, x0) + 1; while (x0 > cx0) x0 -= tw; }     /* (right to left: from A1's right edge leftwards) */
+  else while (x0 + tw <= cx0) x0 += tw;
   while (y0 + th <= gv->hh) y0 += th;
   for (y = y0; y < gv->h; y += th)
-    for (x = x0; x < gv->w; x += tw)
+    for (x = x0; x <= cx1; x += tw)
       for (row = 0; row < th; row++) {
-        LONG yy = y + row, a = x < gv->hw ? gv->hw : x, b = x + tw - 1 >= gv->w ? gv->w - 1 : x + tw - 1;
+        LONG yy = y + row, a = x < cx0 ? cx0 : x, b = x + tw - 1 > cx1 ? cx1 : x + tw - 1;
         if (yy < gv->hh || yy >= gv->h || b < a) continue;
         WriteChunkyPixels(gv->rp, (ULONG)(gv->ox + a), (ULONG)(gv->oy + yy), (ULONG)(gv->ox + b), (ULONG)(gv->oy + yy), px + row * tw + (a - x), tw);
       }
@@ -608,6 +626,7 @@ void ov_sparks(ObjView *ov, GridView *gv)
       int n;
       if (x1 - x0 < 4 || y1 - y0 < 4 || x1 <= gv->hw || y1 <= gv->hh || x0 >= gv->w || y0 >= gv->h) continue;
       if (x0 < gv->hw || y0 < gv->hh) continue;      /* (partly under the headings: left out) */
+      { LONG e = x1 - 1; scr_box(gv, &x0, &e); x1 = e + 1; }
       if (!have_range) { spark_group_range(gv->book, gv->sheet, g, &lo, &hi); have_range = 1; }
       n = spark_values(gv->book, gv->sheet, sp, v, 512);
       prims_init(&pl);
@@ -643,7 +662,9 @@ void ov_draw(ObjView *ov, GridView *gv)
   if (!n) return;
   if (rp->Layer && (rg = NewRegion())) {
     struct Rectangle r;
-    r.MinX = (WORD)(gv->ox + gv->hw); r.MinY = (WORD)(gv->oy + gv->hh); r.MaxX = (WORD)(gv->ox + gv->w - 1); r.MaxY = (WORD)(gv->oy + gv->h - 1);
+    LONG cx0, cx1;
+    cells_x(gv, &cx0, &cx1);
+    r.MinX = (WORD)(gv->ox + cx0); r.MinY = (WORD)(gv->oy + gv->hh); r.MaxX = (WORD)(gv->ox + cx1); r.MaxY = (WORD)(gv->oy + gv->h - 1);
     OrRectRegion(rg, &r);
     old = InstallClipRegion(rp->Layer, rg);
   }
@@ -651,11 +672,13 @@ void ov_draw(ObjView *ov, GridView *gv)
     DObj *o = drw_obj(s, i);
     LONG x0, y0, x1, y1;
     obj_box(gv, o, &x0, &y0, &x1, &y1);
+    DObj tmp;
     if (x1 < gv->hw || y1 < gv->hh || x0 >= gv->w || y0 >= gv->h || (x1 - x0 < 2 && y1 - y0 < 2 && o->kind != OB_SHAPE)) continue;
+    scr_box(gv, &x0, &x1);
     if (o->kind == OB_CHART && o->chart) {
       if (x1 - x0 >= 20 && y1 - y0 >= 20) ov_paint(rp, chart_prims(ov, gv, o->chart, (int)(x1 - x0), (int)(y1 - y0)), gv->ox + x0, gv->oy + y0, gpen, gv);
     } else if (o->kind == OB_PICTURE) draw_picture(ov, gv, o, x0, y0, x1, y1);
-    else if (o->kind == OB_SHAPE) ov_shape(rp, o, gv->ox + x0, gv->oy + y0, gv->ox + x1, gv->oy + y1, gv->zoom, gpen, gv);
+    else if (o->kind == OB_SHAPE) ov_shape(rp, scr_obj(gv, o, &tmp), gv->ox + x0, gv->oy + y0, gv->ox + x1, gv->oy + y1, gv->zoom, gpen, gv);
     else if (o->kind == OB_SLICER) pivot2_draw_slicer(gv, i, x0, y0, x1, y1);    /* (pivot2.c) */
     else if (o->kind == OB_CONTROL) {
       PrimList pl;
@@ -674,11 +697,13 @@ void ov_draw(ObjView *ov, GridView *gv)
       DObj *o = drw_obj(s, ov->sel[i]);
       if (!o) continue;
       obj_box(gv, o, &x0, &y0, &x1, &y1);
+      scr_box(gv, &x0, &x1);
       x0 += gv->ox; x1 += gv->ox; y0 += gv->oy; y1 += gv->oy;
       Move(rp, x0, y0); Draw(rp, x1, y0); Draw(rp, x1, y1); Draw(rp, x0, y1); Draw(rp, x0, y0);
     }
     SetDrPt(rp, 0xFFFF);
     group_box(gv, sel_group(ov, gv), &x0, &y0, &x1, &y1);
+    scr_box(gv, &x0, &x1);
     x0 += gv->ox; x1 += gv->ox; y0 += gv->oy; y1 += gv->oy;
     Move(rp, x0 - 1, y0 - 1); Draw(rp, x1 + 1, y0 - 1); Draw(rp, x1 + 1, y1 + 1); Draw(rp, x0 - 1, y1 + 1); Draw(rp, x0 - 1, y0 - 1);
     hx[0] = x0; hy[0] = y0; hx[1] = (x0 + x1) / 2; hy[1] = y0; hx[2] = x1; hy[2] = y0; hx[3] = x1; hy[3] = (y0 + y1) / 2;
@@ -693,10 +718,12 @@ void ov_draw(ObjView *ov, GridView *gv)
     LONG x0, y0, x1, y1, hx[8], hy[8];
     int k, nh;
     LONG acc = tpen(T_ACCENT), wh = gpen(gv, 0xFFFFFF);
+    DObj tmp;
     if (!o) continue;
     obj_box(gv, o, &x0, &y0, &x1, &y1);
+    scr_box(gv, &x0, &x1);
     x0 += gv->ox; x1 += gv->ox; y0 += gv->oy; y1 += gv->oy;
-    nh = handles(o, x0, y0, x1, y1, hx, hy);
+    nh = handles(scr_obj(gv, o, &tmp), x0, y0, x1, y1, hx, hy);
     if (nh == 8) { SetAPen(rp, acc); Move(rp, x0 - 1, y0 - 1); Draw(rp, x1 + 1, y0 - 1); Draw(rp, x1 + 1, y1 + 1); Draw(rp, x0 - 1, y1 + 1); Draw(rp, x0 - 1, y0 - 1); }
     for (k = 0; k < nh; k++) handle_box(rp, hx[k], hy[k], wh, acc);
     if (i == 0 && o->kind == OB_CHART && o->chart && ov->elem != CE_CHART && x1 - x0 >= 20) {
@@ -766,7 +793,7 @@ static int obj_at(GridView *gv, LONG x, LONG y)
       if (near_seg(x, y, o->flipx ? x1 : x0, o->flipy ? y1 : y0, o->flipx ? x0 : x1, o->flipy ? y0 : y1, 4)) return i;
       continue;
     }
-    if (o->kind == OB_SHAPE && o->shape == SK_INK) { if (x >= x0 - 4 && x <= x1 + 4 && y >= y0 - 4 && y <= y1 + 4 && ink_hit(gv, o, x, y, x0, y0, 4)) return i; continue; }
+    if (o->kind == OB_SHAPE && o->shape == SK_INK) { if (x >= x0 - 4 && x <= x1 + 4 && y >= y0 - 4 && y <= y1 + 4 && ink_hit(gv, o, in_box(gv, x, x0, x1), y, x0, y0, 4)) return i; continue; }
     if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return i;
   }
   return -1;
@@ -798,7 +825,7 @@ static void xor_box(ObjView *ov, GridView *gv)
   LONG l = _mleft(gv->obj), t = _mtop(gv->obj), x0, y0, x1, y1;
   APTR clip;
   x0 = ov->bx0; y0 = ov->by0; x1 = ov->bx1; y1 = ov->by1;
-  clip = MUI_AddClipping(muiRenderInfo(gv->obj), (WORD)(l + gv->hw), (WORD)(t + gv->hh), (WORD)(gv->w - gv->hw), (WORD)(gv->h - gv->hh));
+  { LONG cx0, cx1; cells_x(gv, &cx0, &cx1); clip = MUI_AddClipping(muiRenderInfo(gv->obj), (WORD)(l + cx0), (WORD)(t + gv->hh), (WORD)(cx1 - cx0 + 1), (WORD)(gv->h - gv->hh)); }
   SetDrMd(rp, COMPLEMENT);
   if (ov->drag == DG_MOVE || ov->drag == DG_SIZE) {
     LONG dx = ov->cx - ov->sx, dy = ov->cy - ov->sy;
@@ -809,7 +836,7 @@ static void xor_box(ObjView *ov, GridView *gv)
         /* a line: its dragged end */
         LONG ax = o->flipx ? x1 : x0, ay = o->flipy ? y1 : y0, bx = o->flipx ? x0 : x1, by = o->flipy ? y0 : y1;
         if (ov->handle == 0) { ax += dx; ay += dy; } else { bx += dx; by += dy; }
-        Move(rp, l + ax, t + ay); Draw(rp, l + bx, t + by);
+        Move(rp, l + scr_x(gv, ax), t + ay); Draw(rp, l + scr_x(gv, bx), t + by);
         SetDrMd(rp, JAM1);
         MUI_RemoveClipping(muiRenderInfo(gv->obj), (struct Region *)clip);
         return;
@@ -820,9 +847,10 @@ static void xor_box(ObjView *ov, GridView *gv)
       if (ov->handle >= 4 && ov->handle <= 6) y1 += dy;
     }
   } else { x0 = ov->sx; y0 = ov->sy; x1 = ov->cx; y1 = ov->cy; }
-  if (ov->drag == DG_PLACE && (ov->tshape == SK_LINE || ov->tshape == SK_ARROW)) { Move(rp, l + x0, t + y0); Draw(rp, l + x1, t + y1); }
+  if (ov->drag == DG_PLACE && (ov->tshape == SK_LINE || ov->tshape == SK_ARROW)) { Move(rp, l + scr_x(gv, x0), t + y0); Draw(rp, l + scr_x(gv, x1), t + y1); }
   else {
     if (x1 < x0) { LONG q = x0; x0 = x1; x1 = q; }
+    scr_box(gv, &x0, &x1);
     if (y1 < y0) { LONG q = y0; y0 = y1; y1 = q; }
     Move(rp, l + x0, t + y0); Draw(rp, l + x1, t + y0); Draw(rp, l + x1, t + y1); Draw(rp, l + x0, t + y1); Draw(rp, l + x0, t + y0);
   }
@@ -1004,7 +1032,7 @@ static void erase_at(ObjView *ov, GridView *gv, LONG x, LONG y)
     LONG x0, y0, x1, y1;
     if (o->kind != OB_SHAPE || o->shape != SK_INK) continue;
     obj_box(gv, o, &x0, &y0, &x1, &y1);
-    if (x < x0 - 6 || x > x1 + 6 || y < y0 - 6 || y > y1 + 6 || !ink_hit(gv, o, x, y, x0, y0, 6)) continue;
+    if (x < x0 - 6 || x > x1 + 6 || y < y0 - 6 || y > y1 + 6 || !ink_hit(gv, o, in_box(gv, x, x0, x1), y, x0, y0, 6)) continue;
     if (!ov->erased) { drw_begin(gv->book, gv->sheet); ov->erased = 1; }
     drw_remove(s, i);
     ov->nsel = 0;
@@ -1022,11 +1050,14 @@ int ov_mouse(ObjView *ov, GridView *gv, struct IntuiMessage *im, LONG x, LONG y)
     if (ov->drag == DG_INK) {
       struct RastPort *rp = _rp(gv->obj);
       LONG l = _mleft(gv->obj), t = _mtop(gv->obj);
-      APTR clip = MUI_AddClipping(muiRenderInfo(gv->obj), (WORD)(l + gv->hw), (WORD)(t + gv->hh), (WORD)(gv->w - gv->hw), (WORD)(gv->h - gv->hh));
+      LONG cx0, cx1;
+      APTR clip;
+      cells_x(gv, &cx0, &cx1);
+      clip = MUI_AddClipping(muiRenderInfo(gv->obj), (WORD)(l + cx0), (WORD)(t + gv->hh), (WORD)(cx1 - cx0 + 1), (WORD)(gv->h - gv->hh));
       SetAPen(rp, gpen(gv, ov->tcolor));
       SetDrMd(rp, JAM1);
       if (ov->twidth >= 600) SetAfPt(rp, (UWORD *)half_pat, 1);
-      thick(rp, l + ov->cx, t + ov->cy, l + x, t + y, lw_px((u16)ov->twidth, gv->zoom));
+      thick(rp, l + scr_x(gv, ov->cx), t + ov->cy, l + scr_x(gv, x), t + y, lw_px((u16)ov->twidth, gv->zoom));
       SetAfPt(rp, NULL, 0);
       MUI_RemoveClipping(muiRenderInfo(gv->obj), (struct Region *)clip);
       ov->cx = x; ov->cy = y;
@@ -1069,7 +1100,7 @@ int ov_mouse(ObjView *ov, GridView *gv, struct IntuiMessage *im, LONG x, LONG y)
         LONG x0, y0, x1, y1;
         int part;
         obj_box(gv, o, &x0, &y0, &x1, &y1);
-        part = control_part(o, x1 - x0, y1 - y0, x - x0, y - y0, control_value(gv->book, gv->sheet, o));
+        part = control_part(o, x1 - x0, y1 - y0, in_box(gv, x, x0, x1) - x0, y - y0, control_value(gv->book, gv->sheet, o));
         if (part != CP_THUMB && part != CP_NONE && book_control_step(gv->book, gv->sheet, i, part)) changed(gv);
         if (ov->nsel) { ov->nsel = 0; selmoved(gv); }
         gv->redraw(gv->g);
@@ -1079,7 +1110,7 @@ int ov_mouse(ObjView *ov, GridView *gv, struct IntuiMessage *im, LONG x, LONG y)
         /* a slicer's buttons filter (pivot2.c); its header and frame select and move it */
         LONG x0, y0, x1, y1;
         obj_box(gv, o, &x0, &y0, &x1, &y1);
-        if (pivot2_slicer_click(gv, i, x - x0, y - y0, x1 - x0, y1 - y0, shift)) { changed(gv); gv->redraw(gv->g); return 1; }
+        if (pivot2_slicer_click(gv, i, in_box(gv, x, x0, x1) - x0, y - y0, x1 - x0, y1 - y0, shift)) { changed(gv); gv->redraw(gv->g); return 1; }
       }
       if (shift && !is_sel(ov, i) && ov->nsel < MAXSEL) sel_unit(ov, gv, i, 1);
       else if (!is_sel(ov, i)) { sel_unit(ov, gv, i, 0); ov->elem = CE_CHART; }
@@ -1089,7 +1120,7 @@ int ov_mouse(ObjView *ov, GridView *gv, struct IntuiMessage *im, LONG x, LONG y)
         LONG x0, y0, x1, y1;
         obj_box(gv, o, &x0, &y0, &x1, &y1);
         if (x1 - x0 >= 20 && y1 - y0 >= 20) {
-          int e = prims_hit(chart_prims(ov, gv, o->chart, (int)(x1 - x0), (int)(y1 - y0)), x - x0, y - y0);
+          int e = prims_hit(chart_prims(ov, gv, o->chart, (int)(x1 - x0), (int)(y1 - y0)), in_box(gv, x, x0, x1) - x0, y - y0);
           ov->elem = e == CE_NONE || e == CE_XAXIS || e == CE_YAXIS ? CE_CHART : e;
         }
       }

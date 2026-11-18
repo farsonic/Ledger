@@ -19,6 +19,7 @@
 #include "theme.h"
 #include "lang.h"
 #include "../core/data.h"
+#include "gmirror.h"              /* (last) drawing on a right-to-left sheet mirrored */
 
 static LONG lane(void) { return theme_font()->tf_YSize + 4; }
 LONG gx_band(Sheet *s, int rows)

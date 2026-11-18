@@ -1817,6 +1817,7 @@ static void stat_functions(void)
 #include "analysistest.c"
 #include "synctest.c"
 #include "gc2test.c"
+#include "rtltest.c"
 int main(void)
 {
   values_dates();
@@ -1851,6 +1852,7 @@ int main(void)
   analysis_tests();
   sync_tests();
   gc2_tests();
+  rtl_tests();
   printf("%d tests, %d failed\n", passed + failed, failed);
   return failed != 0;
 }

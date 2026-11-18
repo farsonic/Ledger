@@ -38,6 +38,7 @@ enum {
   ID_LX_REFRESH, ID_LX_SPCHANGE, ID_LX_SPCHANGEALL, ID_LX_SPIGNORE, ID_LX_SPIGNOREALL, ID_LX_SPADD, ID_LX_SPPICK, ID_LX_SPCLOSE,
   ID_LX_WATCHADD, ID_LX_WATCHDEL, ID_LX_WATCHPICK, ID_LX_ERRNEXT, ID_LX_ERRPREV, ID_LX_ERRHELP, ID_LX_ERREDIT, ID_LX_ERRIGNORE, ID_LX_ERREVAL,
   ID_LX_SCROLLED,
+  ID_LX_SHEETRTL,                          /* Page Layout > Sheet Options > Sheet Right-to-Left */
   ID_LX_LAST
 };
 
@@ -57,6 +58,7 @@ enum {
   LXB_FIRST = 32,
   LXB_PRINTGRID = LXB_FIRST, LXB_PRINTHEAD, LXB_NORMAL, LXB_PBP, LXB_PAGELAYOUT, LXB_RULER, LXB_SPLIT, LXB_SIDEBYSIDE, LXB_SYNC,
   LXB_ARROWS, LXB_HASFORMULA, LXB_LANDSCAPE, LXB_NOTESHOWN, LXB_MANYWIN, LXB_VIEWGRID, LXB_VIEWHEAD, LXB_COMMENTS,
+  LXB_SHEETRTL,
   LXB_LAST
 };
 int   lx_bit(int b);
@@ -122,7 +124,7 @@ Clip *app_clip(void);              /* what was copied last */
   I("Page Setup...", 0, ID_LX_PAGESETUP), I("Themes...", 0, ID_LX_THEMEDD), I("Margins...", 0, ID_LX_MARGINSDD), I("Orientation...", 0, ID_LX_ORIENTDD), \
   I("Paper Size...", 0, ID_LX_SIZEDD), I("Print Area...", 0, ID_LX_AREADD), I("Page Breaks...", 0, ID_LX_BREAKSDD), I("Print Titles...", 0, ID_LX_TITLES), I("Header & Footer...", 0, ID_LX_HEADERFOOTER), \
   I("Scale to Fit...", 0, ID_LX_SCALEDD), BAR, \
-  T("Print Gridlines", 0, ID_LX_PRINTGRID), T("Print Headings", 0, ID_LX_PRINTHEAD), BAR, \
+  T("Print Gridlines", 0, ID_LX_PRINTGRID), T("Print Headings", 0, ID_LX_PRINTHEAD), T("Sheet Right-to-Left", 0, ID_LX_SHEETRTL), BAR, \
   T("Normal View", 0, ID_LX_NORMAL), T("Page Break Preview", 0, ID_LX_PBP), T("Page Layout View", 0, ID_LX_PAGELAYOUT), T("Ruler", 0, ID_LX_RULER), \
   I("Custom Views...", 0, ID_LX_CUSTOMVIEWS), \
   M("Formulas"), \
