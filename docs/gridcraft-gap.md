@@ -1,31 +1,22 @@
 # Ledger against GridCraft: what is missing
 
-GridCraft (github.com/storytold/sheetcraft, the ArtCraft spreadsheet) is the program Ledger follows. This list was made on 2026-10-29 from GridCraft's own source (its function registry) and its ribbon command catalogue (docs/gridcraft/parity-checklist.md, copied here with function-parity.md and gaps.md). It is the work list for closing the gaps; FEATURES.md is ticked off as features land.
+GridCraft (github.com/storytold/sheetcraft, the ArtCraft spreadsheet) is the program Ledger follows. This list was first made on 2026-10-29 from GridCraft's own source (its function registry) and its ribbon command catalogue (docs/gridcraft/parity-checklist.md, copied here with function-parity.md and gaps.md), and brought up to date on 2026-11-18 against GridCraft commit **4c388df** (the copies in docs/gridcraft/ are from that commit). It is the work list for closing the gaps; FEATURES.md is ticked off as features land.
 
-Left out on purpose, as in Quill: printing (PDF export is in) and ARexx/MCP scripting.
+Left out on purpose, as in Quill: printing (PDF export is in) and ARexx/MCP scripting (with them GridCraft's macros, Record Macro, Python code that runs, and buttons that run macros).
 
 ## Functions
 
-GridCraft has 513 worksheet functions (509 in its registry and special forms, plus RAND, RANDBETWEEN, NOW and TODAY); Ledger has 187. Missing: 326.
+GridCraft 4c388df has 516 worksheet functions (511 in its registry and evaluator special forms, listed in docs/gridcraft/functions.txt, plus RAND, RANDARRAY, RANDBETWEEN, NOW and TODAY). Ledger has every one of them: the two GridCraft added since 2026-10-29 are in (2026-11-18):
 
-- **Statistical (79):** BETA.DIST, BETA.INV, BINOM.DIST, BINOM.DIST.RANGE, BINOM.INV, CHISQ.DIST, CHISQ.DIST.RT, CHISQ.INV, CHISQ.INV.RT, CHISQ.TEST, CONFIDENCE.NORM, CONFIDENCE.T, COVARIANCE.P, COVARIANCE.S, DEVSQ, EXPON.DIST, F.DIST, F.DIST.RT, F.INV, F.INV.RT, F.TEST, FISHER, FISHERINV, FORECAST.ETS, FORECAST.ETS.CONFINT, FORECAST.ETS.SEASONALITY, FORECAST.ETS.STAT, FORECAST.LINEAR, FREQUENCY, GAMMA, GAMMA.DIST, GAMMA.INV, GAMMALN, GAMMALN.PRECISE, GAUSS, GEOMEAN, GROWTH, HARMEAN, HYPGEOM.DIST, INTERCEPT, KURT, LINEST, LOGEST, LOGNORM.DIST, LOGNORM.INV, MODE.MULT, NEGBINOM.DIST, NORM.DIST, NORM.INV, NORM.S.DIST, NORM.S.INV, PEARSON, PERCENTRANK.EXC, PERCENTRANK.INC, PERMUTATIONA, PHI, POISSON.DIST, PROB, QUARTILE.EXC, RANK.AVG, RSQ, SKEW, SKEW.P, SLOPE, STANDARDIZE, STDEVPA, STEYX, T.DIST, T.DIST.2T, T.DIST.RT, T.INV, T.INV.2T, T.TEST, TREND, TRIMMEAN, VARA, VARPA, WEIBULL.DIST, Z.TEST
-- **Engineering (54):** BESSELI, BESSELJ, BESSELK, BESSELY, BIN2DEC, BIN2HEX, BIN2OCT, BITAND, BITLSHIFT, BITOR, BITRSHIFT, BITXOR, COMPLEX, CONVERT, DEC2BIN, DEC2HEX, DEC2OCT, DELTA, ERF, ERF.PRECISE, ERFC, ERFC.PRECISE, GESTEP, HEX2BIN, HEX2DEC, HEX2OCT, IMABS, IMAGINARY, IMARGUMENT, IMCONJUGATE, IMCOS, IMCOSH, IMCOT, IMCSC, IMCSCH, IMDIV, IMEXP, IMLN, IMLOG10, IMLOG2, IMPOWER, IMPRODUCT, IMREAL, IMSEC, IMSECH, IMSIN, IMSINH, IMSQRT, IMSUB, IMSUM, IMTAN, OCT2BIN, OCT2DEC, OCT2HEX
-- **Financial (45):** ACCRINT, ACCRINTM, AMORDEGRC, AMORLINC, COUPDAYBS, COUPDAYS, COUPDAYSNC, COUPNCD, COUPNUM, COUPPCD, CUMIPMT, CUMPRINC, DB, DDB, DISC, DOLLARDE, DOLLARFR, DURATION, EFFECT, FVSCHEDULE, INTRATE, ISPMT, MDURATION, MIRR, NOMINAL, ODDFPRICE, ODDFYIELD, ODDLPRICE, ODDLYIELD, PDURATION, PRICE, PRICEDISC, PRICEMAT, RECEIVED, RRI, SYD, TBILLEQ, TBILLPRICE, TBILLYIELD, VDB, XIRR, XNPV, YIELD, YIELDDISC, YIELDMAT
-- **MathTrig (32):** ACOSH, ACOT, ACOTH, ARABIC, ASINH, ATANH, BASE, CEILING.PRECISE, COMBINA, COT, COTH, CSC, CSCH, DECIMAL, FACTDOUBLE, FLOOR.PRECISE, ISO.CEILING, MDETERM, MINVERSE, MMULT, MULTINOMIAL, MUNIT, PERCENTOF, ROMAN, SEC, SECH, SEQUENCE, SERIESSUM, SQRTPI, SUMX2MY2, SUMX2PY2, SUMXMY2
-- **Compatibility (32):** BETADIST, BETAINV, BINOMDIST, CHIDIST, CHIINV, CHITEST, CONFIDENCE, COVAR, CRITBINOM, EXPONDIST, FDIST, FINV, FORECAST, FTEST, GAMMADIST, GAMMAINV, HYPGEOMDIST, LOGINV, LOGNORMDIST, NEGBINOMDIST, NORMDIST, NORMINV, NORMSDIST, NORMSINV, PERCENTRANK, POISSON, TDIST, TINV, TTEST, USDOLLAR, WEIBULL, ZTEST
-- **Text (21):** ARRAYTOTEXT, ASC, BAHTTEXT, DBCS, FINDB, JIS, LEFTB, LENB, MIDB, PHONETIC, REGEXEXTRACT, REGEXREPLACE, REGEXTEST, REPLACEB, RIGHTB, SEARCHB, TEXTAFTER, TEXTBEFORE, TEXTSPLIT, UNICODE, VALUETOTEXT
-- **Lookup (18):** CHOOSECOLS, CHOOSEROWS, DROP, EXPAND, FILTER, GROUPBY, HSTACK, PIVOTBY, SORT, SORTBY, TAKE, TOCOL, TOROW, UNIQUE, VSTACK, WRAPCOLS, WRAPROWS, XMATCH
-- **Special form (17):** AGGREGATE, AREAS, BYCOL, BYROW, CELL, FORMULATEXT, ISOMITTED, LAMBDA, LET, MAKEARRAY, MAP, REDUCE, SCAN, SHEET, SHEETS, SUBTOTAL, TRIMRANGE
-- **Database (12):** DAVERAGE, DCOUNT, DCOUNTA, DGET, DMAX, DMIN, DPRODUCT, DSTDEV, DSTDEVP, DSUM, DVAR, DVARP
-- **Cube (7):** CUBEKPIMEMBER, CUBEMEMBER, CUBEMEMBERPROPERTY, CUBERANKEDMEMBER, CUBESET, CUBESETCOUNT, CUBEVALUE
-- **DateTime (4):** DAYS360, ISOWEEKNUM, NETWORKDAYS.INTL, WORKDAY.INTL
-- **Web (3):** ENCODEURL, FILTERXML, WEBSERVICE
-- **AddIn (1):** EUROCONVERT
-- **Information (1):** INFO
+- ✅ ECMA.CEILING (Compatibility): CEILING by its ECMA-376 name, `_xlfn.` in files; not on Microsoft's list, as USDOLLAR.
+- ✅ GETPIVOTDATA (Lookup): the value a pivot table shows for a data field where the named Rows and Columns items meet, from the pivot's definition and source (volatile); `#REF!` for anything the report doesn't show. (GridCraft's "Generate GetPivotData", typing it by clicking a report cell, is not in Ledger either.)
+- ⬜ PY: GridCraft keeps Python cells (Excel's `_xlfn._xlws.PY`) with their cached results without running the code; Ledger opens such a cell as a formula of an unknown function showing its cached value.
+
+GridCraft's function fixes in this period, each checked in Ledger first and made where Ledger differed (with FunctionTests rows, LibreOffice's differing answers noted in tools/functest/excel.txt): HARMEAN with no numbers `#N/A`; T.DIST with 0 degrees `#DIV/0!` (density), T.INV(0) `#DIV/0!`; GAMMA.DIST, WEIBULL.DIST and BETA.DIST densities at 0 and at the ends; BINOM.DIST's 2,147,483,646-trial limit; BINOM.DIST and POISSON.DIST masses by Loader's saddle point (1E-8 relative error at 1E7 trials before); the t density at huge degrees; PERCENTRANK's significance 309 and 15-digit rounding; F.DIST/F.INV at 1E10 degrees; MOD's 1.1259E12 quotient limit; YEARFRAC basis 0 from February's end; LINEST keeping a predictor that varies little next to a large offset (Ledger centres the variables; it already solved by orthogonalisation, not the normal equations); FIXED and DOLLAR's 255/254-character limits and digits past the fifteenth (Ledger now shows 15 significant digits and then zeros everywhere, as Excel); single-character case changes (LOWER of the dotted capital I is i, Latin Extended-A letters); UNICHAR's noncharacters; IMSQRT by Excel's polar route; BITLSHIFT/BITRSHIFT of 0; TRUE as DEC2BIN's places. Already as Excel in Ledger: GCD/LCM with negative fractions, BIN2*/HEX2*/OCT2* with spaces, UPPER keeping ß, DOLLAR of a negative amount rounding to 0, HYPERLINK without a friendly name, AutoSum stopping at a blank.
 
 ## Ribbon commands
 
-GridCraft implements 275 of the 291 Excel ribbon commands in its catalogue. Below, each of GridCraft's commands, tab by tab, with a first guess (by name) whether Ledger has it: ✅ probably has, ⬜ probably missing. Each is to be checked and the missing ones built. The File, Home (but for the commands other parts of the work own: Format as Table, Flash Fill, protection), Page Layout, Formulas, Review and View tabs have been checked one by one and their marks are real: ✅ done, ⬜ not done (see the note under the tab), ➖ left out on purpose.
+GridCraft 4c388df implements 282 of the 296 Excel ribbon commands in its catalogue (275 of 291 on 2026-10-29: since then Insert's WordArt, called Decorative Text there, and Equation, View's Record Macro and a Developer tab of form controls). Below, each of GridCraft's commands, tab by tab, with a first guess (by name) whether Ledger has it: ✅ probably has, ⬜ probably missing. Each is to be checked and the missing ones built. The File, Home (but for the commands other parts of the work own: Format as Table, Flash Fill, protection), Page Layout, Formulas, Review and View tabs have been checked one by one and their marks are real: ✅ done, ⬜ not done (see the note under the tab), ➖ left out on purpose.
 
 ### File (7 of 11 by name)
 
@@ -156,9 +147,13 @@ New Cell Style keeps the active cell's look under a name in Home > My Styles whi
 - ✅ Link (Links) `insert.link`
 - ✅ Comment (Comments) `review.newComment`
 - ✅ Text Box (Text) `insert.textBox`
+- ✅ WordArt (Text) `insert.wordArt` (new in GridCraft, there "Decorative Text"; 2026-11-18)
 - ✅ Header & Footer (Text) `pageLayout.headerFooter`
+- ⬜ Equation (Symbols) `insert.equation` (new in GridCraft: a LaTeX editor, Office Math in .xlsx; Ledger shows an equation's fallback text only)
 - ✅ Symbol (Symbols) `insert.symbol`
 - ✅ Checkbox (Cell Controls) `insert.checkbox`
+
+WordArt (Insert > Text > WordArt, and the Insert menu) puts large decorative text at the active cell in one of GridCraft's ten styles (its own palette: text colour, outline, shadow, bold or italic, size); its text is then typed in and edited as a text box's. It is not inserted on a protected sheet unless objects may be edited. It is saved as GridCraft saves it, a text box whose text body has the plain text warp textNoShape, with the run's outline (a:ln) and shadow (outerShdw), and read back as WordArt. GridCraft's Format Chart Area pane got the stacked and 100% stacked chart types (#2605); Ledger's Format Chart dialog now has a Chart type list with every kind, the chart's own shown.
 
 Checkbox makes the selected cells checkboxes, as GridCraft and Excel do: the cell holds TRUE or FALSE and shows a box (empty cells start FALSE; a formula's TRUE/FALSE shows too); a click on the cell or Space ticks it. It is kept as the cell format "checkbox" (GridCraft's way) and saved in .xlsx as Excel saves it: General plus the xf's feature property bag extension (featurePropertyBag.xml, [MS-XLSX] 2.1.22), read back from Excel's files.
 
@@ -293,6 +288,7 @@ The Protect group's Unprotect Sheet and Protect Workbook are the data work's. Al
 - ✅ Unhide (Window) `view.unhideWindow`
 - ✅ Switch Windows (Window) `view.switchWindows`
 - ➖ Macros (Macros) `view.macros`
+- ➖ Record Macro (Macros) `macro.record` (new in GridCraft; scripting is left out)
 
 Split makes two or four panes that scroll on their own, at the active cell (or the middle); the bars can be dragged, and go when double-clicked, dragged to an edge or Split is pressed again; saved and loaded as Excel does (pane state="split"). Custom Views are saved in the file (customWorkbookViews / customSheetViews). Macros: left out, as is scripting.
 
@@ -302,6 +298,15 @@ Split makes two or four panes that scroll on their own, at the active cell (or t
 - ➖ All Scripts (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.allScripts`
 - ➖ Record Actions (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.recordActions`
 - ➖ Trust Scripts (Scripting Tools) (scripting left out on purpose, as for Quill) `automate.trustScripts`
+
+### Developer (0 of 4; new in GridCraft)
+
+- ➖ Button (Form Control) (Controls) `insert.button` (it runs a macro or command: scripting is left out)
+- ⬜ Spin Button (Form Control) (Controls) `insert.spinButton`
+- ⬜ Scroll Bar (Form Control) (Controls) `insert.slider`
+- ⬜ Properties (Controls) `control.format`
+
+GridCraft's form controls are floating objects linked to a cell (a spin button or scroll bar sets its number); Ledger's checkbox cells are the cell form of the same idea. The spin button and scroll bar could come without scripting.
 
 ### Table Design (2 of 13 by name)
 
@@ -361,3 +366,18 @@ Recommended PivotTables offers GridCraft's suggestions (a category by a number, 
 - ✅ Report Layout (Layout) `pivot.reportLayout`
 - ✅ PivotTable Styles (PivotTable Styles) `pivot.style`
 
+
+## GridCraft's changes from 2026-10-27 to 4c388df (2026-11-18)
+
+123 merged pull requests (the sync report): 3 new features, 79 fixes, the rest other work. What applies to Ledger, and what became of it:
+
+- ✅ Insert > WordArt (#784), Format Chart Area's stacked and 100% stacked types (#2605), GETPIVOTDATA (#284), ECMA.CEILING, the function fixes listed under Functions.
+- ✅ Flush a saved workbook to disk before replacing the old one (#3178): Ledger wrote over the old file in place; workbooks, CSV and PDF now go to Ledger.tmp in the same drawer first and are renamed over the old file once written and closed.
+- ✅ Set precision as displayed (#1366): Ledger Options, Formulas; calcPr fullPrecision="0".
+- ✅ A hidden Total Row keeps its calculations (#4383): Ledger dropped them on saving.
+- ✅ Google Sheets' DUMMYFUNCTION wrapper opened as the formula (#2871).
+- ✅ Fill Series keeps its stop value despite float drift.
+- ✅ (found while checking the above) a typed number is the nearest double, as a formula's literal: 0.3 typed in a cell was an ulp off, so MATCH(0.3,A1,0) failed.
+- Already as GridCraft now has it: Page Setup's first page number (#4382), R1C1 reference style kept (#2809), AutoSum stopping at a blank (#3291), Subtotal's outline with every row under the grand total (#3945), HYPERLINK without a friendly name.
+- ⬜ Not yet: Equations (Insert > Equation, #471), Python cells kept with their results (#2637, no code runs), form controls (#481; buttons are scripting), SYLK (.slk) files (#1481), a web page's table opened as a sheet (#3166), Find and Replace within the selection (#3224), CSV date order detected per column (#2765), custom-list sort (Ledger has no custom lists), Arabic right-to-left cells (#947), Solver's Load/Save Model, Options and Sensitivity report (#3086, #3087, #501).
+- ➖ Not for Ledger: the installers, Windows/Linux/macOS/Flatpak packaging and window decorations, the web host and page API, update checks, telemetry, the MCP/control server, Python code running, macros and Record Macro, the command palette and its shortcuts, egui interface work, Rust lint and CI work, performance work on GridCraft's own engine (Ledger's calculation is its own), the shared Craft libraries' cutovers.

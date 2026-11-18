@@ -16,7 +16,7 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 10 | Format as Table (banded rows, header row, totals row) | yes | ✅ |
 | 11 | Dynamic array formulas that spill (SEQUENCE, SORT, FILTER, UNIQUE...) | yes | ✅ |
 | 12 | LET and LAMBDA | yes | ✅ |
-| 13 | More functions (statistics, engineering, text, information: towards GridCraft's 500+): Ledger has 542 against GridCraft's 513, each with its description and Excel category in Insert Function | 500+ | ✅ |
+| 13 | More functions (statistics, engineering, text, information: towards GridCraft's 500+): Ledger has every one of GridCraft's (516 at 4c388df, ECMA.CEILING and GETPIVOTDATA the latest), each with its description and Excel category in Insert Function | 500+ | ✅ |
 | 14 | Text to Columns | yes | ✅ |
 | 15 | Group and outline rows/columns; Subtotals | yes | ✅ |
 | 16 | Protect sheet (locked cells can't be changed) | yes | ✅ |
@@ -35,3 +35,10 @@ Worked through top to bottom. ✅ done (built, tested natively and in the emulat
 | 29 | Analysis ToolPak (Data Analysis: Anova, regression, t/F/z tests, histogram, descriptive statistics and the rest of Excel's 19 tools) | yes | ✅ |
 | 30 | Forecast Sheet (FORECAST.ETS with confidence bounds, table and chart on a new sheet) | yes | ✅ |
 | 31 | Checkbox cells, Lock Cell, Allow Edit Ranges (saved in .xlsx as Excel saves them) | yes | ✅ |
+| 32 | WordArt (Insert > WordArt, GridCraft's ten styles, saved with its textNoShape marker) | yes (4c388df) | ✅ |
+| 33 | Set precision as displayed | yes (4c388df) | ✅ |
+| 34 | Safe saving (the new file written in full before it replaces the old one) | yes (4c388df) | ✅ |
+| 35 | Equations (Insert > Equation, LaTeX, Office Math in .xlsx) | yes (4c388df) | ⬜ |
+| 36 | Python in cells (stored with cached results, no code run) | yes (4c388df) | ⬜ (running code ➖) |
+| 37 | Form controls (spin button, scroll bar, button) | yes (4c388df) | ⬜ spin button and scroll bar; buttons ➖ (they run macros) |
+| 38 | SYLK (.slk) files | yes (4c388df) | ⬜ |

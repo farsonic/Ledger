@@ -117,6 +117,19 @@ As in GridCraft, from the top:
 | Amiga-+, - | zoom in, out |
 | Amiga-` | the next workbook window |
 
+## Since 0.3 (GridCraft 4c388df, 2026-11-18)
+
+Brought up to date with GridCraft's changes to 18 November 2026 (docs/gridcraft-gap.md lists them all, done or not):
+
+- **Insert > WordArt:** large decorative text in ten styles (colour, outline, shadow), edited as a text box's text, saved as GridCraft saves it.
+- **GETPIVOTDATA** (a pivot table's value where the named items meet) and **ECMA.CEILING**: 516 functions, every one of GridCraft's.
+- **Format Chart** has a Chart type list with the stacked and 100% stacked forms.
+- **Set precision as displayed** (File > Options, Formulas): numbers kept as their formats show them, as in Excel.
+- **Safer saving:** a workbook (or CSV or PDF) is written in full as Ledger.tmp beside the old file and only then takes its place, so a full disk no longer spoils the old file.
+- **Excel's answers at the edges** for HARMEAN, T.DIST, T.INV, GAMMA.DIST, WEIBULL.DIST, BETA.DIST, BINOM.DIST, POISSON.DIST (accurate far out), PERCENTRANK, F.DIST, MOD, YEARFRAC, LINEST (a predictor next to a large offset), FIXED and DOLLAR (length limits; 15 significant digits and then zeros, everywhere numbers are formatted), LOWER/UPPER/PROPER (Latin Extended-A letters), UNICHAR, IMSQRT, BITLSHIFT and DEC2BIN; FIXED(1E191,0) no longer overruns a buffer. FunctionTests.xlsx has 3,615 tests.
+- **Files:** a hidden table Total Row keeps its calculations; Google Sheets' DUMMYFUNCTION wrappers open as the formulas.
+- **Typed numbers** are read exactly as a formula's are (0.3 typed in a cell was a hair off, so MATCH couldn't find it).
+
 ## What's new in 0.3
 
 Ledger 0.3 closes the gap with GridCraft: every function it has, every ribbon command but its scripting tools (left out, as in Quill), and its big features. In more detail:
