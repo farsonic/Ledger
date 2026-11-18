@@ -60,6 +60,8 @@ static const char *const icx[ICX_N - ICX_BASE] = {
   /* EDITSPARK: a sparkline and a pencil */ "ci R 1 6 9 12 ca P 3 2 10 5 8 8 10 co P 4 9 6 14 1 15 2 10 7",
   /* DELCHART: a chart and a red cross */ "ci L 1 15 10 15 ca F 2 9 4 14 F 6 6 8 14 cr L 10 1 15 6 L 15 1 10 6",
   /* WORDART: a large A with its shadow and a swash */ "cs P 3 4 14 8 3 12 14 L 6 10 10 10 ca P 3 2 12 7 1 11 12 L 4 8 10 8 L 3 12 3 11 L 11 12 11 11 co P 4 1 15 6 13 10 15 15 13",
+  /* SPIN: a spin button's two arrows */ "ci R 4 1 11 14 L 4 7 11 7 ct Q 3 6 5 9 5 7 3 Q 3 6 9 9 9 7 11",
+  /* SCROLLBAR: a bar across with its thumb */ "ci R 1 5 14 10 L 4 5 4 10 L 11 5 11 10 ct Q 3 3 7 3 9 2 8 Q 3 12 7 12 9 13 8 cd F 6 6 8 9",
 };
 const char *chart_icon_desc(int icon)
 {

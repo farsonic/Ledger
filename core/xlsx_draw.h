@@ -25,4 +25,15 @@ void xd_write_parts(Book *b, int si, ZipWriter *w);   /* the drawing, its charts
 /* loading: sheet's drawing (through its relationships) and its sparklines */
 void xd_load_sheet(Book *b, ZipReader *z, const char *sheetpath, int sheet);
 
+/* form controls (formctl.c): spin buttons and scroll bars */
+#include "xml.h"
+int   fc_count(Sheet *s);
+void  fc_xlsx_types(Book *b, Buf *o);
+void  fc_xlsx_rels(Book *b, int si, Buf *o);             /* rIdC1... to the ctrlProp parts */
+void  fc_xlsx_controls(Book *b, int si, Buf *o);         /* the sheet's <controls> */
+void  fc_xlsx_vml(Book *b, int si, Buf *o);              /* their shapes in the VML drawing */
+char *fc_xlsx_prop(Book *b, int si, int k, int *number); /* control k's ctrlProp part (malloc'd), NULL past the last */
+void  fc_xlsx_read_controls(Book *b, int sheet, Xml *x);
+void  fc_xlsx_read_prop(Book *b, int sheet, const char *rid, const char *data, size_t len);
+void  fc_xlsx_read_done(Book *b, int sheet);
 #endif

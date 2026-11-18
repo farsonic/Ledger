@@ -21,7 +21,7 @@
 /* ------------------------------------------------------------------ objects */
 typedef struct { i32 r, c; i32 dy, dx; } DCorner;     /* a cell, and pixels down and across into it (at 100%) */
 enum { AN_TWOCELL, AN_ONECELL, AN_ABSOLUTE };          /* move and size with cells, move only, neither */
-enum { OB_CHART, OB_PICTURE, OB_SHAPE, OB_SLICER };
+enum { OB_CHART, OB_PICTURE, OB_SHAPE, OB_SLICER, OB_CONTROL };
 enum { SK_RECT, SK_ROUNDRECT, SK_ELLIPSE, SK_TRIANGLE, SK_LINE, SK_ARROW, SK_TEXTBOX, SK_ICON, SK_INK, SK_N };
 enum { PIC_NONE, PIC_PNG, PIC_JPEG };
 
@@ -54,6 +54,10 @@ typedef struct {
   Chart *chart;                    /* OB_CHART */
   struct Slicer *slicer;           /* OB_SLICER (slicer.h) */
   u32 group;                       /* the innermost group (DGroup.id) it is in, 0 none */
+  /* OB_CONTROL (formctl.c): a form control, its value 0..30000 as Excel's */
+  u8 ctl;                          /* CT_ */
+  i32 cval, cmin, cmax, cinc, cpage;
+  Formula *link;                   /* the cell it sets (a reference), or NULL */
 } DObj;
 
 /* a group of objects (Page Layout > Arrange > Group; a grpSp in the file): its members are the
@@ -68,6 +72,29 @@ typedef struct { u32 id, parent; char name[48]; } DGroup;
 extern const char *const drw_icon_names[DRW_NICONS];
 const char *drw_icon_desc(int k);         /* NULL if k isn't one */
 int   drw_icon_by_name(const char *name);  /* -1 if none */
+
+/* ------------------------------------------------------------------ form controls (formctl.c) */
+/* Excel's spin button and scroll bar (Developer > Insert, Form Controls): floating objects that set a
+   number in their linked cell; up or across from min to max by inc (a scroll bar's track by page).
+   Its value is the linked cell's while that holds a number in range. Saved in .xlsx as Excel writes
+   them (a ctrlProp part, the sheet's <controls> and a VML shape); buttons, which run macros, are left
+   out with scripting */
+enum { CT_SPIN, CT_SCROLL };
+#define CTL_MAX 30000
+enum { CP_NONE, CP_DOWN, CP_UP, CP_PAGEDOWN, CP_PAGEUP, CP_THUMB };   /* the parts: value down or up */
+/* a control of kind ctl at cell r, c (Excel's size), 0..100 by 1 (page 10); its index or -1 (a
+   protected sheet), an undo step */
+int   book_control_add(Book *b, int sheet, int ctl, i32 r, i32 c);
+/* Format Control: link ("" none, else a cell such as $B$1 or Sheet2!B1), value and limits; the linked
+   cell gets the value. 0 with *why when something is out of range (nothing changes) */
+int   book_control_set(Book *b, int sheet, int i, const char *link, i32 val, i32 min, i32 max, i32 inc, i32 page, const char **why);
+i32   control_value(Book *b, int sheet, const DObj *o);
+void  control_link_text(Book *b, int sheet, const DObj *o, char *out, size_t cap);   /* "" none */
+int   control_horizontal(const DObj *o, i32 w, i32 h);   /* laid out across (wider than high) */
+/* the part at x, y of a control drawn w x h; clicking it (book_control_step) changes the value by its
+   step or page; 1 if the value changed (an undo step) */
+int   control_part(const DObj *o, i32 w, i32 h, i32 x, i32 y, i32 val);
+int   book_control_step(Book *b, int sheet, int i, int part);
 
 /* ------------------------------------------------------------------ WordArt (Insert > WordArt) */
 /* GridCraft's ten WordArt styles (its own palette): text colour, outline (and its width, hundredths
@@ -216,6 +243,9 @@ Prim *prim_add(PrimList *l, int t, u16 elem);   /* zeroed; NULL out of memory */
 int   prims_hit(const PrimList *l, i32 x, i32 y);
 /* text widths for laying out: px pixels to the em */
 typedef i32 (*TextWidthFn)(void *ctx, const char *utf8, int px, int bold);
+
+/* a form control (formctl.c) drawn in w x h pixels */
+int    control_render(Book *b, int sheet, const DObj *o, i32 w, i32 h, PrimList *out);
 
 /* ------------------------------------------------------------------ charts (chart.c) */
 Chart *chart_new(int kind);

@@ -438,6 +438,7 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
   while (xml_next(&x) != XT_EOF) {
     const char *n = x.name;
     if (x.type != XT_START) continue;
+    if (!strcmp(n, "controls")) { fc_xlsx_read_controls(rd->b, sheet, &x); continue; }   /* form controls (formctl.c) */
     if (page_xml_sheet(s, &x)) continue;
     if (!strcmp(n, "sheetFormatPr")) {
       const char *v;
@@ -855,6 +856,12 @@ static void read_sheet_rels(Rd *rd, ZipReader *z, const char *sheetpath, int she
   for (k = 0; k < n; k++) tablexml_read_rel(rd->b, z, rels[k].type, rels[k].target, sheet);   /* tables, pivot tables */
   xd_load_sheet(rd->b, z, sheetpath, sheet);     /* charts, pictures, shapes, sparklines (xlsx_draw.c) */
   for (k = 0; k < n; k++) if (!strcmp(rels[k].type, "threadedComment")) cm_read(rd->b, z, rels[k].target, sheet);
+  for (k = 0; k < n; k++) if (!strcmp(rels[k].type, "ctrlProp")) {
+    size_t pl;
+    u8 *pd = part(z, rels[k].target, &pl);
+    if (pd) { fc_xlsx_read_prop(rd->b, sheet, rels[k].id, (const char *)pd, pl); free(pd); }
+  }
+  fc_xlsx_read_done(rd->b, sheet);
   {
     /* links out: their addresses from the relationships (an external link is written as it is) */
     Sheet *s = rd->b->sh[sheet];
@@ -1505,8 +1512,9 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
   }
   page_write_sheet(s, o);
   xd_sheet_drawing_ref(b, si, o);   /* charts, pictures, shapes (xlsx_draw.c) */
-  if (s->nnotes) buf_adds(o, "<legacyDrawing r:id=\"rIdN2\"/>");   /* (the notes' boxes, for Excel) */
+  if (s->nnotes || fc_count(s)) buf_adds(o, "<legacyDrawing r:id=\"rIdN2\"/>");   /* (the notes' boxes and the form controls, for Excel) */
   xd_sheet_picture(b, si, o);       /* background */
+  fc_xlsx_controls(b, si, o);       /* form controls (formctl.c) */
   tablexml_sheet_parts(b, si, o);
   xd_sheet_ext(b, si, o);           /* sparklines */
   buf_adds(o, "</worksheet>");
@@ -1566,6 +1574,7 @@ static void write_vml(Book *b, int si, Buf *o)
                   "<x:AutoFill>False</x:AutoFill><x:Row>%ld</x:Row><x:Column>%ld</x:Column></x:ClientData></v:shape>",
                1024 * (si + 1) + i + 1, i + 1, (long)n->c + 1, (long)n->r, (long)n->c + 3, (long)n->r + 4, (long)n->r, (long)n->c);
   }
+  fc_xlsx_vml(b, si, o);
   buf_adds(o, "</xml>");
 }
 /* a sheet's relationships (its notes), or nothing if it has none */
@@ -1574,12 +1583,14 @@ static int write_sheet_rels(Book *b, int si, Buf *o)
   Sheet *s = b->sh[si];
   int i, out = 0;
   for (i = 0; i < s->nlinks; i++) if (s->links[i].target[0] != '#') out = 1;
-  if (!s->nnotes && !out && !tablexml_has_rels(b, si) && !xd_has_rels(b, si)) return 0;
+  if (!s->nnotes && !out && !tablexml_has_rels(b, si) && !xd_has_rels(b, si) && !fc_count(s)) return 0;
   buf_adds(o, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
               "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">");
   if (s->nnotes)
-    buf_printf(o, "<Relationship Id=\"rIdN1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments\" Target=\"../comments%d.xml\"/>"
-                  "<Relationship Id=\"rIdN2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing\" Target=\"../drawings/vmlDrawing%d.vml\"/>", si + 1, si + 1);
+    buf_printf(o, "<Relationship Id=\"rIdN1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments\" Target=\"../comments%d.xml\"/>", si + 1);
+  if (s->nnotes || fc_count(s))
+    buf_printf(o, "<Relationship Id=\"rIdN2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing\" Target=\"../drawings/vmlDrawing%d.vml\"/>", si + 1);
+  fc_xlsx_rels(b, si, o);
   cm_sheet_rels(s, si, o);
   for (i = 0; i < s->nlinks; i++) {
     if (s->links[i].target[0] == '#') continue;
@@ -1619,10 +1630,11 @@ u8 *xlsx_save(Book *b, size_t *len)
     buf_printf(&o, "<Override PartName=\"/xl/worksheets/sheet%d.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>", i + 1);
     if (b->sh[i]->nnotes) buf_printf(&o, "<Override PartName=\"/xl/comments%d.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml\"/>", i + 1);
   }
-  for (i = 0; i < b->nsh && !b->sh[i]->nnotes; i++) ;
+  for (i = 0; i < b->nsh && !b->sh[i]->nnotes && !fc_count(b->sh[i]); i++) ;
   if (i < b->nsh) buf_adds(&o, "<Default Extension=\"vml\" ContentType=\"application/vnd.openxmlformats-officedocument.vmlDrawing\"/>");
   tablexml_content_types(b, &o);
   xd_content_types(b, &o);
+  fc_xlsx_types(b, &o);
   cm_types(b, &o);
   if (dynamic) buf_adds(&o, "<Override PartName=\"/xl/metadata.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml\"/>");
   if (checkbox_used(b)) buf_adds(&o, "<Override PartName=\"/" CHECKBOX_PART "\" ContentType=\"application/vnd.ms-excel.featurepropertybag+xml\"/>");
@@ -1715,9 +1727,12 @@ u8 *xlsx_save(Book *b, size_t *len)
     zip_add(&w, path, o.data, o.len);
     o.len = 0;
     if (write_sheet_rels(b, i, &o)) { sprintf(path, "xl/worksheets/_rels/sheet%d.xml.rels", i + 1); zip_add(&w, path, o.data, o.len); }
-    if (b->sh[i]->nnotes) {
-      o.len = 0; write_comments(b, i, &o); sprintf(path, "xl/comments%d.xml", i + 1); zip_add(&w, path, o.data, o.len);
-      o.len = 0; write_vml(b, i, &o); sprintf(path, "xl/drawings/vmlDrawing%d.vml", i + 1); zip_add(&w, path, o.data, o.len);
+    if (b->sh[i]->nnotes) { o.len = 0; write_comments(b, i, &o); sprintf(path, "xl/comments%d.xml", i + 1); zip_add(&w, path, o.data, o.len); }
+    if (b->sh[i]->nnotes || fc_count(b->sh[i])) { o.len = 0; write_vml(b, i, &o); sprintf(path, "xl/drawings/vmlDrawing%d.vml", i + 1); zip_add(&w, path, o.data, o.len); }
+    {
+      int k, num;
+      char *cp;
+      for (k = 0; (cp = fc_xlsx_prop(b, i, k, &num)); k++) { sprintf(path, "xl/ctrlProps/ctrlProp%d.xml", num); zip_add(&w, path, cp, strlen(cp)); free(cp); }
     }
     xd_write_parts(b, i, &w);
 

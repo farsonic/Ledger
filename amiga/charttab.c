@@ -351,6 +351,52 @@ static void insert_wordart(int style)
   refresh_all();
   edit_text();
 }
+/* ------------------------------------------------------------------ form controls (formctl.c) */
+/* Format Control: the value, its limits and the linked cell */
+static void dlg_control(void)
+{
+  static const ULONG ends[] = { ID_DLGOK, 0 };
+  DObj *o = sel_obj();
+  Object *w, *val, *mn, *mx, *inc, *page = NULL, *lnk;
+  char tv[16], tn[16], tx[16], ti[16], tp[16], tl[200], u[200];
+  int i = ov_selected(OV());
+  if (!o || o->kind != OB_CONTROL) { ask("OK", "%s", tr("Select a spin button or scroll bar first (Ctrl-click it).")); return; }
+  sprintf(tv, "%ld", (long)control_value(book, cur_index(), o)); sprintf(tn, "%ld", (long)o->cmin); sprintf(tx, "%ld", (long)o->cmax);
+  sprintf(ti, "%ld", (long)o->cinc); sprintf(tp, "%ld", (long)o->cpage);
+  control_link_text(book, cur_index(), o, u, sizeof u);
+  utf8_to_latin1(u, strlen(u), tl, sizeof tl);
+  w = dialog_window("Format Control", ColGroup(2),
+        Child, Label1(tr("Current value:")), Child, val = str_obj(tv, 6),
+        Child, Label1(tr("Minimum value:")), Child, mn = str_obj(tn, 6),
+        Child, Label1(tr("Maximum value:")), Child, mx = str_obj(tx, 6),
+        Child, Label1(tr("Incremental change:")), Child, inc = str_obj(ti, 6),
+        Child, Label1(tr("Page change:")), Child, o->ctl == CT_SCROLL ? (page = str_obj(tp, 6)) : HSpace(0),
+        Child, Label1(tr("Cell link:")), Child, lnk = str_obj(tl, 100),
+      End, NULL);
+  if (!w) return;
+  set(w, MUIA_Window_ActiveObject, (ULONG)val);
+  for (;;) {
+    const char *why;
+    char lu[300];
+    size_t k, n = 0;
+    if (run_modal(w, ends, NULL) != ID_DLGOK) break;
+    for (k = 0; sget(lnk)[k] && n + 4 < sizeof lu; k++) n += (size_t)utf8_put(lu + n, (u8)sget(lnk)[k]);
+    lu[n] = 0;
+    if (book_control_set(book, cur_index(), i, lu, atol(sget(val)), atol(sget(mn)), atol(sget(mx)), atol(sget(inc)), page ? atol(sget(page)) : o->cpage, &why)) break;
+    ask("OK", "%s", tr(why));
+  }
+  MUI_DisposeObject(w);
+  refresh_all();
+}
+static void insert_control(int ctl)
+{
+  Sheet *s = cur_sheet();
+  int i = book_control_add(book, cur_index(), ctl, s->cur_r, s->cur_c);
+  if (i < 0) { ask("OK", "%s", tr("The sheet is protected: unprotect it to insert a form control.")); return; }
+  ov_select(OV(), i);
+  refresh_all();
+  dlg_control();
+}
 static void place_shape(int k)
 {
   ov_tool(OV(), TOOL_PLACE, 0, 0, shape_of[k % 7]);
@@ -1064,7 +1110,10 @@ void chart_command(ULONG id)
     break; }
   /* Format */
   case ID_X_ELEMDD: ov_set_elem(ov, elem_of((int)v)); refresh_all(); break;
-  case ID_X_FORMATSEL: dlg_format(); break;
+  case ID_X_FORMATSEL: if (o && o->kind == OB_CONTROL) dlg_control(); else dlg_format(); break;
+  case ID_X_SPIN: insert_control(CT_SPIN); break;
+  case ID_X_SCROLLBAR: insert_control(CT_SCROLL); break;
+  case ID_X_CTLFORMAT: dlg_control(); break;
   case ID_X_FILLDD: case ID_X_OUTLINEDD: {
     ULONG col = colour_choice(v);
     if (!o || col == 0xFFFFFFFFUL) break;

@@ -68,8 +68,67 @@ static void gc2_sylk(void)
   if (b) book_free(b);
 }
 
+static void gc2_controls(void)
+{
+  Book *b = book_new(), *d;
+  DObj *o;
+  const char *why;
+  int i, j;
+  size_t len;
+  u8 *x;
+  PrimList pl;
+  put(b, "B1", "=A1*2");
+  i = book_control_add(b, 0, CT_SPIN, 0, 3);
+  j = book_control_add(b, 0, CT_SCROLL, 4, 3);
+  ok("controls: added", i == 0 && j == 1 && drw_obj(b->sh[0], i)->kind == OB_CONTROL && drw_obj(b->sh[0], j)->ctl == CT_SCROLL);
+  ok("controls: limits checked", !book_control_set(b, 0, i, "$A$1", 5, 10, 2, 1, 10, &why) && !book_control_set(b, 0, i, "A1:A3", 5, 0, 20, 1, 10, &why) &&
+     !book_control_set(b, 0, i, "$A$1", 5, 0, 40000, 1, 10, &why));
+  ok("controls: format control sets the cell", book_control_set(b, 0, i, "$A$1", 5, 0, 20, 2, 10, &why) && num_at(b, "A1") == 5 && num_at(b, "B1") == 10);
+  o = drw_obj(b->sh[0], i);
+  ok("controls: spin parts", control_part(o, 16, 32, 8, 4, 5) == CP_UP && control_part(o, 16, 32, 8, 28, 5) == CP_DOWN);
+  ok("controls: spin up and down", book_control_step(b, 0, i, CP_UP) && num_at(b, "A1") == 7 && book_control_step(b, 0, i, CP_DOWN) && book_control_step(b, 0, i, CP_DOWN) && num_at(b, "A1") == 3);
+  ok("controls: stops at the ends", book_control_step(b, 0, i, CP_DOWN) && num_at(b, "A1") == 1 && book_control_step(b, 0, i, CP_DOWN) && num_at(b, "A1") == 0 && !book_control_step(b, 0, i, CP_DOWN));
+  put(b, "A1", "12");
+  ok("controls: the value follows the cell", control_value(b, 0, drw_obj(b->sh[0], i)) == 12);
+  book_undo(b, NULL, NULL);
+  ok("controls: undo", num_at(b, "A1") == 0);
+  ok("controls: scroll bar", book_control_set(b, 0, j, "Sheet1!$C$1", 50, 0, 100, 1, 10, &why) && num_at(b, "C1") == 50 &&
+     control_part(drw_obj(b->sh[0], j), 16, 100, 8, 2, 50) == CP_DOWN && control_part(drw_obj(b->sh[0], j), 16, 100, 8, 20, 50) == CP_PAGEDOWN &&
+     control_part(drw_obj(b->sh[0], j), 16, 100, 8, 98, 50) == CP_UP && book_control_step(b, 0, j, CP_PAGEUP) && num_at(b, "C1") == 60);
+  prims_init(&pl);
+  ok("controls: drawn", control_render(b, 0, drw_obj(b->sh[0], j), 16, 100, &pl) && pl.n == 6);
+  prims_free(&pl);
+  book_insert_rows(b, 0, 0, 2);
+  ok("controls: the link follows inserted rows", control_value(b, 0, drw_obj(b->sh[0], i)) == 0 && num_at(b, "C3") == 60);
+  { char t[40]; control_link_text(b, 0, drw_obj(b->sh[0], j), t, sizeof t); ok("controls: link text", !strcmp(t, "$C$3")); }
+  book_set_note(b, 0, 5, 5, "a note", "me");
+  x = xlsx_save(b, &len);
+  d = x ? xlsx_load(x, len, NULL, 0) : NULL;
+  ok("controls: saved and read", d && drw_count(d->sh[0]) == 2 && drw_obj(d->sh[0], 0)->kind == OB_CONTROL && drw_obj(d->sh[0], 0)->ctl == CT_SPIN &&
+     drw_obj(d->sh[0], 1)->ctl == CT_SCROLL && drw_obj(d->sh[0], 1)->cpage == 10 && drw_obj(d->sh[0], 0)->cinc == 2 && drw_obj(d->sh[0], 0)->cmax == 20 &&
+     control_value(d, 0, drw_obj(d->sh[0], 1)) == 60 && drw_obj(d->sh[0], 1)->from.r == drw_obj(b->sh[0], j)->from.r && d->sh[0]->nnotes == 1);
+  {
+    /* what Excel needs to find: the parts and the sheet's elements */
+    ZipReader z;
+    int ok1 = 0;
+    if (x && zip_open(&z, x, len)) {
+      size_t l1, l2;
+      int k1 = zip_find(&z, "xl/ctrlProps/ctrlProp2.xml"), k2 = zip_find(&z, "xl/worksheets/sheet1.xml");
+      u8 *p1 = k1 >= 0 ? zip_read(&z, k1, &l1) : NULL, *p2 = k2 >= 0 ? zip_read(&z, k2, &l2) : NULL;
+      ok1 = p1 && p2 && strstr((char *)p1, "objectType=\"Scroll\"") && strstr((char *)p1, "fmlaLink=\"$C$3\"") && strstr((char *)p2, "<controls>") && strstr((char *)p2, "legacyDrawing");
+      free(p1); free(p2);
+      zip_close(&z);
+    }
+    ok("controls: the file's parts", ok1);
+  }
+  free(x);
+  if (d) book_free(d);
+  book_free(b);
+}
+
 static void gc2_tests(void)
 {
+  gc2_controls();
   gc2_sylk();
   gc2_find();
   gc2_csv_dates();

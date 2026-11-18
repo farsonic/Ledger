@@ -37,7 +37,7 @@ static int count_kind(Book *b, int si, int ex, int pics)
   }
   return n;
 }
-int xd_has_drawing(Book *b, int si) { return si >= 0 && si < b->nsh && drw_count(b->sh[si]) > 0; }
+int xd_has_drawing(Book *b, int si) { return si >= 0 && si < b->nsh && drw_count(b->sh[si]) > fc_count(b->sh[si]); }   /* (form controls go in the VML drawing) */
 static int has_sparks(Book *b, int si) { Sheet *s = b->sh[si]; return s->drw && s->drw->ng > 0; }
 static int has_bg(Book *b, int si) { Sheet *s = b->sh[si]; return s->drw && s->drw->bg; }
 int xd_has_rels(Book *b, int si) { return xd_has_drawing(b, si) || has_bg(b, si); }
@@ -630,7 +630,7 @@ static void w_group_open(Buf *o, Sheet *s, u32 gid)
              "<a:chOff x=\"%ld\" y=\"%ld\"/><a:chExt cx=\"%ld\" cy=\"%ld\"/></a:xfrm></xdr:grpSpPr>",
              (long)x0 * EMU, (long)y0 * EMU, (long)(x1 - x0) * EMU, (long)(y1 - y0) * EMU, (long)x0 * EMU, (long)y0 * EMU, (long)(x1 - x0) * EMU, (long)(y1 - y0) * EMU);
 }
-static int writable(const DObj *ob) { return !((ob->kind == OB_CHART && !ob->chart) || (ob->kind == OB_PICTURE && !ob->pic) || (ob->kind == OB_SLICER && !ob->slicer)); }
+static int writable(const DObj *ob) { return ob->kind != OB_CONTROL && !((ob->kind == OB_CHART && !ob->chart) || (ob->kind == OB_PICTURE && !ob->pic) || (ob->kind == OB_SLICER && !ob->slicer)); }
 void xd_write_parts(Book *b, int si, ZipWriter *w)
 {
   Sheet *s = b->sh[si];
@@ -1228,6 +1228,7 @@ static void read_drawing(Book *b, ZipReader *z, const char *path, int sheet)
         if (nm) snprintf(o.name, sizeof o.name, "%s", nm);
         if (ds && *ds) { free(o.descr); o.descr = str_dup(ds); }
       }
+      else if (!strcmp(n, "compatExt")) o.kind = -1;       /* Excel's mirror of a form control (formctl.c reads the control) */
       else if (!strcmp(n, "cNvSpPr")) { const char *t = xml_attr(&x, "txBox"); if (t && atoi(t)) o.txbox = 1; }
       else if (!strcmp(n, "prstGeom")) {
         const char *p = xml_attr(&x, "prst");

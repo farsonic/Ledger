@@ -34,6 +34,7 @@ enum {
   ID_X_SPCLEAR,                                     /* (the menu) the selected sparklines cleared */
   ID_X_OBJSEL,                                      /* (the grid: an object was selected) */
   ID_X_WORDARTDD, ID_X_WORDART0, ID_X_WORDART9 = ID_X_WORDART0 + 9,   /* Insert > WordArt: a style's WordArt */
+  ID_X_SPIN, ID_X_SCROLLBAR, ID_X_CTLFORMAT,        /* form controls (formctl.c): insert, Format Control */
   ID_X_LAST
 };
 
@@ -54,7 +55,7 @@ enum {
   ICX_RECOMMENDED, ICX_ALLCHARTS, ICX_SPARKLINE, ICX_SPARKCOL, ICX_WINLOSS, ICX_PEN, ICX_PENBLACK, ICX_PENRED, ICX_HIGHLIGHTER,
   ICX_ERASER, ICX_LASSO, ICX_INKSHAPE, ICX_ICONS, ICX_ADDELEM, ICX_QUICKLAYOUT, ICX_STYLES, ICX_SWITCHRC, ICX_SELECTDATA,
   ICX_CHANGETYPE, ICX_MOVECHART, ICX_FORMATSEL, ICX_AXIS, ICX_CLEARSPARK, ICX_SPCOLOR, ICX_MARKCOLOR, ICX_EDITSPARK, ICX_DELCHART,
-  ICX_WORDART, ICX_N
+  ICX_WORDART, ICX_SPIN, ICX_SCROLLBAR, ICX_N
 };
 const char *chart_icon_desc(int icon);     /* (charticons.c) NULL if not one of these */
 

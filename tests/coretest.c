@@ -15,6 +15,7 @@
 #include "../core/drawing.h"
 #include "../core/data.h"
 #include "../core/xls.h"
+#include "../core/zip.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

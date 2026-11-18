@@ -28,6 +28,7 @@
 #include "layout.h"
 #include "uitab.h"
 #include "../core/funcdesc.h"
+#include "chartids.h"
 
 /* ------------------------------------------------------------------ */
 /* the lists */
@@ -294,6 +295,8 @@ static const Item i_fn[] = {
   { K_BUTTON, S_SMALL, IC_TIME, 0, "Time", ID_TIME, 0, 0, 0, 0, "The time now (Amiga-:)" },
   { K_DROP, S_SMALL, IC_SYMBOL, L_SYMBOLS, "Symbol", ID_SYMBOLDD, 0, 0, 0, 0, "A symbol" },
   { K_BUTTON, S_SMALL, IC_CHECKBOX, 0, "Checkbox", ID_AN_CHECKBOX, 0, 0, F_NEWCOL, 0, "Cell controls: checkboxes in the selected cells (TRUE ticked, FALSE not; click or Space to tick)" },
+  { K_BUTTON, S_SMALL, ICX_SPIN, 0, "Spin Button", ID_X_SPIN, 0, 0, 0, 0, "A spin button (form control) that counts its linked cell up and down; Ctrl-click to select it" },
+  { K_BUTTON, S_SMALL, ICX_SCROLLBAR, 0, "Scroll Bar", ID_X_SCROLLBAR, 0, 0, 0, 0, "A scroll bar (form control) that sets its linked cell between a minimum and a maximum" },
 };
 static const Item i_names[] = {
   { K_BUTTON, S_LARGE, IC_DEFNAME, 0, "Name", ID_DEFNAME, 0, 0, 0, 0, "Give the selection a name to use in formulas" },

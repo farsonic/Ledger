@@ -648,6 +648,12 @@ void ov_draw(ObjView *ov, GridView *gv)
     } else if (o->kind == OB_PICTURE) draw_picture(ov, gv, o, x0, y0, x1, y1);
     else if (o->kind == OB_SHAPE) ov_shape(rp, o, gv->ox + x0, gv->oy + y0, gv->ox + x1, gv->oy + y1, gv->zoom, gpen, gv);
     else if (o->kind == OB_SLICER) pivot2_draw_slicer(gv, i, x0, y0, x1, y1);    /* (pivot2.c) */
+    else if (o->kind == OB_CONTROL) {
+      PrimList pl;
+      prims_init(&pl);
+      if (control_render(gv->book, gv->sheet, o, x1 - x0, y1 - y0, &pl)) ov_paint(rp, &pl, gv->ox + x0, gv->oy + y0, gpen, gv);
+      prims_free(&pl);
+    }
   }
   /* a group: its box with handles, its objects outlined */
   if (sel_group(ov, gv)) {
@@ -1049,6 +1055,17 @@ int ov_mouse(ObjView *ov, GridView *gv, struct IntuiMessage *im, LONG x, LONG y)
     }
     if (h < 0) {
       DObj *o = drw_obj(SH(gv), i);
+      if (o->kind == OB_CONTROL && !(im->Qualifier & IEQUALIFIER_CONTROL)) {
+        /* a form control works when clicked (formctl.c); Ctrl-click selects it to move or format, as in Excel */
+        LONG x0, y0, x1, y1;
+        int part;
+        obj_box(gv, o, &x0, &y0, &x1, &y1);
+        part = control_part(o, x1 - x0, y1 - y0, x - x0, y - y0, control_value(gv->book, gv->sheet, o));
+        if (part != CP_THUMB && part != CP_NONE && book_control_step(gv->book, gv->sheet, i, part)) changed(gv);
+        if (ov->nsel) { ov->nsel = 0; selmoved(gv); }
+        gv->redraw(gv->g);
+        return 1;
+      }
       if (o->kind == OB_SLICER) {
         /* a slicer's buttons filter (pivot2.c); its header and frame select and move it */
         LONG x0, y0, x1, y1;
