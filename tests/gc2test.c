@@ -250,8 +250,27 @@ static void gc2_html(void)
   if (b) book_free(b);
 }
 
+static void gc2_rtl(void)
+{
+  Book *b = book_new(), *d;
+  u8 *x;
+  size_t len;
+  char *h;
+  put(b, "A1", "1");
+  b->sh[0]->rtl = 1;
+  x = xlsx_save(b, &len);
+  d = x ? xlsx_load(x, len, NULL, 0) : NULL;
+  ok("right-to-left sheet kept", d && d->sh[0]->rtl);
+  h = html_book(b, 0);
+  ok("right-to-left sheet in a web page", h && strstr(h, "<table dir=\"rtl\">"));
+  free(h); free(x);
+  if (d) book_free(d);
+  book_free(b);
+}
+
 static void gc2_tests(void)
 {
+  gc2_rtl();
   gc2_html();
   gc2_equation();
   gc2_python();

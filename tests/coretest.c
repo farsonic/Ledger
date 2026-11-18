@@ -16,6 +16,7 @@
 #include "../core/data.h"
 #include "../core/xls.h"
 #include "../core/zip.h"
+#include "../core/htmlout.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

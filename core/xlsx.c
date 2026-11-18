@@ -450,6 +450,7 @@ static void read_sheet(Rd *rd, ZipReader *z, const char *path, int sheet)
       if ((v = xml_attr(&x, "showGridLines"))) s->gridlines = strcmp(v, "0") && strcmp(v, "false");
       if ((v = xml_attr(&x, "showRowColHeaders"))) s->headings = strcmp(v, "0") && strcmp(v, "false");
       if ((v = xml_attr(&x, "showZeros"))) s->showzeros = strcmp(v, "0") && strcmp(v, "false");
+      if ((v = xml_attr(&x, "rightToLeft"))) s->rtl = strcmp(v, "0") && strcmp(v, "false");    /* (kept; the grid isn't mirrored yet) */
       if ((v = xml_attr(&x, "zoomScale"))) { int zz = atoi(v); if (zz >= 10 && zz <= 400) s->zoom = (u16)zz; }
       if ((v = xml_attr(&x, "tabSelected")) && atoi(v)) rd->b->active = sheet;
       if ((v = xml_attr(&x, "topLeftCell"))) { i32 r, c; if (cell_ref(v, &r, &c)) { s->stop = s->top = r; s->sleft = s->left = c; } }
@@ -1373,7 +1374,7 @@ static void write_sheet(Book *b, int si, SST *sst, Buf *o)
     rect_text(d, ref);
     buf_printf(o, "<dimension ref=\"%s\"/>", ref);
   }
-  buf_printf(o, "<sheetViews><sheetView workbookViewId=\"0\"%s%s%s%s", si == b->active ? " tabSelected=\"1\"" : "",
+  buf_printf(o, "<sheetViews><sheetView workbookViewId=\"0\"%s%s%s%s%s", si == b->active ? " tabSelected=\"1\"" : "", s->rtl ? " rightToLeft=\"1\"" : "",
              s->gridlines ? "" : " showGridLines=\"0\"", s->headings ? "" : " showRowColHeaders=\"0\"", s->showzeros ? "" : " showZeros=\"0\"");
   if (s->zoom && s->zoom != 100) buf_printf(o, " zoomScale=\"%d\"", s->zoom);
   if (sheet_is_split(s)) { ref_text(s->splity ? s->stop : s->top, s->splitx ? s->sleft : s->left, 0, 0, ref); buf_printf(o, " topLeftCell=\"%s\"", ref); }

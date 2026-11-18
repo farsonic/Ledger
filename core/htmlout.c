@@ -34,7 +34,7 @@ static void sheet_table(Book *b, int si, Buf *o)
   Sheet *s = b->sh[si];
   i32 lr = sheet_last_row(s), lc = sheet_last_col(s), r, c;
   int i;
-  buf_adds(o, "<h2>"); esc(o, s->name); buf_adds(o, "</h2>\n<table>\n<colgroup>");
+  buf_adds(o, "<h2>"); esc(o, s->name); buf_adds(o, s->rtl ? "</h2>\n<table dir=\"rtl\">\n<colgroup>" : "</h2>\n<table>\n<colgroup>");
   for (c = 0; c <= lc; c++) if (sheet_col_width(s, c)) buf_printf(o, "<col style=\"width:%dpx\">", sheet_col_width(s, c));
   buf_adds(o, "</colgroup>\n");
   for (r = 0; r <= lr; r++) {
