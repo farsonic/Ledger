@@ -276,8 +276,11 @@ int ledger_this_year;
 int parse_number(const char *s, double *out, int *isdate)
 {
   const char *p = s;
-  int neg = 0, paren = 0, pct = 0, digits = 0, cur = 0;
+  int neg = 0, paren = 0, pct = 0, digits = 0, cur = 0, nb = 0;
   double v = 0;
+  char nbuf[360];                 /* the number's digits, point and exponent, for strtod: the nearest
+                                     double, as a formula's 0.3 is (adding digit by digit was off by
+                                     an ulp, so a typed 0.3 didn't MATCH 0.3) */
   if (isdate) *isdate = 0;
   while (*p == ' ') p++;
   if (!*p) return 0;
@@ -315,6 +318,7 @@ int parse_number(const char *s, double *out, int *isdate)
         if (!isdigit((u8)p[1])) return 0;
       } else {
         v = v * 10 + (*p - '0');
+        if (nb < 340) nbuf[nb++] = *p;
         digits++;
         if (group >= 0) group++;
       }
@@ -325,7 +329,8 @@ int parse_number(const char *s, double *out, int *isdate)
   if (*p == '.') {
     double f = 0.1;
     p++;
-    while (isdigit((u8)*p)) { v += (*p - '0') * f; f /= 10; p++; digits++; }
+    if (nb < 340) nbuf[nb++] = '.';
+    while (isdigit((u8)*p)) { v += (*p - '0') * f; f /= 10; if (nb < 340) nbuf[nb++] = *p; p++; digits++; }
   }
   if (!digits) return 0;
   if ((*p == 'e' || *p == 'E') && (isdigit((u8)p[1]) || ((p[1] == '+' || p[1] == '-') && isdigit((u8)p[2])))) {
@@ -334,7 +339,9 @@ int parse_number(const char *s, double *out, int *isdate)
     if (*p == '+') p++; else if (*p == '-') { eneg = 1; p++; }
     while (isdigit((u8)*p)) { if (ex < 400) ex = ex * 10 + (*p - '0'); p++; }
     v *= pow(10.0, eneg ? -ex : ex);
+    if (nb < 340) nb += sprintf(nbuf + nb, "e%s%d", eneg ? "-" : "", ex);
   }
+  if (nb < 340) { nbuf[nb] = 0; v = strtod(nbuf, NULL); }
   if (*p == '%') { pct = 1; p++; }
   if (paren) { if (*p != ')' || neg) return 0; p++; neg = 1; }
   while (*p == ' ') p++;
@@ -1302,6 +1309,7 @@ int book_input(Book *b, int sheet, i32 r, i32 c, const char *text, int *errpos)
     cell->f = f;
     cell->calcgen = 0;
     if (v.t == V_NUM) cell->style = (u16)auto_format(b, style, kind, text);
+    if (!f) cell_precision(b, cell);               /* (a typed number, with Set precision as displayed) */
     v = val_empty(); f = NULL;
   }
   val_free(&v);
@@ -1467,7 +1475,38 @@ static void restyle_one(Book *b, int sheet, i32 r, i32 c, const void *arg)
   if (ns == old && sheet_cell(s, r, c)) return;
   if (ns == old) return;
   undo_cell(b, sheet, r, c);
-  if ((cell = sheet_cell_make(s, r, c))) cell->style = (u16)ns;
+  if ((cell = sheet_cell_make(s, r, c))) {
+    cell->style = (u16)ns;
+    if (!cell->f && !cell->spill) cell_precision(b, cell);   /* (a reformatted number, with Set precision as displayed) */
+  }
+}
+static void precision_one(Book *b, int sheet, i32 r, i32 c, const void *arg)
+{
+  Cell *cell = sheet_cell(b->sh[sheet], r, c);
+  double was;
+  (void)arg;
+  if (!cell || cell->f || cell->spill || cell->v.t != V_NUM) return;
+  was = cell->v.n;
+  if (fmt_shown_number(b, book_fmt_code(b, b->styles[cell->style].numfmt), was) == was) return;
+  undo_cell(b, sheet, r, c);
+  if ((cell = sheet_cell(b->sh[sheet], r, c))) cell_precision(b, cell);
+}
+/* Set precision as displayed turned on: every number typed in the workbook kept as its format shows
+   it, for good (as Excel warns, "Data will permanently lose accuracy"); formulas follow at the recalc.
+   An undo step; off: nothing changes */
+int book_set_precdisp(Book *b, int on)
+{
+  LayoutBook *l = book_lx(b);
+  int i;
+  if (!l) return 0;
+  if (!on) { l->precdisp = 0; b->dirty = 1; return 1; }
+  l->precdisp = 1;
+  book_begin(b);
+  for (i = 0; i < b->nsh; i++) { Rect all; all.r1 = 0; all.c1 = 0; all.r2 = MAXROW - 1; all.c2 = MAXCOL - 1; each_cell(b, i, all, 0, precision_one, NULL); }
+  book_end(b);
+  b->calcgen++;
+  after_edit(b);
+  return 1;
 }
 int book_restyle(Book *b, int sheet, Rect area, StyleEdit fn, const void *arg)
 {

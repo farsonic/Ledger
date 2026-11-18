@@ -215,8 +215,57 @@ static void sync_hidden_totals(void)
   book_free(b);
 }
 
+static void numfmt_edit(Style *st, Font *f, const void *arg) { (void)f; st->numfmt = *(const u16 *)arg; }
+static void book_restyle_fmt(Book *b, const char *ref, const char *code)
+{
+  u16 id = (u16)book_fmt(b, code), sh; Rect r; u8 fl;
+  parse_ref(b, ref, &sh, &r, &fl);
+  book_restyle(b, 0, r, numfmt_edit, &id);
+}
+/* Set precision as displayed (GridCraft #1366): numbers kept as their formats show them */
+static void sync_precision(void)
+{
+  Book *b = book_new(), *d;
+  u8 *x;
+  size_t len;
+  char err[100];
+  int pct;
+  put(b, "A1", "1.236"); put(b, "A2", "=A1*10"); put(b, "B1", "0.12345"); put(b, "C1", "=1/3"); put(b, "D1", "2.5");
+  book_restyle_fmt(b, "A1:A2", "0.00"); book_restyle_fmt(b, "B1", "0.0%"); book_restyle_fmt(b, "C1", "0.000");
+  book_recalc(b);
+  ok("precision as displayed: off by default", num_at(b, "A1") == 1.236 && near(num_at(b, "A2"), 12.36) && !book_precdisp(b));
+  ok("precision as displayed: turned on", book_set_precdisp(b, 1) && num_at(b, "A1") == 1.24 && near(num_at(b, "A2"), 12.4) && num_at(b, "B1") == 0.123 && num_at(b, "C1") == 0.333 && num_at(b, "D1") == 2.5);
+  put(b, "A3", "3.14159"); book_restyle_fmt(b, "A3", "#,##0.0");
+  put(b, "A4", "2.71828");
+  ok("precision as displayed: typed and reformatted", num_at(b, "A3") == 3.1 && num_at(b, "A4") == 2.71828);
+  pct = num_at(b, "A2") == 12.4;
+  x = xlsx_save(b, &len);
+  ok("precision as displayed: saved as fullPrecision=0", pct && x && part_has(x, len, "xl/workbook.xml", "fullPrecision=\"0\""));
+  d = x ? xlsx_load(x, len, err, sizeof err) : NULL;
+  ok("precision as displayed: read back", d && book_precdisp(d));
+  if (d) book_free(d);
+  free(x);
+  ok("precision as displayed: undone, step by step", book_undo(b, NULL, NULL) && book_undo(b, NULL, NULL) && book_undo(b, NULL, NULL) && book_undo(b, NULL, NULL) && num_at(b, "A1") == 1.236);
+  book_set_precdisp(b, 0);
+  put(b, "A5", "1.23456"); book_restyle_fmt(b, "A5", "0.0");
+  ok("precision as displayed: off again", num_at(b, "A5") == 1.23456);
+  book_free(b);
+}
+
+/* a typed number is the nearest double, as a formula's literal (it was added up digit by digit) */
+static void sync_typed_numbers(void)
+{
+  Book *b = book_new();
+  put(b, "A1", "0.3"); put(b, "A2", "1.23456"); put(b, "A3", "1,234.5e2"); put(b, "A4", "12%"); put(b, "A5", "($1,000.25)");
+  ok("typed numbers: the nearest double", num_at(b, "A1") == 0.3 && num_at(b, "A2") == 1.23456 && num_at(b, "A3") == 123450 && num_at(b, "A4") == 0.12 && num_at(b, "A5") == -1000.25);
+  ok("typed numbers: MATCH finds them", evn(b, "MATCH(1.23456,A2,0)") == 1 && evn(b, "A1-0.3") == 0);
+  book_free(b);
+}
+
 static void sync_tests(void)
 {
+  sync_typed_numbers();
+  sync_precision();
   sync_hidden_totals();
   sync_wordart();
   sync_chart_types();

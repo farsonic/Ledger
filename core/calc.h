@@ -102,6 +102,10 @@ const char *u8_at(const char *s, long i);            /* the i-th character (0-ba
 /* number formatting (numfmt.c): value v in format code; *color gets a [Color] from the code
    (COLOR_AUTO if none). width is the room in characters for General (0 = 11) */
 void  fmt_value(Book *b, const char *code, const Value *v, char *out, size_t cap, u32 *color, int width);
+/* v as code shows it (Set precision as displayed): rounded to its decimals, percent and scaling */
+double fmt_shown_number(Book *b, const char *code, double v);
+void   cell_precision(Book *b, Cell *c);          /* a number cell rounded so, when the option is on */
+int    book_precdisp(const Book *b);              /* (pagesetup.c) Set precision as displayed is on */
 int   fmt_is_date(const char *code);                 /* the format shows a date or time */
 
 #endif

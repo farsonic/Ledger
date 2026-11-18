@@ -162,6 +162,7 @@ static void spill_write(Book *b, Sheet *s, i32 r, i32 c, const Arr *a, int force
       if (!(cell = sheet_cell_make(s, r + i, c + j))) continue;
       val_free(&cell->v);
       cell->v = cell_element(&a->v[i * a->cols + j]);
+      cell_precision(b, cell);
       cell->spill = 1;
       cell->calcgen = b->calcgen;
     }
@@ -275,6 +276,7 @@ static void compute_cell(Book *b, int sheet, i32 r, i32 c, Cell *cell, int depth
   if (!cell || cell->f != f) { val_free(&v); return; }
   val_free(&cell->v);
   cell->v = v;
+  cell_precision(b, cell);                          /* (Set precision as displayed) */
   cell->calcstate = 0;
   f->sr = nr; f->sc = nc; f->spillblocked = blocked;
   f->arrayeval = arrayish;

@@ -127,9 +127,12 @@ typedef struct LayoutBook {
   u16 maxiter;                    /* 100 */
   double maxchange;               /* 0.001 */
   u8 r1c1;                        /* R1C1 reference style */
+  u8 precdisp;                    /* Set precision as displayed: numbers kept as their formats show them (calcPr fullPrecision="0") */
   u8 hasprops;
   CustomView views[MAXVIEWS]; int nviews;
 } LayoutBook;
+/* (book.c) Set precision as displayed on (every typed number rounded to its format, an undo step) or off */
+int book_set_precdisp(Book *b, int on);
 LayoutBook *book_lx(Book *b);         /* made with defaults when first asked for (NULL out of memory) */
 void   lx_free(LayoutBook *x);
 /* a theme put on the workbook: its colours become the palette and its body font the default font

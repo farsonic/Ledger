@@ -2699,3 +2699,6 @@
   { { "Orchid", "Orchidee", "Orchid\351e", "Orqu\355dea", "Orchidea" } },
   { { "Graphite", "Graphit", "Graphite", "Grafito", "Grafite" } },
   { { "Lime Pop", "Limette", "Citron vert", "Lima", "Lime" } },
+  /* Set precision as displayed (layouttab.c, Ledger Options) */
+  { { "Set precision as displayed:", "Genauigkeit wie angezeigt festlegen:", "D\351finir le calcul avec la pr\351cision au format affich\351 :", "Establecer precisi\363n de pantalla:", "Imposta precisione come visualizzato:" } },
+  { { "Data will permanently lose accuracy.", "Die Daten verlieren dauerhaft an Genauigkeit.", "Les donn\351es vont perdre d\351finitivement de leur exactitude.", "Los datos perder\341n precisi\363n de forma permanente.", "I dati perderanno definitivamente la precisione." } },

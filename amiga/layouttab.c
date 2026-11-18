@@ -649,7 +649,7 @@ static void calc_options(int page)
   static const char *modes[4], *pl[4];
   static const ULONG ends[] = { ID_DLGOK, 0 };
   LayoutBook *x = book_lx(book);
-  Object *w, *reg, *mode, *it, *maxi, *maxc, *font, *size, *sheets, *r1c1, *calcnow;
+  Object *w, *reg, *mode, *it, *maxi, *maxc, *font, *size, *sheets, *r1c1, *precd, *calcnow;
   char mc[24], sz[12];
   if (!x) return;
   lx_trl(modes_en, modes); lx_trl(pages_en, pl);
@@ -670,6 +670,7 @@ static void calc_options(int page)
         Child, Label1(tr("Enable iterative calculation:")), Child, HGroup, Child, it = lx_check(x->iterate), Child, HSpace(0), End,
         Child, Label1(tr("Maximum iterations:")), Child, maxi = lx_int(x->maxiter, 5),
         Child, Label1(tr("Maximum change:")), Child, maxc = StringObject, StringFrame, MUIA_String_Contents, (ULONG)mc, MUIA_String_Accept, (ULONG)"0123456789.eE-", MUIA_String_MaxLen, 20, MUIA_CycleChain, 1, End,
+        Child, Label1(tr("Set precision as displayed:")), Child, HGroup, Child, precd = lx_check(x->precdisp), Child, HSpace(0), End,
         Child, Label1(tr("R1C1 reference style:")), Child, HGroup, Child, r1c1 = lx_check(x->r1c1), Child, LLabel1(tr("(kept in the file; Ledger shows A1)")), Child, HSpace(0), End,
       End,
       Child, TextObject, MUIA_Text_Contents, (ULONG)tr("\33cIterative calculation works circular formulas out again and again\nuntil they change less than the maximum change."), End,
@@ -686,6 +687,11 @@ static void calc_options(int page)
     book->manualcalc = (int)lx_xget(mode, MUIA_Cycle_Active);
     x->iterate = lx_xget(it, MUIA_Selected) != 0;
     x->r1c1 = lx_xget(r1c1, MUIA_Selected) != 0;
+    {
+      /* (as Excel: turning it on rounds every number to its format, for good) */
+      int pd = lx_xget(precd, MUIA_Selected) != 0;
+      if (pd != x->precdisp && (!pd || ask("OK|Cancel", "%s", tr("Data will permanently lose accuracy.")) == 1)) book_set_precdisp(book, pd);
+    }
     if (n >= 1 && n <= 32767) x->maxiter = (u16)n;
     if (d > 0) x->maxchange = d;
     if (lx_sget(font)[0]) { strncpy(opt_font, lx_sget(font), sizeof opt_font - 1); opt_font[sizeof opt_font - 1] = 0; }

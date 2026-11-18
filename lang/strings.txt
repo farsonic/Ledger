@@ -2706,3 +2706,6 @@ Ink Stamp	Tintenstempel	Tampon encreur	Sello de tinta	Timbro a inchiostro
 Orchid	Orchidee	Orchidée	Orquídea	Orchidea
 Graphite	Graphit	Graphite	Grafito	Grafite
 Lime Pop	Limette	Citron vert	Lima	Lime
+## Set precision as displayed (layouttab.c, Ledger Options)
+Set precision as displayed:	Genauigkeit wie angezeigt festlegen:	Définir le calcul avec la précision au format affiché :	Establecer precisión de pantalla:	Imposta precisione come visualizzato:
+Data will permanently lose accuracy.	Die Daten verlieren dauerhaft an Genauigkeit.	Les données vont perdre définitivement de leur exactitude.	Los datos perderán precisión de forma permanente.	I dati perderanno definitivamente la precisione.

@@ -831,17 +831,19 @@ void page_write_calcpr(Book *b, Buf *o)
     buf_adds(o, "\"");
   }
   if (b->lx && b->lx->r1c1) buf_adds(o, " refMode=\"R1C1\"");
+  if (b->lx && b->lx->precdisp) buf_adds(o, " fullPrecision=\"0\"");
 }
 void page_xml_calcpr(Book *b, Xml *x)
 {
   const char *v;
   LayoutBook *l;
-  if (!truthy(xml_attr(x, "iterate")) && !((v = xml_attr(x, "refMode")) && !strcmp(v, "R1C1"))) return;
+  if (!truthy(xml_attr(x, "iterate")) && !((v = xml_attr(x, "refMode")) && !strcmp(v, "R1C1")) && !((v = xml_attr(x, "fullPrecision")) && !truthy(v))) return;
   if (!(l = book_lx(b))) return;
   l->iterate = (u8)truthy(xml_attr(x, "iterate"));
   if ((v = xml_attr(x, "iterateCount"))) { long n = atol(v); if (n >= 1 && n <= 32767) l->maxiter = (u16)n; }
   if ((v = xml_attr(x, "iterateDelta"))) { double d = strtod(v, NULL); if (d > 0 && d < 1e6) l->maxchange = d; }
   l->r1c1 = (v = xml_attr(x, "refMode")) && !strcmp(v, "R1C1");
+  l->precdisp = (v = xml_attr(x, "fullPrecision")) && !truthy(v);
 }
 void page_read_theme(Book *b, const char *xml, size_t len)
 {
@@ -899,3 +901,4 @@ void page_write_theme(Book *b, Buf *o)
               "<a:bgFillStyleLst><a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill><a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill><a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill></a:bgFillStyleLst>"
               "</a:fmtScheme></a:themeElements></a:theme>");
 }
+int book_precdisp(const Book *b) { return b->lx && b->lx->precdisp; }

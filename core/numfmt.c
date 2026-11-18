@@ -663,3 +663,38 @@ void fmt_value(Book *b, const char *code, const Value *v, char *out, size_t cap,
     fmt_number(b, s, x, neg, &o);
   }
 }
+
+/* Set precision as displayed (GridCraft #1366): v as the format shows it, for formats with digit
+   placeholders (fixed decimals, percent, thousands scaling); General, dates, times, fractions,
+   scientific and text formats leave it as it is, and so does a section that hides the number */
+double fmt_shown_number(Book *b, const char *code, double v)
+{
+  Sect sec[MAXSECT];
+  Shape sh;
+  const Sect *s;
+  int n, i, k, neg = v < 0;
+  double x = neg ? -v : v, m;
+  (void)b;
+  if (!code || !*code || !(v - v == 0)) return v;
+  n = split(code, sec);
+  for (i = 0; i < n; i++) sect_prefix(&sec[i]);
+  if (n < 1 || sec[0].hascond || (n > 1 && sec[1].hascond)) return v;
+  s = neg && n >= 2 ? &sec[1] : v == 0 && n >= 3 ? &sec[2] : &sec[0];
+  if (sect_is_date(s) || sect_has_at(s)) return v;
+  analyse(s, &sh);
+  if (!sh.hasdigits || sh.sci || sh.frac || sh.decdig > 15) return v;
+  for (k = 0; k < sh.percent; k++) x *= 100;
+  for (k = 0; k < sh.scale; k++) x /= 1000;
+  m = pow(10.0, sh.decdig);
+  if (x * m >= 1e15) return v;
+  x = floor(x * m + 0.5 + 1e-9) / m;
+  for (k = 0; k < sh.percent; k++) x /= 100;
+  for (k = 0; k < sh.scale; k++) x *= 1000;
+  { char t[40]; sprintf(t, "%.15g", x); x = strtod(t, NULL); }   /* (no binary leftovers of the scaling) */
+  return neg ? -x : x;
+}
+/* a number cell kept as its format shows it, when the workbook has Set precision as displayed on */
+void cell_precision(Book *b, Cell *c)
+{
+  if (c && c->v.t == V_NUM && book_precdisp(b)) c->v.n = fmt_shown_number(b, book_fmt_code(b, b->styles[c->style].numfmt), c->v.n);
+}
