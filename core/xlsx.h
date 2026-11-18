@@ -20,4 +20,14 @@ Book *csv_load_report(const char *data, size_t len, char delim, int *either_col,
 /* one sheet as CSV text (malloc'd): numbers in full, dates as shown, text quoted when needed */
 char *csv_save(Book *b, int sheet, char delim);
 
+/* SYLK (.slk, sylk.c): sylk_is the data starts with an ID record; sylk_load one sheet from it (NULL if
+   it isn't SYLK), *skipped the records it couldn't read (may be NULL); sylk_save one sheet as SYLK
+   text (malloc'd, Latin-1 as Excel writes it) */
+int   sylk_is(const char *data, size_t len);
+Book *sylk_load(const char *data, size_t len, int *skipped);
+char *sylk_save(Book *b, int sheet);
+/* a formula's text (without '=') between R1C1 and A1 references for the cell at row, col (0-based):
+   malloc'd, NULL out of memory */
+char *sylk_r1c1_to_a1(const char *f, long row, long col);
+char *sylk_a1_to_r1c1(const char *f, long row, long col);
 #endif

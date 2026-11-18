@@ -43,6 +43,8 @@ enum {
   ID_DLGOK, ID_DLGCANCEL, ID_DLG1, ID_DLG2, ID_DLG3, ID_DLG4, ID_FXTYPED, ID_MANUALCALC, ID_ZOOMIN, ID_ZOOMOUT, ID_UNFREEZE, ID_FREEZE, ID_DLG5, ID_DLG6, ID_DLG7,
   /* the window's own controls */
   ID_NAMEBOX, ID_FXENTER, ID_FXCANCEL, ID_FXBUTTON, ID_FXACTIVE, ID_ZOOMSET,
+  /* added later */
+  ID_SAVESLK,
   /* from 1000: notifications from the grid and other controls rather than commands */
   ID_SELCHG = 1000, ID_CHANGED, ID_EDITCHG, ID_EDITDONE, ID_BRUSHDONE,
   /* a workbook window activated or closed: these plus its slot (main.c's wins[]) */

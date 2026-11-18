@@ -95,7 +95,7 @@ double ledger_now(void)
 static struct NewMenu menus[] = {
   M("Project"),
   I("New", "N", ID_NEW), I("Open...", "O", ID_OPEN), I("Import CSV...", 0, ID_IMPORTCSV), BAR,
-  I("Save", "S", ID_SAVE), I("Save As...", "A", ID_SAVEAS), I("Save Sheet as CSV...", 0, ID_SAVECSV), LX_PROJECT_ITEMS BAR,
+  I("Save", "S", ID_SAVE), I("Save As...", "A", ID_SAVEAS), I("Save Sheet as CSV...", 0, ID_SAVECSV), I("Save Sheet as SYLK...", 0, ID_SAVESLK), LX_PROJECT_ITEMS BAR,
   I("Close", "W", ID_CLOSE), I("Next Window", "`", ID_NEXTWIN), BAR, I("About...", "?", ID_ABOUT), I("Quit", "Q", ID_QUIT),
   M("Edit"),
   I("Undo", "Z", ID_UNDO), I("Redo", "Y", ID_REDO), BAR,
@@ -738,7 +738,14 @@ static Book *load_file(const char *path)
   set(win, MUIA_Window_Sleep, TRUE);
   if (len >= 4 && data[0] == 'P' && data[1] == 'K') b = ods_is(data, len) ? ods_load(data, len, err, sizeof err) : xlsx_load(data, len, err, sizeof err);
   else if (len >= 8 && data[0] == 0xD0 && data[1] == 0xCF) b = xls_load(data, len, err, sizeof err);   /* (datatab: old Excel) */
-  else b = csv_load_report((const char *)data, len, 0, &either, &both);
+  else if (sylk_is((const char *)data, len)) {
+    int bad = 0;
+    if ((b = sylk_load((const char *)data, len, &bad)) && bad) {
+      static char msg[200];
+      snprintf(msg, sizeof msg, tr("%d records of this SYLK file couldn't be read and were left out."), bad);
+      ask("OK", "%s", msg);
+    }
+  } else b = csv_load_report((const char *)data, len, 0, &either, &both);
   set(win, MUIA_Window_Sleep, FALSE);
   free(data);
   if (b) csv_dates_note(either, both);
@@ -773,7 +780,7 @@ static void open_path(const char *path)
     char p2[512], *dot;
     strncpy(p2, path, sizeof p2 - 6); p2[sizeof p2 - 6] = 0;
     dot = strrchr(p2, '.');
-    if (dot && dot > (char *)FilePart((STRPTR)p2) && (!Stricmp((STRPTR)dot, (STRPTR)".xls") || !Stricmp((STRPTR)dot, (STRPTR)".ods"))) { strcpy(dot, ".xlsx"); path = p2; }
+    if (dot && dot > (char *)FilePart((STRPTR)p2) && (!Stricmp((STRPTR)dot, (STRPTR)".xls") || !Stricmp((STRPTR)dot, (STRPTR)".ods") || !Stricmp((STRPTR)dot, (STRPTR)".slk"))) { strcpy(dot, ".xlsx"); path = p2; }
     if (book_untouched()) show_book(b, path);
     else win_new(b, path);
   }
@@ -781,11 +788,11 @@ static void open_path(const char *path)
 static int save_to(const char *path)
 {
   size_t n = strlen(path);
-  int ok = 0, csv = n > 4 && !Stricmp((STRPTR)path + n - 4, (STRPTR)".csv");
+  int ok = 0, csv = n > 4 && !Stricmp((STRPTR)path + n - 4, (STRPTR)".csv"), slk = n > 4 && !Stricmp((STRPTR)path + n - 4, (STRPTR)".slk");
   if (lx_save_as_other(path)) return 1;          /* (.pdf, .html: an export, the workbook keeps its name) */
   set(win, MUIA_Window_Sleep, TRUE);
-  if (csv) {
-    char *t = csv_save(book, cur_index(), ',');
+  if (csv || slk) {                    /* (the active sheet, as Excel saves CSV and SYLK) */
+    char *t = slk ? sylk_save(book, cur_index()) : csv_save(book, cur_index(), ',');
     ok = t && file_write_safe(path, t, strlen(t));
     free(t);
   } else {
@@ -799,17 +806,18 @@ static int save_to(const char *path)
   }
   set(win, MUIA_Window_Sleep, FALSE);
   if (!ok) { ask("OK", "Ledger couldn't save\n%s\n(Is the disk full or write-protected?)", path); return 0; }
-  if (!csv) { book->dirty = 0; strncpy(bookpath, path, sizeof bookpath - 1); bookpath[sizeof bookpath - 1] = 0; ui_book_path(book, bookpath); book_recalc(book); }
+  if (!csv && !slk) { book->dirty = 0; strncpy(bookpath, path, sizeof bookpath - 1); bookpath[sizeof bookpath - 1] = 0; ui_book_path(book, bookpath); book_recalc(book); }
   add_recent(path);
   set_title();
   return 1;
 }
-static int save_as(int csv)
+static int save_as(int csv)                /* csv 1: the sheet as CSV, 2: as SYLK */
 {
   char path[512];
+  const char *ext = csv == 2 ? ".slk" : ".csv";
   strcpy(path, bookpath[0] ? bookpath : "Book1.xlsx");
-  if (csv) { char *dot = strrchr(path, '.'); if (dot && dot > (char *)FilePart((STRPTR)path)) strcpy(dot, ".csv"); else strncat(path, ".csv", sizeof path - strlen(path) - 1); }
-  if (!file_request(1, csv ? "Save Sheet as CSV" : "Save Workbook As", path, sizeof path, csv ? "#?.csv" : "#?.xlsx")) return 0;
+  if (csv) { char *dot = strrchr(path, '.'); if (dot && dot > (char *)FilePart((STRPTR)path)) strcpy(dot, ext); else strncat(path, ext, sizeof path - strlen(path) - 1); }
+  if (!file_request(1, csv == 2 ? "Save Sheet as SYLK" : csv ? "Save Sheet as CSV" : "Save Workbook As", path, sizeof path, csv == 2 ? "#?.slk" : csv ? "#?.csv" : "#?.xlsx")) return 0;
   if (!csv && !strchr((const char *)FilePart((STRPTR)path), '.')) strncat(path, ".xlsx", sizeof path - strlen(path) - 1);
   return save_to(path);
 }
@@ -1374,7 +1382,7 @@ static void command(ULONG id)
   case ID_OPEN: {
     char path[512];
     strcpy(path, bookpath);
-    if (file_request(0, "Open Workbook", path, sizeof path, "#?.(xlsx|xls|ods|csv|txt|tsv)")) open_path(path);
+    if (file_request(0, "Open Workbook", path, sizeof path, "#?.(xlsx|xls|ods|csv|txt|tsv|slk)")) open_path(path);
     break; }
   case ID_IMPORTCSV: {
     char path[512];
@@ -1404,6 +1412,7 @@ static void command(ULONG id)
   case ID_SAVE: save(); break;
   case ID_SAVEAS: save_as(0); break;
   case ID_SAVECSV: save_as(1); break;
+  case ID_SAVESLK: save_as(2); break;
   case ID_ABOUT:
     ask("OK", "%s", tr("Ledger 0.3\nA spreadsheet for the Amiga (68040 or better, MUI)\n\nReads and writes Excel workbooks (.xlsx) and CSV.\nIts look follows GridCraft's; its icons are its own."));
     break;

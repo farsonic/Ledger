@@ -37,8 +37,40 @@ static void gc2_csv_dates(void)
   if (b) book_free(b);
 }
 
+static int str_is(char *got, const char *want) { int k = got && !strcmp(got, want); if (!k) printf("  got %s\n", got ? got : "(null)"); free(got); return k; }
+static void gc2_sylk(void)
+{
+  /* as Excel writes it (made by hand): formats, a width, values, R1C1 formulas, a shared formula */
+  const char *t = "ID;PWXL;N;E\r\nP;PGeneral\r\nP;P0.00\r\nF;W2 2 20\r\nB;Y4;X3;D0 0 3 2\r\n"
+                  "C;Y1;X1;K\"Item;;s\"\r\nC;X2;K12.5\r\nF;P1;Y2;X2\r\nC;Y2;X1;KTRUE\r\nC;X2;K25;ER[-1]C*2\r\n"
+                  "C;Y3;X2;K50;ER[-1]C*2\r\nC;Y4;X2;S;R3;C2\r\nC;Y4;X3;K#N/A;ENA()\r\nC;Y1;X3;ESUM(R1C2:R[3]C[-1])+ROUND(C2:C2,0)\r\nE\r\n";
+  int bad;
+  Book *b = sylk_load(t, strlen(t), &bad), *d;
+  char *out;
+  ok("sylk: is SYLK", sylk_is(t, strlen(t)) && !sylk_is("a,b\n", 4));
+  ok("sylk: values", b && text_at(b, "A1", "Item;s") && num_at(b, "B1") == 12.5 && cell_value(b, 0, 1, 0)->t == V_BOOL && bad == 0);
+  ok("sylk: formulas in A1", b && text_at(b, "B2", "=B1*2") && num_at(b, "B2") == 25 && text_at(b, "B4", "=B3*2") && num_at(b, "B4") == 100);
+  ok("sylk: absolute and whole columns", b && text_at(b, "C1", "=SUM($B$1:B4)+ROUND($B:$B,0)"));
+  ok("sylk: number format and width", b && book_fmt_code(b, b->styles[sheet_cell_style(b->sh[0], 1, 1)].numfmt)[0] == '0' && sheet_col_width(b->sh[0], 1) == 140);
+  ok("sylk: R1C1 to A1", str_is(sylk_r1c1_to_a1("R[-1]C+RC[-1]+R1C1+R3+C2+'R1C1'!R2C2&\"RC\"+RATE(1,2,3)+R[1]C:R[2]C", 4, 4), "E4+D5+$A$1+$3:$3+$B:$B+'R1C1'!$B$2&\"RC\"+RATE(1,2,3)+E6:E7"));
+  ok("sylk: A1 to R1C1", str_is(sylk_a1_to_r1c1("E4+D5+$A$1+$3:$3+$B:$B+Sheet2!$B$2&\"A1\"+LOG10(2)+Table1[Col1]+A:C", 4, 4), "R[-1]C+RC[-1]+R1C1+R3:R3+C2:C2+Sheet2!R2C2&\"A1\"+LOG10(2)+Table1[Col1]+C[-4]:C[-2]"));
+  ok("sylk: off the sheet", str_is(sylk_r1c1_to_a1("R[-5]C", 0, 0), "#REF!"));
+  out = b ? sylk_save(b, 0) : NULL;
+  ok("sylk: saved", out && strstr(out, "ID;P") && strstr(out, "C;Y1;X1;K\"Item;;s\"") && strstr(out, ";ER[-1]C*2") && strstr(out, "P;P0.00") && strstr(out, "\r\nE\r\n"));
+  d = out ? sylk_load(out, strlen(out), &bad) : NULL;
+  ok("sylk: read back", d && bad == 0 && text_at(d, "C1", "=SUM($B$1:B4)+ROUND($B:$B,0)") && num_at(d, "B4") == 100 && text_at(d, "A1", "Item;s") && sheet_col_width(d->sh[0], 1) == 140);
+  free(out);
+  if (d) book_free(d);
+  if (b) book_free(b);
+  /* Latin-1 bytes */
+  { const char *l1 = "ID;P\nC;Y1;X1;K\"Gr\xfc\xdf" "e\"\nE\n"; b = sylk_load(l1, strlen(l1), NULL); }
+  ok("sylk: Latin-1 text", b && text_at(b, "A1", "Gr\xc3\xbc\xc3\x9f" "e"));
+  if (b) book_free(b);
+}
+
 static void gc2_tests(void)
 {
+  gc2_sylk();
   gc2_find();
   gc2_csv_dates();
 }
