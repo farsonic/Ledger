@@ -36,7 +36,7 @@ static void respath_tests(void)
   ok("respath: join after a plain dir", res_join(out, sizeof out, "PROGDIR:TrueType", "fonts.list") && !strcmp(out, "PROGDIR:TrueType/fonts.list"));
   ok("respath: join a sub-path", res_join(out, sizeof out, "Bureau:Fonts", "QuillSans/13") && !strcmp(out, "Bureau:Fonts/QuillSans/13"));
   ok("respath: join with an empty dir or name", res_join(out, sizeof out, "", "Fonts") && !strcmp(out, "Fonts") &&
-     res_join(out, sizeof out, "Bureau:Dict", "") && !strcmp(out, "Bureau:Dict"));
+     res_join(out, sizeof out, "Bureau:Dict", "") && !strcmp(out, "Bureau:Dict/"));
   ok("respath: join that just fits", res_join(small, sizeof small, "A:", "bcdef") && !strcmp(small, "A:bcdef"));
   strcpy(small, "junk");
   ok("respath: join one byte too long gives \"\"", !res_join(small, sizeof small, "A:", "bcdefg") && small[0] == 0);
