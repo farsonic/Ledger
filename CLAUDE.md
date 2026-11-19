@@ -17,7 +17,7 @@ first, then `README.md` (what Ledger does) and `FEATURES.md` / `docs/gridcraft-g
 | `core/` | Portable C99, no AmigaOS calls: the workbook (`book.c`), formula parser and evaluator (`formula.c`, `calc.c`), functions (`func*.c`, with `funcdesc.c` describing each), number formats, `.xlsx`/`.xls`/`.ods` readers and writers, charts, tables, pivots, slicers, drawings, validation, outline, protection, Flash Fill, data tools, what-if, Solver, the Analysis ToolPak, forecasting, page setup, PDF and HTML output, spelling, fonts and the TrueType rasteriser. |
 | `amiga/` | The MUI front end: the window, ribbon, grid, formula bar, panes and dialogs; `lang.c`/`lang_table.h` (generated) for interface strings. |
 | `lang/` | `strings.txt`: every interface string with its German, French, Spanish and Italian translations. `tools/mklang.py` makes `amiga/lang_table.h`; `tools/langcheck.py` checks every string is translated and used. |
-| `tests/` | `coretest.c` (it includes `analysistest.c`, `drawtest.c`, `layouttest.c`, `uitest.c`, `synctest.c` and `gc2test.c`, the two rounds of the GridCraft 4c388df sync), `xlsxtool.c`, `fixtures/` (made by `mkfixtures.py`). |
+| `tests/` | `coretest.c` (it includes `respathtest.c`, `analysistest.c`, `drawtest.c`, `layouttest.c`, `uitest.c`, `synctest.c` and `gc2test.c`, the two rounds of the GridCraft 4c388df sync), `xlsxtool.c`, `fixtures/` (made by `mkfixtures.py`). |
 | `tools/` | `test.sh` (native tests, what CI runs), `functest/` (makes and checks `FunctionTests.xlsx`, compares with LibreOffice), `Install-Ledger` (Installer script), `mkicons.py`, `vbcc-aos68k-fpu` (the vbcc config for the 68040+FPU build). |
 | `docs/` | `gridcraft-gap.md` (every GridCraft ribbon command and Ledger's status), `functions-*.txt`, and `gridcraft/` (copies of GridCraft's own reference documents, MIT, see its README). |
 | `FEATURES.md` | GridCraft's big features, one row each, with Ledger's status. |
@@ -60,6 +60,10 @@ Before a package ships, search it for certificate or key material and refuse if 
   FunctionTests row's note.
 - Every interface string is translated (English, German, French, Spanish, Italian, in Excel's words for
   each); the window fits 640x480; menus alongside the ribbon.
+- Shared drawers (Fonts, TrueType, Dict) are found through `core/respath.c` (beside the program, then the
+  Bureau suite's `Bureau:`, then `FONTS:` for screen fonts; resolved once at start, `theme_find_shared`):
+  never write `PROGDIR:Fonts` and the like in `amiga/`. `core/respath.c/.h` are the same text in all five
+  Bureau programs' repositories; change them in all or none.
 - Printing and GridCraft's scripting tools (Automate tab, ARexx) are left out on purpose.
 - A new feature gets a native test, its row in `FEATURES.md` / `docs/gridcraft-gap.md` updated, and a
   README note.

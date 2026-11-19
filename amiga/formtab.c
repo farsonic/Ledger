@@ -7,6 +7,7 @@
 #include "lxpriv.h"
 #include "../core/audit.h"
 #include "../core/spell.h"
+#include "../core/respath.h"
 #include "../core/calc.h"
 #include "../core/ops.h"
 #include "../core/comments.h"
@@ -540,10 +541,10 @@ static struct { int sheet; i32 r, c; u32 off, ws, we; char word[128]; int found;
 static void spell_load_all(void)
 {
   FILE *f;
-  char line[128];
+  char line[128], path[160];
   if (spell_loaded) return;
   spell_loaded = 1;
-  if (!spell_load(&spell, "PROGDIR:Dict/british-english")) return;
+  if (!res_join(path, sizeof path, res_dict_dir, "british-english") || !spell_load(&spell, path)) return;
   if ((f = fopen("PROGDIR:Ledger.words", "r"))) {
     while (fgets(line, sizeof line, f)) { line[strcspn(line, "\r\n")] = 0; if (line[0]) spell_add(&spell, line, (u32)strlen(line)); }
     fclose(f);
@@ -597,7 +598,7 @@ static void spelling_open(void)
 {
   Sheet *s = cur_sheet();
   spell_load_all();
-  if (!spell.n) { ask("OK", "%s", tr("Ledger has no dictionary: it should be in\nthe Dict drawer next to Ledger.")); return; }
+  if (!spell.n) { ask("OK", "%s", tr("Ledger has no dictionary: it should be in\nthe Dict drawer next to Ledger or in Bureau:Dict.")); return; }
   if (!spwin) {
     Object *close;
     spwin = QWindowObject, MUIA_Window_Title, (ULONG)tr("Spelling: English (UK)"), MUIA_Window_ID, MAKE_ID('S','P','E','L'),

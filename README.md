@@ -88,6 +88,19 @@ As in GridCraft, from the top:
 4. A 68040 or 68060 with its FPU is needed. 16 MB or more of memory is comfortable; big workbooks want more.
 5. Graphics: an RTG screen (Picasso96 or CyberGraphX) shows the cells best; AGA works too, on fewer colours.
 
+### Bureau
+
+Ledger is also part of **Bureau**, one package with Quill, Ledger, Easel, Folio and Dispatch and a single
+installer (`Install-Bureau`), where the files the programs share are installed once: the screen fonts in
+`FONTS:`, the TrueType fonts in `Bureau:TrueType`, the word lists in `Bureau:Dict`, and Ledger in
+`Bureau:Ledger` with nothing else beside it. The installer assigns `Bureau:` in `S:User-Startup`.
+
+For each drawer Ledger takes the first that is there: screen fonts from `PROGDIR:Fonts`, `Bureau:Fonts`,
+then `FONTS:`; TrueType fonts from `PROGDIR:TrueType`, then `Bureau:TrueType`; the dictionary from
+`PROGDIR:Dict`, then `Bureau:Dict`. So the Ledger package unpacked on its own works as before, and its
+`Install-Ledger` puts Ledger in `Bureau:Ledger` (without copies of the shared drawers) when Bureau is
+installed. Settings, recent workbooks and your own words stay next to Ledger.
+
 ## Keys
 
 | Key | Does |

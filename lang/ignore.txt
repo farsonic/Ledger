@@ -107,6 +107,9 @@ font: %s: file %ld ticks, glyphs %ld ticks\n
 font: made %s at %ld/64 pixels: %ld high\n
 font: %s through diskfont is %ld wide, not %ld\n
 font: %s %u through diskfont.library\n
+shared drawers: %s %s %s\n
+# ---- the word list's file name (in the Dict drawer)
+british-english
 # ---- icon drawings with letters in them (theme.c)
 ci B abc cg L 5 12 8 15 L 8 15 14 8
 ci R 2 1 13 15 cr F 1 7 14 12 cw B PDF

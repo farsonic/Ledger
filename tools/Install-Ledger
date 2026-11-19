@@ -1,4 +1,4 @@
-; $VER: Install-Ledger 0.3 (29.10.2026)
+; $VER: Install-Ledger 0.3 (19.11.2026)
 ;
 ; Installer script for Ledger, the spreadsheet (Commodore's Installer 43 or later, or AROS's).
 ; Started from its icon (default tool Installer). It installs or updates Ledger in a drawer of your
@@ -8,6 +8,9 @@
 ;            the example workbooks (optional) and the source code (optional), all with their
 ;            icons; the Ledger drawer gets Ledger's own icon. The example workbooks' icons are set
 ;            to open in the Ledger just installed.
+;            Part of the Bureau suite: when Bureau: is assigned, Ledger goes into Bureau:Ledger
+;            by default, and the Fonts, TrueType and Dict drawers are left out when the suite's
+;            are there (FONTS:QuillSans.font, Bureau:TrueType, Bureau:Dict): Ledger finds them.
 ; Keeps:     your settings (Ledger.prefs, Ledger.recent) when updating.
 ; Needs:     a 68040 or better, MUI 3.8 or later (muimaster.library 19).
 ;
@@ -17,6 +20,11 @@
 
 (set @app-name "Ledger")
 (set #version "0.3")
+
+; the Bureau suite: its assign, and its shared fonts and dictionary
+(set #bureau (exists "Bureau:" (noreq)))
+(set #shared (if #bureau (and (exists "Bureau:TrueType" (noreq)) (exists "Bureau:Dict" (noreq))
+                              (exists "FONTS:QuillSans.font" (noreq))) 0))
 
 ; ------------------------------------------------------------------ install or remove
 
@@ -40,14 +48,17 @@
     (askdir
       (prompt "Which Ledger drawer should be removed?")
       (help "Choose the Ledger drawer itself: the one holding\n"
-            "the Ledger program and its Fonts drawer.")
-      (default (if (exists "Work:Ledger" (noreq)) "Work:Ledger" "SYS:"))))
-  ; only a drawer that really is Ledger's
-  (if (not (and (exists (tackon #old "Ledger")) (exists (tackon #old "Fonts/QuillSans.font"))))
+            "the Ledger program (and its Fonts drawer, unless\n"
+            "it was installed as part of Bureau).")
+      (default (if (exists "Bureau:Ledger/Ledger" (noreq)) "Bureau:Ledger"
+                 (if (exists "Work:Ledger" (noreq)) "Work:Ledger" "SYS:")))))
+  ; only a drawer that really is Ledger's (in Bureau: without a Fonts drawer)
+  (if (not (and (exists (tackon #old "Ledger"))
+                (or (exists (tackon #old "Fonts/QuillSans.font")) (exists (tackon #old "README.md")))))
     (abort (cat "\"" #old "\"\n"
                 "doesn't look like a Ledger drawer (there is no\n"
-                "Ledger program with a Fonts drawer in it),\n"
-                "so nothing was removed.")))
+                "Ledger program with its Fonts drawer or\n"
+                "README.md beside it), so nothing was removed.")))
   (if (askbool
         (prompt (cat "Delete the whole drawer\n\n" #old "\n\n"
                      "with everything in it, including your Ledger\n"
@@ -110,8 +121,11 @@
     (help "Choose the drawer or disk to put Ledger in, for\n"
           "example Work:. Ledger goes into a drawer of its own,\n"
           "Ledger, inside the one you choose. If an older Ledger\n"
-          "is there, it is updated and your settings are kept.")
-    (default (if (exists "Work:" (noreq)) "Work:" "SYS:"))
+          "is there, it is updated and your settings are kept.\n\n"
+          "With the Bureau suite installed (Bureau: assigned),\n"
+          "Bureau: is offered and the suite's shared fonts and\n"
+          "dictionary are used instead of copies of them.")
+    (default (if #bureau "Bureau:" (if (exists "Work:" (noreq)) "Work:" "SYS:")))
     (disk)))
 (set #dest (tackon #where "Ledger"))
 (set @default-dest #dest)
@@ -162,6 +176,9 @@
     (infos)
     (nogauge))
   (complete 10)
+  ; the suite's shared drawers are there: Ledger finds them, no copies needed
+  (if (not #shared)
+  (
   (copyfiles
     (prompt "Copying Ledger's screen fonts")
     (help @copyfiles-help)
@@ -185,6 +202,7 @@
       (source "Dict")
       (dest (tackon #dest "Dict"))
       (all)))
+  ))
   (complete 85)
 
   (if (in #parts 0)
@@ -223,6 +241,7 @@
   (cat "Ledger " #version " is "
        (if #same "ready in" (if #update "updated in" "installed in"))
        "\n\n" #dest "\n\n"
+       (if (and #shared (not #same)) "It uses Bureau's shared fonts and dictionary.\n\n" "")
        "Double-click the Ledger icon to start it, or a\n"
        "workbook whose icon has Ledger as its default\n"
        "tool. README.md tells you what it can do and\n"

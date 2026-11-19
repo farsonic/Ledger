@@ -1881,18 +1881,30 @@ static int home_has_fonts(BPTR dir)
   if (l) UnLock(l);
   return l != 0;
 }
-/* PROGDIR: made right if a shell started Ledger without it (it holds Fonts and TrueType) */
+/* the screen fonts installed by the Bureau suite (Bureau:Fonts or FONTS:), not beside Ledger
+   (requesters off: the caller's) */
+static int shared_fonts(void)
+{
+  BPTR l = Lock((STRPTR)"Bureau:Fonts/QuillSans.font", ACCESS_READ);
+  if (!l) l = Lock((STRPTR)"FONTS:QuillSans.font", ACCESS_READ);
+  if (l) UnLock(l);
+  return l != 0;
+}
+/* PROGDIR: made right if a shell started Ledger without it (it holds Fonts and TrueType, unless
+   Ledger is installed as part of Bureau and they are in Bureau: and FONTS:) */
 static void find_home(const char *argv0)
 {
   char name[256];
   const char *tries[2];
-  int i;
+  int i, shared;
   struct Process *me = (struct Process *)FindTask(NULL);
   APTR pw = me->pr_WindowPtr;
   BPTR l;
   me->pr_WindowPtr = (APTR)-1;
   l = GetProgramDir() ? Lock((STRPTR)"PROGDIR:Fonts/QuillSans.font", ACCESS_READ) : 0;
   if (l) { UnLock(l); me->pr_WindowPtr = pw; return; }
+  shared = shared_fonts();
+  if (GetProgramDir() && shared) { me->pr_WindowPtr = pw; return; }
   tries[0] = argv0;
   tries[1] = GetProgramName((STRPTR)name, sizeof name) ? name : NULL;
   for (i = 0; i < 2 && !home_lock; i++) {
@@ -1900,7 +1912,7 @@ static void find_home(const char *argv0)
     if (!tries[i] || !tries[i][0] || !(f = Lock((STRPTR)tries[i], ACCESS_READ))) continue;
     d = ParentDir(f);
     UnLock(f);
-    if (d && home_has_fonts(d)) home_lock = d; else if (d) UnLock(d);
+    if (d && (shared || home_has_fonts(d))) home_lock = d; else if (d) UnLock(d);
   }
   if (!home_lock) { BPTR d = Lock((STRPTR)"", ACCESS_READ); if (d && home_has_fonts(d)) home_lock = d; else if (d) UnLock(d); }
   if (home_lock) home_old = SetProgramDir(home_lock);
@@ -1913,14 +1925,16 @@ static void free_home(void)
   UnLock(home_lock);
   home_lock = 0;
 }
-/* Ledger's Fonts drawer added to FONTS: while it runs (diskfont.library finds its fonts there) */
+/* Ledger's Fonts drawer (beside it or Bureau:Fonts) added to FONTS: while it runs (diskfont.library
+   finds its fonts there); nothing to add when they are in FONTS: itself */
 static void add_fonts(void)
 {
-  BPTR l = Lock((STRPTR)"PROGDIR:Fonts", ACCESS_READ), sys;
+  BPTR l, sys;
   struct Process *me = (struct Process *)FindTask(NULL);
   APTR pw = me->pr_WindowPtr;
-  if (!l) return;
+  if (!strcmp(res_fonts_dir, "FONTS:")) return;
   me->pr_WindowPtr = (APTR)-1;
+  if (!(l = Lock((STRPTR)res_fonts_dir, ACCESS_READ))) { me->pr_WindowPtr = pw; return; }
   if ((sys = Lock((STRPTR)"FONTS:", ACCESS_READ))) {
     LONG same = SameLock(l, sys);
     UnLock(sys);
@@ -1933,7 +1947,7 @@ static void remove_fonts(void)
 {
   BPTR l;
   if (!fonts_assigned) return;
-  if ((l = Lock((STRPTR)"PROGDIR:Fonts", ACCESS_READ))) { RemAssignList((STRPTR)"FONTS", l); UnLock(l); }
+  if ((l = Lock((STRPTR)res_fonts_dir, ACCESS_READ))) { RemAssignList((STRPTR)"FONTS", l); UnLock(l); }
   fonts_assigned = 0;
 }
 /* the keyboard back to the grid after a command, except those that left a window or field wanting it */
@@ -1961,6 +1975,7 @@ int main(int argc, char **argv)
     if (NameFromLock(wa->wa_Lock, (STRPTR)start, sizeof start)) AddPart((STRPTR)start, wa->wa_Name, sizeof start);
   }
   if (argc == 0 && _WBenchMsg) wb_tooltypes(arg_screen, sizeof arg_screen);
+  theme_find_shared();                  /* (after DEBUG=, which logs where they are) */
   load_prefs();
   if (arg_screen[0]) strcpy(pub_screen, arg_screen);
   if (pub_screen[0]) {
@@ -1976,7 +1991,7 @@ int main(int argc, char **argv)
   DiskfontBase = OpenLibrary((STRPTR)"diskfont.library", 39);
   add_fonts();
   splash_step(6, tr("Reading the TrueType fonts"));
-  if (!fonts_init(&fonts, "PROGDIR:TrueType")) printf("Ledger: no fonts in PROGDIR:TrueType (fonts.list).\n");
+  if (!fonts_init(&fonts, res_truetype_dir)) printf("Ledger: no fonts in %s (fonts.list).\n", res_truetype_dir);
   splash_step(10, tr("Looking for installed fonts"));
   sysfonts_scan(&fonts, scan_step);
   splash_step(45, tr("Preparing"));
@@ -2003,7 +2018,7 @@ int main(int argc, char **argv)
   splash_close();
   if (!theme_fonts_ok()) {
     static char fmsg[640];
-    snprintf(fmsg, sizeof fmsg, "%s\n\n%s", tr("Ledger couldn't open its own screen fonts, so text is drawn in the\nsystem font and won't look as it should.\n\nKeep the Fonts drawer next to Ledger."), theme_fonts_why());
+    snprintf(fmsg, sizeof fmsg, "%s\n\n%s", tr("Ledger couldn't open its own screen fonts, so text is drawn in the\nsystem font and won't look as it should.\n\nKeep the Fonts drawer next to Ledger, or install\nLedger as part of Bureau."), theme_fonts_why());
     ask("OK", "%s", fmsg);
   }
   if (missing_screen[0]) {

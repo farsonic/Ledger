@@ -17,6 +17,7 @@
 #include "theme.h"
 #include "../core/fonts.h"
 #include "../core/ttraster.h"
+#include "../core/respath.h"
 #include "lang.h"
 #include "chartids.h"
 #include "pivot2.h"
@@ -93,6 +94,29 @@ static struct TextFont *tf_bold, *tf_big, *tf_small;
 struct OwnFont { struct TextFont *tf; UBYTE *mem; char name[24]; UWORD ysize, users; };
 struct Family { char name[24]; int n; UWORD ys[MAXSIZES]; char file[MAXSIZES][28]; int aa; char aaname[240]; };   /* aa: AAText .otag written (1), couldn't be (-1); its fonts' name then */
 static struct OwnFont own[MAXOWN];
+/* the shared drawers (theme.h): beside the program, in Bureau: or (screen fonts) FONTS: */
+const char *res_fonts_dir = "PROGDIR:Fonts", *res_truetype_dir = "PROGDIR:TrueType", *res_dict_dir = "PROGDIR:Dict";
+/* a drawer is there: Lock() with requesters off, so a missing Bureau: never asks for its volume */
+static int res_there(const char *dir, void *ud)
+{
+  struct Process *me = (struct Process *)FindTask(NULL);
+  APTR pw = me->pr_WindowPtr;
+  BPTR l;
+  (void)ud;
+  me->pr_WindowPtr = (APTR)-1;
+  l = Lock((STRPTR)dir, ACCESS_READ);
+  me->pr_WindowPtr = pw;
+  if (l) UnLock(l);
+  return l != 0;
+}
+void theme_find_shared(void)
+{
+  const char *d;
+  res_fonts_dir = res_pick(RES_FONTS, res_there, NULL);
+  if ((d = res_pick(RES_TRUETYPE, res_there, NULL))) res_truetype_dir = d;
+  if ((d = res_pick(RES_DICT, res_there, NULL))) res_dict_dir = d;
+  FTRACE("shared drawers: %s %s %s\n", res_fonts_dir, res_truetype_dir, res_dict_dir);
+}
 static char font_why[120];              /* why the last font couldn't be loaded (for the warning) */
 const char *theme_fonts_why(void) { return font_why; }
 /* the reason a font couldn't be loaded, kept for theme_fonts_why (the warning at start) and
@@ -262,7 +286,7 @@ static int aa_otag(const char *fam)
   BPTR l;
   for (i = 0; i < sizeof aa_ttf / sizeof aa_ttf[0] && strcmp(aa_ttf[i][0], fam); i++) ;
   if (i == sizeof aa_ttf / sizeof aa_ttf[0]) return 0;
-  snprintf(path, sizeof path, "PROGDIR:TrueType/%s", aa_ttf[i][1]);
+  if (!res_join(path, sizeof path, res_truetype_dir, aa_ttf[i][1])) return 0;
   if (!(l = Lock((STRPTR)path, ACCESS_READ))) return 0;
   n = NameFromLock(l, (STRPTR)ttf, sizeof ttf);
   UnLock(l);
@@ -271,7 +295,7 @@ static int aa_otag(const char *fam)
 static int nown;
 static struct Family fams[MAXFAM];
 static int nfams;
-/* one of Quill's families in PROGDIR:Fonts: its sizes and their files, read from its .font (a
+/* one of Quill's families in the Fonts drawer (res_fonts_dir): its sizes and their files, read from its .font (a
    FontContentsHeader and an entry a size) once and remembered, a failure too: NULL again then */
 static struct Family *family(const char *name)
 {
@@ -286,7 +310,7 @@ static struct Family *family(const char *name)
   f = &fams[nfams++];
   memset(f, 0, sizeof *f);
   strcpy(f->name, name);
-  snprintf(path, sizeof path, "PROGDIR:Fonts/%s", name);
+  if (!res_join(path, sizeof path, res_fonts_dir, name)) { nfams--; return NULL; }
   if (!(fh = Open((STRPTR)path, MODE_OLDFILE))) { why("can't open", path); return NULL; }
   if (Read(fh, &h, sizeof h) == sizeof h && h.fch_FileID == FCH_ID)
     for (i = 0; i < h.fch_NumEntries && f->n < MAXSIZES; i++) {
@@ -320,7 +344,7 @@ static struct TextFont *load_own(const char *name, UWORD ysize, int exact)
   if (best < 0 || (exact && f->ys[best] != ysize)) return NULL;
   for (i = 0; i < nown; i++) if (own[i].ysize == f->ys[best] && !strcmp(own[i].name, name)) { own[i].users++; return own[i].tf; }
   if (nown >= MAXOWN) return NULL;
-  snprintf(path, sizeof path, "PROGDIR:Fonts/%s", f->file[best]);
+  if (!res_join(path, sizeof path, res_fonts_dir, f->file[best])) return NULL;
   if (!(mem = load_hunks(path))) return NULL;
   dfh = (struct DiskFontHeader *)(mem + 4);         /* after MOVEQ #-1,D0; RTS */
   if (dfh->dfh_FileID != DFH_ID || dfh->dfh_TF.tf_YSize == 0) { SetIoErr(0); why("not a font:", path); FreeVec(mem); return NULL; }
@@ -669,9 +693,8 @@ struct TextFont *theme_open_font(const char *name, UWORD ysize)
   if (DiskfontBase) {
 #endif
     FTRACE("font: %s %u through diskfont.library\n", name, (unsigned)ysize);
-    snprintf(path, sizeof path, "PROGDIR:Fonts/%s", name);
-    ta.ta_Name = (STRPTR)path; ta.ta_YSize = ysize; ta.ta_Style = 0; ta.ta_Flags = 0;
-    if ((tf = OpenDiskFont(&ta))) return tf;
+    ta.ta_YSize = ysize; ta.ta_Style = 0; ta.ta_Flags = 0;
+    if (res_join(path, sizeof path, res_fonts_dir, name)) { ta.ta_Name = (STRPTR)path; if ((tf = OpenDiskFont(&ta))) return tf; }
     ta.ta_Name = (STRPTR)name;
     if ((tf = OpenDiskFont(&ta))) return tf;
   }
